@@ -1,0 +1,53 @@
+# Environment variables and secrets
+.env
+.env.*
+*.env
+
+# OAuth tokens and credentials  
+credentials.json
+fresh_token.pickle
+token.pickle
+
+# LangGraph checkpoints and data
+.langgraph_api/
+*.pckl
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Git submodules (we'll include the code directly)
+agent-chat-ui/.git/
+agent-inbox/.git/
+src/supervisor-py/.git/

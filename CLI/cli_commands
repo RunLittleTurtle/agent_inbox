@@ -1,0 +1,38 @@
+# Install new dependencies first
+pip install -r requirements.txt
+
+# Check service status
+python cli.py status
+
+# 🚀 START EVERYTHING (One Command!)
+python cli.py start                   # Starts both LangGraph server + Agent Inbox UI (use for agent inbox : http://localhost:2024)
+
+python cli.py start --langgraph-port 2025 --inbox-port 3001  # Custom other ports
+
+# Launch individual services
+python cli.py langgraph               # Launch LangGraph dev server only
+python cli.py inbox                   # Launch Agent Inbox UI only
+
+# Create and test email workflow
+python cli.py email
+
+# Get help for any command
+python cli.py --help
+python cli.py email --help
+
+# Setup Gmail OAuth authentication (REQUIRED FIRST TIME)
+python cli.py setup-oauth               # Setup Google OAuth for Gmail access
+
+# Fetch latest Gmail emails and trigger workflow
+python cli.py gmail                     # Fetch 1 latest email and send to workflow
+python cli.py gmail --count 5           # Fetch 5 latest emails
+python cli.py gmail --no-process        # Fetch without triggering workflow
+python cli.py gmail --no-body           # Fetch without showing body
+
+
+# venv
+source .venv/bin/activate
+
+git add .
+git commit -m "comment"
+git push origin main

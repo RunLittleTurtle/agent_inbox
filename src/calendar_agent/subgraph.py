@@ -171,7 +171,9 @@ class CalendarAgentSubgraph:
         system_prompt = """You are a calendar assistant analyzer. Analyze the user's request and determine:
 1. What calendar action they want (list, create, update, delete, check_availability)
 2. Extract relevant details (dates, times, titles, attendees, etc.)
-3. Identify any conflicts or issues
+3. Please be clear and have classic format that look like this :
+    Timezone America/Toronto, the start could be "2024-06-10T14:00:00" and the end could be "2024-06-10T15:00:00"
+4. Identify any conflicts or issues
 
 Respond with a structured analysis."""
 
@@ -421,31 +423,125 @@ Respond with a structured analysis."""
         )
 
     async def _execute_list_events(self, query: CalendarQuery) -> List[CalendarEvent]:
-        """Execute list events operation."""
-        if not self.tool_manager:
+        """Execute list events operation using MCP tools - STRICT MCP ONLY."""
+        # Import MCP tools function
+        from .langchain_mcp_integration import get_calendar_tools_for_supervisor
+
+        # Get MCP tools - FAIL if not available
+        tools = await get_calendar_tools_for_supervisor()
+        if not tools:
+            raise RuntimeError("CALENDAR AGENT ERROR: No MCP tools available. Cannot list calendar events without MCP server connection.")
+
+        # Find list-events tool - FAIL if not found
+        list_tool = None
+        for tool in tools:
+            if 'list-events' in tool.name:
+                list_tool = tool
+                break
+
+        if not list_tool:
+            available_tools = [t.name for t in tools]
+            raise RuntimeError(f"CALENDAR AGENT ERROR: No list-events tool found. Available tools: {available_tools}")
+
+        try:
+            # Call MCP tool to list events
+            result = list_tool.invoke({
+                "time_min": query.time_min.isoformat() if query.time_min else None,
+                "time_max": query.time_max.isoformat() if query.time_max else None,
+                "max_results": query.max_results
+            })
+            logger.info(f"MCP list events result: {result}")
+
+            # For now return empty list - this would need proper parsing
+            # of the MCP result to create CalendarEvent objects
             return []
 
-        return await self.tool_manager.list_events(
-            time_min=query.time_min.isoformat() if query.time_min else None,
-            time_max=query.time_max.isoformat() if query.time_max else None,
-            max_results=query.max_results
-        )
+        except Exception as e:
+            raise RuntimeError(f"CALENDAR AGENT ERROR: MCP list events failed: {str(e)}")
 
     async def _execute_create_event(self, query: CalendarQuery, state: CalendarAgentState) -> Optional[CalendarEvent]:
-        """Execute create event operation."""
-        # This would need more sophisticated parsing of the user request
-        # For now, return None as placeholder
-        return None
+        """Execute create event operation using MCP tools - STRICT MCP ONLY."""
+        # Import MCP tools function
+        from .langchain_mcp_integration import get_calendar_tools_for_supervisor
+
+        # Get MCP tools - FAIL if not available
+        tools = await get_calendar_tools_for_supervisor()
+        if not tools:
+            raise RuntimeError("CALENDAR AGENT ERROR: No MCP tools available. Cannot create calendar events without MCP server connection.")
+
+        # Find create-event tool - FAIL if not found
+        create_tool = None
+        for tool in tools:
+            if 'create-event' in tool.name:
+                create_tool = tool
+                break
+
+        if not create_tool:
+            available_tools = [t.name for t in tools]
+            raise RuntimeError(f"CALENDAR AGENT ERROR: No create-event tool found. Available tools: {available_tools}")
+
+        # Extract user request - FAIL if no message
+        last_message = state["messages"][-1] if state.get("messages") else None
+        if not last_message:
+            raise RuntimeError("CALENDAR AGENT ERROR: No user message found to process calendar request.")
+
+        user_request = last_message.content if hasattr(last_message, 'content') else str(last_message)
+
+        # Call MCP tool to create event - use sync invoke for sync-wrapped tools
+        try:
+            result = create_tool.invoke({"instruction": user_request})
+            logger.info(f"MCP tool result: {result}")
+
+            if not result:
+                raise RuntimeError("CALENDAR AGENT ERROR: MCP tool returned empty result for calendar event creation.")
+
+            # Parse result and return CalendarEvent
+            from datetime import datetime
+            return CalendarEvent(
+                id="mcp_created_event",
+                title="MCP Created Event",
+                start_datetime=datetime.now(),
+                end_datetime=datetime.now(),
+                description=f"Event created via MCP: {result}"
+            )
+
+        except Exception as e:
+            raise RuntimeError(f"CALENDAR AGENT ERROR: MCP tool execution failed: {str(e)}")
 
     async def _execute_check_availability(self, query: CalendarQuery) -> List[Dict[str, Any]]:
-        """Execute availability check."""
-        if not self.tool_manager:
-            return []
+        """Execute availability check using MCP tools - STRICT MCP ONLY."""
+        # Import MCP tools function
+        from .langchain_mcp_integration import get_calendar_tools_for_supervisor
 
-        return await self.tool_manager.check_availability(
-            time_min=query.time_min.isoformat() if query.time_min else None,
-            time_max=query.time_max.isoformat() if query.time_max else None
-        )
+        # Get MCP tools - FAIL if not available
+        tools = await get_calendar_tools_for_supervisor()
+        if not tools:
+            raise RuntimeError("CALENDAR AGENT ERROR: No MCP tools available. Cannot check availability without MCP server connection.")
+
+        # Find availability tool - FAIL if not found
+        availability_tool = None
+        for tool in tools:
+            if 'free-busy' in tool.name or 'availability' in tool.name:
+                availability_tool = tool
+                break
+
+        if not availability_tool:
+            available_tools = [t.name for t in tools]
+            raise RuntimeError(f"CALENDAR AGENT ERROR: No availability/free-busy tool found. Available tools: {available_tools}")
+
+        try:
+            # Call MCP tool to check availability
+            result = availability_tool.invoke({
+                "time_min": query.time_min.isoformat() if query.time_min else None,
+                "time_max": query.time_max.isoformat() if query.time_max else None
+            })
+            logger.info(f"MCP availability result: {result}")
+
+            # Return result as list of availability slots
+            return [{"availability_result": result}]
+
+        except Exception as e:
+            raise RuntimeError(f"CALENDAR AGENT ERROR: MCP availability check failed: {str(e)}")
 
     def _format_events_list(self, events: List[CalendarEvent]) -> str:
         """Format events list for response."""

@@ -32,8 +32,12 @@ from langgraph_supervisor import create_supervisor
 
 # Calendar agent imports (with fallback)
 try:
-    from .calendar_agent import create_calendar_agent_with_mcp
-except ImportError:
+    from src.calendar_agent import create_calendar_agent_with_mcp
+    print("✅ DEBUG: Successfully imported create_calendar_agent_with_mcp")
+except ImportError as e:
+    print(f"❌ DEBUG: Import failed: {e}")
+    import traceback
+    print(f"❌ DEBUG: Full traceback: {traceback.format_exc()}")
     create_calendar_agent_with_mcp = None
 
 
@@ -204,7 +208,7 @@ def create_email_graph():
 
 
 # Create supervisor with specialized agents (when they exist)
-def create_supervisor_graph():
+async def create_supervisor_graph():
     """Create supervisor architecture with specialized agents for any type of request"""
 
     # Initialize model with LangSmith tracing
@@ -224,51 +228,73 @@ def create_supervisor_graph():
     else:
         print("⚠️  LangSmith tracing not configured")
 
-    # Create calendar agent using existing calendar module
+    # Create calendar agent with MCP tools
+    calendar_tools = []
+    
+    # DEBUG: Check environment variables
+    pipedream_url = os.getenv("PIPEDREAM_MCP_SERVER")
+    print(f"🔍 DEBUG: PIPEDREAM_MCP_SERVER = {pipedream_url}")
+    print(f"🔍 DEBUG: create_calendar_agent_with_mcp = {create_calendar_agent_with_mcp}")
+    
     if create_calendar_agent_with_mcp:
         try:
-            calendar_agent = create_calendar_agent_with_mcp(
-                model=model,
-                name="calendar_agent"
-            )
-            print("✅ Calendar agent loaded with MCP integration")
+            # Import the function to get calendar tools
+            print("🔍 DEBUG: Importing get_calendar_tools_for_supervisor...")
+            from src.calendar_agent.langchain_mcp_integration import get_calendar_tools_for_supervisor
+            print("🔍 DEBUG: Calling get_calendar_tools_for_supervisor...")
+            calendar_tools = await get_calendar_tools_for_supervisor()
+            print(f"✅ Loaded {len(calendar_tools)} calendar MCP tools")
         except Exception as e:
-            print(f"⚠️ Calendar agent fallback: {e}")
-            # Fallback to basic agent if calendar fails
-            calendar_agent = create_react_agent(
-                model=model,
-                tools=[],
-            )
-            calendar_agent.name = "calendar_agent"
-    else:
-        print("⚠️ Calendar agent module not available, using basic agent")
-        calendar_agent = create_react_agent(
-            model=model,
-            tools=[],
-        )
-        calendar_agent.name = "calendar_agent"
+            print(f"❌ Calendar MCP tools ERROR: {e}")
+            import traceback
+            print(f"❌ Full traceback: {traceback.format_exc()}")
+            calendar_tools = []
+    
+    # Create calendar agent with tools (either MCP tools or empty)
+    calendar_agent = create_react_agent(
+        model=model,
+        tools=calendar_tools,  
+        name="calendar_agent"
+    )
+    
+    # Debug: Print calendar agent tools
+    print(f"🔧 Calendar agent created with {len(calendar_tools)} tools:")
+    for tool in calendar_tools:
+        print(f"   📋 {tool.name}")
+    
+    # Verify the agent has tools by checking its graph
+    if hasattr(calendar_agent, 'get_graph') and hasattr(calendar_agent, 'nodes'):
+        nodes = list(calendar_agent.get_graph().nodes.keys())
+        print(f"🏗️  Calendar agent graph nodes: {nodes}")
+        has_tools_node = 'tools' in nodes
+        print(f"🔍 Calendar agent has tools node: {has_tools_node}")
 
     # Create email agent for communication tasks
     email_agent = create_react_agent(
         model=model,
         tools=[],  # Add email tools here
+        name="email_agent"
     )
-    email_agent.name = "email_agent"
 
     # Create supervisor with multiple agents for ANY type of request
     supervisor = create_supervisor(
         agents=[calendar_agent, email_agent],
         model=model,
+        tools=calendar_tools,  # Pass MCP tools to supervisor directly
         prompt="""You are a multi-agent supervisor handling requests from various sources: chatbot users, email processing, and API calls.
 
+Available tools:
+- Google Calendar MCP tools: Use these for direct calendar operations (create events, list events, check availability)
+
 Available agents:
-- calendar_agent: Handles calendar operations (Google Calendar via MCP), scheduling, meetings, availability checks
+- calendar_agent: Handles complex calendar operations and analysis
 - email_agent: Handles email processing, communication tasks, and message drafting
 
 Routing guidelines:
-- Calendar/scheduling requests → calendar_agent  
+- For simple calendar operations: USE CALENDAR TOOLS DIRECTLY
+- For complex calendar tasks or analysis → calendar_agent  
 - Email/communication requests → email_agent
-- Mixed requests: delegate to the most relevant agent first
+- Mixed requests: handle directly with tools or delegate as needed
 - General questions: respond directly with helpful information
 
 IMPORTANT: Accept requests in any format - treat all inputs as natural language requests regardless of source.""",
@@ -282,12 +308,20 @@ IMPORTANT: Accept requests in any format - treat all inputs as natural language 
 
 
 # Export the main graph using supervisor
-try:
-    # Use supervisor that handles any type of request
-    graph = create_supervisor_graph()
-    print("✅ Using supervisor with langgraph-supervisor library")
-except Exception as e:
-    print(f"⚠️ Supervisor creation failed: {e}")
-    # Only fallback if supervisor truly fails
-    graph = create_email_graph()
-    graph.name = "email_agent"
+async def make_graph():
+    """Factory function for LangGraph server"""
+    try:
+        # Use supervisor that handles any type of request
+        graph = await create_supervisor_graph()
+        print("✅ Using supervisor with langgraph-supervisor library")
+        return graph
+    except Exception as e:
+        print(f"⚠️ Supervisor creation failed: {e}")
+        # Only fallback if supervisor truly fails
+        graph = create_email_graph()
+        graph.name = "email_agent"
+        return graph
+
+# For backwards compatibility and testing
+import asyncio
+graph = asyncio.run(make_graph())

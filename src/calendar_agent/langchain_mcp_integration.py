@@ -293,27 +293,86 @@ async def create_calendar_agent_with_mcp(
 async def get_calendar_tools_for_supervisor() -> List[BaseTool]:
     """
     Get calendar tools for supervisor integration.
-    Returns properly configured LangChain tools from MCP server.
+    Returns properly configured LangChain tools from Pipedream MCP server.
     """
     try:
+        # Use Pipedream MCP server URL from environment
+        pipedream_url = os.getenv("PIPEDREAM_MCP_SERVER")
+        if not pipedream_url:
+            print("⚠️ PIPEDREAM_MCP_SERVER environment variable not set")
+            return []
+
         mcp_servers = {
-            "calendar": {
-                "command": "npx",
-                "args": [
-                    "-y",
-                    "@modelcontextprotocol/server-google-workspace",
-                    "calendar"
-                ],
-                "transport": "stdio",
+            "pipedream_calendar": {
+                "url": pipedream_url,
+                "transport": "streamable_http"
             }
         }
 
+        print(f"🔗 Connecting to Pipedream MCP server: {pipedream_url}")
+        
         client = MultiServerMCPClient(mcp_servers)
-        tools = await client.get_tools()
+        
+        # Add timeout to prevent hanging
+        tools = await asyncio.wait_for(
+            client.get_tools(),
+            timeout=30.0
+        )
 
         print(f"✅ Retrieved {len(tools)} calendar tools for supervisor")
-        return tools
+        for tool in tools:
+            print(f"   📊 {tool.name}: {tool.description[:100]}...")
+        
+        # CRITICAL FIX: Create truly synchronous tools from async MCP tools
+        from langchain_core.tools import StructuredTool
+        import asyncio as async_module
+        import concurrent.futures
+        
+        sync_tools = []
+        for async_tool in tools:
+            # Create a truly synchronous tool function
+            def make_sync_tool(atool):
+                def sync_func(**kwargs) -> str:
+                    """Synchronous function that runs async MCP tool"""
+                    try:
+                        # Run the async tool in a new event loop if needed
+                        loop = None
+                        try:
+                            loop = async_module.get_running_loop()
+                        except RuntimeError:
+                            pass
+                        
+                        if loop is None:
+                            # No running loop, create new one
+                            result = async_module.run(atool.ainvoke(kwargs))
+                        else:
+                            # Create a new thread to run the async tool
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                future = executor.submit(async_module.run, atool.ainvoke(kwargs))
+                                result = future.result(timeout=30)
+                        
+                        return str(result)
+                    except Exception as e:
+                        return f"Error executing {atool.name}: {str(e)}"
+                
+                # Create StructuredTool with sync func, NOT coroutine
+                sync_tool = StructuredTool(
+                    name=atool.name,
+                    description=atool.description,
+                    args_schema=atool.args_schema,
+                    func=sync_func,  # Use func, NOT coroutine
+                    return_direct=False
+                )
+                return sync_tool
+            
+            sync_tools.append(make_sync_tool(async_tool))
+        
+        print(f"✅ Created {len(sync_tools)} truly sync calendar tools")
+        return sync_tools
 
+    except asyncio.TimeoutError:
+        print("⚠️ Calendar tools loading timed out (30s)")
+        return []
     except Exception as e:
         print(f"⚠️ Failed to load calendar tools: {e}")
         return []

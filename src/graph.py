@@ -194,7 +194,7 @@ def create_email_graph():
 
 # Create supervisor with specialized agents (when they exist)
 def create_supervisor_graph():
-    """Create supervisor architecture with specialized agents"""
+    """Create supervisor architecture with specialized agents for any type of request"""
 
     # Initialize model with LangSmith tracing
     model = ChatOpenAI(
@@ -213,18 +213,36 @@ def create_supervisor_graph():
     else:
         print("⚠️  LangSmith tracing not configured")
 
-    # For now, create a simple agent until we add specialized ones
-    simple_agent = create_react_agent(
+    # Create calendar agent for scheduling tasks
+    calendar_agent = create_react_agent(
         model=model,
-        tools=[],  # Add tools here when ready
-        name="email_agent",
-        prompt="You are an email processing assistant."
+        tools=[],  # Add calendar MCP tools here
     )
+    calendar_agent.name = "calendar_agent"
 
-    # Create supervisor
-    supervisor = create_supervisor(
-        agents=[simple_agent],
+    # Create email agent for communication tasks  
+    email_agent = create_react_agent(
         model=model,
+        tools=[],  # Add email tools here
+    )
+    email_agent.name = "email_agent"
+
+    # Create supervisor with multiple agents
+    supervisor = create_supervisor(
+        agents=[calendar_agent, email_agent],
+        model=model,
+        prompt="""You are a supervisor coordinating specialized agents to handle any type of request.
+
+Available agents:
+- calendar_agent: Handles calendar, scheduling, meetings, and time-related tasks
+- email_agent: Handles email, messaging, and communication tasks
+
+Route requests to the most appropriate agent based on the content:
+- For calendar/scheduling: use calendar_agent
+- For email/communication: use email_agent  
+- For general questions: respond directly
+
+Handle requests from any source (chatbot, email, API) - don't assume the input format.""",
         supervisor_name="supervisor",
         output_mode="last_message",
         add_handoff_messages=True
@@ -234,13 +252,13 @@ def create_supervisor_graph():
     return supervisor.compile(name="supervisor")
 
 
-# Export the main graph
+# Export the main graph using supervisor
 try:
-    # Try to create supervisor first, fall back to simple graph
+    # Use supervisor that handles any type of request
     graph = create_supervisor_graph()
+    print("✅ Using supervisor with langgraph-supervisor library")
 except Exception as e:
-    print(f"Note: Using simple graph instead of supervisor: {e}")
+    print(f"⚠️ Supervisor creation failed: {e}")
+    # Only fallback if supervisor truly fails
     graph = create_email_graph()
-
-# Configure for Agent Inbox
-graph.name = "email_agent"
+    graph.name = "email_agent"

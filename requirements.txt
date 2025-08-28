@@ -21,6 +21,7 @@ redis>=5.2.0
 
 # MCP (Model Context Protocol)
 mcp>=1.0.0
+mcp>=0.1.0
 
 # Google APIs & OAuth
 google-auth>=2.35.0

@@ -1,10 +1,9 @@
 """
-Calendar Agent Package
-Modern LangGraph calendar agent with MCP integration.
+Calendar Agent Module
+Modern LangGraph calendar agent with official langchain-mcp-adapters integration.
 """
 from .state import CalendarAgentState, CalendarEvent, CalendarQuery, CalendarAnalysis, AgentOutput
-from .mcp_client import CalendarMCPClient, CalendarToolManager, create_calendar_mcp_client
-from .subgraph import CalendarAgentSubgraph, create_calendar_agent_subgraph
+from .langchain_mcp_integration import CalendarAgentWithMCP, create_calendar_agent_with_mcp
 
 __all__ = [
     "CalendarAgentState",
@@ -12,9 +11,6 @@ __all__ = [
     "CalendarQuery",
     "CalendarAnalysis",
     "AgentOutput",
-    "CalendarMCPClient",
-    "CalendarToolManager", 
-    "create_calendar_mcp_client",
-    "CalendarAgentSubgraph",
-    "create_calendar_agent_subgraph"
+    "CalendarAgentWithMCP",
+    "create_calendar_agent_with_mcp"
 ]

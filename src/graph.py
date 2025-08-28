@@ -5,25 +5,36 @@ Connected to LangSmith for observability and tracing.
 """
 
 import os
+import sys
 from dotenv import load_dotenv
+from typing import Dict, Any, Optional, List, Annotated
+from pydantic import BaseModel, Field
+from datetime import datetime
 
 # Load environment variables for LangSmith integration
 load_dotenv()
-from typing import Annotated, List, Dict, Any, Optional
-from datetime import datetime
-from pydantic import BaseModel, Field
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.checkpoint.memory import MemorySaver
+# Add local libraries to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph_supervisor-py'))
+
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'supervisor-py'))
-from langgraph_supervisor.supervisor import create_supervisor
+# Local LangGraph imports
+from langgraph.graph import StateGraph, MessagesState, START, END
+from langgraph.graph.message import add_messages
 from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
+
+# Local supervisor imports
+from langgraph_supervisor import create_supervisor
+
+# Calendar agent imports (with fallback)
+try:
+    from .calendar_agent import create_calendar_agent_with_mcp
+except ImportError:
+    create_calendar_agent_with_mcp = None
 
 
 class EmailMessage(BaseModel):
@@ -51,7 +62,7 @@ class AgentOutput(BaseModel):
 
 
 class AgentState(BaseModel):
-    """Modern LangGraph state with reducers and structured data"""
+    """Modern LangGraph state with reducers and structured data using Pydantic"""
     # Core email data
     email: Optional[EmailMessage] = None
 
@@ -213,36 +224,54 @@ def create_supervisor_graph():
     else:
         print("⚠️  LangSmith tracing not configured")
 
-    # Create calendar agent for scheduling tasks
-    calendar_agent = create_react_agent(
-        model=model,
-        tools=[],  # Add calendar MCP tools here
-    )
-    calendar_agent.name = "calendar_agent"
+    # Create calendar agent using existing calendar module
+    if create_calendar_agent_with_mcp:
+        try:
+            calendar_agent = create_calendar_agent_with_mcp(
+                model=model,
+                name="calendar_agent"
+            )
+            print("✅ Calendar agent loaded with MCP integration")
+        except Exception as e:
+            print(f"⚠️ Calendar agent fallback: {e}")
+            # Fallback to basic agent if calendar fails
+            calendar_agent = create_react_agent(
+                model=model,
+                tools=[],
+            )
+            calendar_agent.name = "calendar_agent"
+    else:
+        print("⚠️ Calendar agent module not available, using basic agent")
+        calendar_agent = create_react_agent(
+            model=model,
+            tools=[],
+        )
+        calendar_agent.name = "calendar_agent"
 
-    # Create email agent for communication tasks  
+    # Create email agent for communication tasks
     email_agent = create_react_agent(
         model=model,
         tools=[],  # Add email tools here
     )
     email_agent.name = "email_agent"
 
-    # Create supervisor with multiple agents
+    # Create supervisor with multiple agents for ANY type of request
     supervisor = create_supervisor(
         agents=[calendar_agent, email_agent],
         model=model,
-        prompt="""You are a supervisor coordinating specialized agents to handle any type of request.
+        prompt="""You are a multi-agent supervisor handling requests from various sources: chatbot users, email processing, and API calls.
 
 Available agents:
-- calendar_agent: Handles calendar, scheduling, meetings, and time-related tasks
-- email_agent: Handles email, messaging, and communication tasks
+- calendar_agent: Handles calendar operations (Google Calendar via MCP), scheduling, meetings, availability checks
+- email_agent: Handles email processing, communication tasks, and message drafting
 
-Route requests to the most appropriate agent based on the content:
-- For calendar/scheduling: use calendar_agent
-- For email/communication: use email_agent  
-- For general questions: respond directly
+Routing guidelines:
+- Calendar/scheduling requests → calendar_agent  
+- Email/communication requests → email_agent
+- Mixed requests: delegate to the most relevant agent first
+- General questions: respond directly with helpful information
 
-Handle requests from any source (chatbot, email, API) - don't assume the input format.""",
+IMPORTANT: Accept requests in any format - treat all inputs as natural language requests regardless of source.""",
         supervisor_name="supervisor",
         output_mode="last_message",
         add_handoff_messages=True

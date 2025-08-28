@@ -19,9 +19,9 @@ pydantic-settings>=2.6.0
 aiosqlite>=0.20.0
 redis>=5.2.0
 
-# MCP (Model Context Protocol)
-mcp>=1.0.0
-mcp>=0.1.0
+# MCP (Model Context Protocol) with LangChain adapters
+mcp>=1.9.2
+langchain-mcp-adapters>=0.1.9
 
 # Google APIs & OAuth
 google-auth>=2.35.0

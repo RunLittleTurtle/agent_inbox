@@ -27,6 +27,7 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.config import get_stream_writer
 
 # Local supervisor imports
 from langgraph_supervisor import create_supervisor
@@ -111,17 +112,43 @@ def update_dynamic_context(state: AgentState, context_updates: Dict[str, Any]) -
     return state.model_copy(update={"dynamic_context": current_context})
 
 
-# Simple email processing node
+# Simple email processing node with streaming
 def process_email_node(state: AgentState) -> AgentState:
-    """Process incoming email and extract basic information"""
+    """Process incoming email and extract basic information with real-time streaming"""
 
+    # Get stream writer for custom events
+    writer = get_stream_writer()
+    
     if not state.email:
+        writer({
+            "event": "error",
+            "node": "process_email",
+            "data": {"message": "No email provided", "timestamp": datetime.now().isoformat()}
+        })
         return state.model_copy(update={
             "status": "error",
             "error_messages": ["No email provided"]
         })
 
+    # Stream start of processing
+    writer({
+        "event": "node_start",
+        "node": "process_email",
+        "data": {
+            "message": f"Starting email analysis from {state.email.sender}",
+            "sender": state.email.sender,
+            "subject": state.email.subject,
+            "timestamp": datetime.now().isoformat()
+        }
+    })
+
     # Extract intent from subject and body
+    writer({
+        "event": "tool_execution",
+        "node": "process_email",
+        "data": {"tool": "text_analysis", "status": "analyzing_content", "timestamp": datetime.now().isoformat()}
+    })
+    
     email_content = f"{state.email.subject} {state.email.body}".lower()
 
     intent = "general"
@@ -131,6 +158,18 @@ def process_email_node(state: AgentState) -> AgentState:
         intent = "document"
     elif any(word in email_content for word in ["contact", "phone", "address", "info"]):
         intent = "contact"
+
+    # Stream intent detection result
+    writer({
+        "event": "intent_detected",
+        "node": "process_email",
+        "data": {
+            "intent": intent,
+            "confidence": 0.9,
+            "reasoning": f"Detected intent '{intent}' based on keywords in email content",
+            "timestamp": datetime.now().isoformat()
+        }
+    })
 
     # Add processing message
     processing_msg = AIMessage(
@@ -148,6 +187,18 @@ def process_email_node(state: AgentState) -> AgentState:
         reasoning=f"Analyzed email content and determined intent: {intent}"
     )
 
+    # Stream completion
+    writer({
+        "event": "node_complete",
+        "node": "process_email",
+        "data": {
+            "message": f"Email processing complete - Intent: {intent}",
+            "intent": intent,
+            "next_step": "human_review",
+            "timestamp": datetime.now().isoformat()
+        }
+    })
+
     return state.model_copy(update={
         "messages": state.messages + [processing_msg],
         "output": state.output + [output],
@@ -156,9 +207,35 @@ def process_email_node(state: AgentState) -> AgentState:
     })
 
 
-# Human review node (Agent Inbox integration)
+# Human review node (Agent Inbox integration) with streaming
 def human_review_node(state: AgentState) -> AgentState:
-    """Human-in-the-loop review point"""
+    """Human-in-the-loop review point with real-time updates"""
+
+    # Get stream writer for custom events
+    writer = get_stream_writer()
+    
+    # Stream start of human review
+    writer({
+        "event": "node_start",
+        "node": "human_review",
+        "data": {
+            "message": "Preparing email for human review",
+            "status": "initializing_review",
+            "timestamp": datetime.now().isoformat()
+        }
+    })
+
+    # Stream review preparation
+    writer({
+        "event": "review_preparation",
+        "node": "human_review",
+        "data": {
+            "message": "Email analysis complete, routing to Agent Inbox",
+            "intent": state.intent,
+            "ready_for_review": True,
+            "timestamp": datetime.now().isoformat()
+        }
+    })
 
     review_msg = AIMessage(
         content="Email processed and ready for human review in Agent Inbox",
@@ -173,6 +250,18 @@ def human_review_node(state: AgentState) -> AgentState:
         structured_data={"requires_review": True},
         reasoning="Reached human review checkpoint for Agent Inbox"
     )
+
+    # Stream completion - ready for human interaction
+    writer({
+        "event": "human_review_ready",
+        "node": "human_review", 
+        "data": {
+            "message": "Email ready for human review in Agent Inbox",
+            "status": "awaiting_human_input",
+            "review_url": "/agent-inbox",
+            "timestamp": datetime.now().isoformat()
+        }
+    })
 
     return state.model_copy(update={
         "messages": state.messages + [review_msg],

@@ -27,6 +27,29 @@ import { toast } from "sonner";
 
 export type StateType = { messages: Message[]; ui?: UIMessage[] };
 
+// Enhanced streaming event types
+export interface StreamEvent {
+  event_type: 'node_update' | 'token' | 'custom' | 'error' | 'raw';
+  data: Record<string, any>;
+  timestamp: string;
+  node?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface WorkflowProgress {
+  currentNode: string;
+  completedNodes: string[];
+  totalNodes: number;
+  progress: number;
+  status: 'running' | 'complete' | 'error' | 'waiting';
+}
+
+export interface TokenStreamData {
+  content: string;
+  isComplete: boolean;
+  metadata?: Record<string, any>;
+}
+
 const useTypedStream = useStream<
   StateType,
   {
@@ -79,26 +102,143 @@ const StreamSession = ({
 }) => {
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
+  
+  // Enhanced state for streaming
+  const [streamEvents, setStreamEvents] = useState<StreamEvent[]>([]);
+  const [workflowProgress, setWorkflowProgress] = useState<WorkflowProgress>({
+    currentNode: '',
+    completedNodes: [],
+    totalNodes: 0,
+    progress: 0,
+    status: 'waiting'
+  });
+  const [tokenStream, setTokenStream] = useState<TokenStreamData>({
+    content: '',
+    isComplete: false
+  });
+  
   const streamValue = useTypedStream({
     apiUrl,
     apiKey: apiKey ?? undefined,
     assistantId,
     threadId: threadId ?? null,
-    onCustomEvent: (event, options) => {
+    onUpdateEvent: (data: any) => {
+      console.log('🔄 UPDATE EVENT:', data);
+      const timestamp = new Date().toISOString();
+      const eventData = {
+        timestamp,
+        event_type: 'update',
+        data: data
+      };
+      setStreamEvents(prev => [...prev.slice(-50), eventData as unknown as StreamEvent]);
+      
+      // Check if this update contains messages (indicates completion)
+      if (data && data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+        console.log('🏁 COMPLETION DETECTED - Messages found in update:', data.messages);
+        setWorkflowProgress(prev => ({
+          ...prev,
+          status: 'complete'
+        }));
+      }
+    },
+    onMetadataEvent: (data: any) => {
+      console.log('📊 METADATA EVENT:', data);
+      const timestamp = new Date().toISOString();
+      const eventData = {
+        timestamp,
+        event_type: 'metadata',
+        data: data
+      };
+      setStreamEvents(prev => [...prev.slice(-50), eventData as unknown as StreamEvent]);
+    },
+    onCustomEvent: (event: any, options: any) => {
+      console.log('🔥 CUSTOM EVENT RECEIVED:', typeof event, event);
+      
       if (isUIMessage(event) || isRemoveUIMessage(event)) {
-        options.mutate((prev) => {
+        options.mutate((prev: any) => {
           const ui = uiMessageReducer(prev.ui ?? [], event);
           return { ...prev, ui };
         });
       }
+      
+      // Capture any custom streaming events
+      if (event && typeof event === 'object') {
+        const eventData = {
+          timestamp: new Date().toISOString(),
+          event_type: 'custom_stream',
+          data: event
+        };
+        setStreamEvents(prev => [...prev.slice(-50), eventData as unknown as StreamEvent]);
+        console.log('🔥 ADDED CUSTOM EVENT TO STATE:', eventData);
+      }
     },
     onThreadId: (id) => {
       setThreadId(id);
-      // Refetch threads list when thread ID changes.
-      // Wait for some seconds before fetching so we're able to get the new thread that was created.
+      // Reset streaming state for new thread
+      setStreamEvents([]);
+      setWorkflowProgress({
+        currentNode: '',
+        completedNodes: [],
+        totalNodes: 0,
+        progress: 0,
+        status: 'waiting'
+      });
+      setTokenStream({
+        content: '',
+        isComplete: false
+      });
+      
       sleep().then(() => getThreads().then(setThreads).catch(console.error));
     },
   });
+
+  // Process node updates for workflow progress
+  const processNodeUpdate = (event: StreamEvent) => {
+    setWorkflowProgress(prev => {
+      const newCompleted = [...prev.completedNodes];
+      if (event.node && !newCompleted.includes(event.node)) {
+        newCompleted.push(event.node);
+      }
+      
+      return {
+        ...prev,
+        currentNode: event.node || prev.currentNode,
+        completedNodes: newCompleted,
+        totalNodes: Math.max(prev.totalNodes, newCompleted.length + 1),
+        progress: (newCompleted.length / Math.max(prev.totalNodes, newCompleted.length + 1)) * 100,
+        status: 'running'
+      };
+    });
+  };
+
+  // Process token streaming
+  const processTokenStream = (event: StreamEvent) => {
+    const content = event.data.content || '';
+    setTokenStream(prev => ({
+      content: prev.content + content,
+      isComplete: event.data.isComplete || false,
+      metadata: event.metadata
+    }));
+  };
+
+  // Process custom events
+  const processCustomEvent = (event: StreamEvent) => {
+    // Handle custom workflow events
+    if (event.data.event === 'node_complete') {
+      setWorkflowProgress(prev => ({
+        ...prev,
+        status: 'complete'
+      }));
+    }
+  };
+  
+  // Enhanced stream value with additional state
+  const enhancedStreamValue = {
+    ...streamValue,
+    streamEvents,
+    workflowProgress,
+    tokenStream
+  };
 
   useEffect(() => {
     checkGraphStatus(apiUrl, apiKey).then((ok) => {
@@ -119,7 +259,7 @@ const StreamSession = ({
   }, [apiKey, apiUrl]);
 
   return (
-    <StreamContext.Provider value={streamValue}>
+    <StreamContext.Provider value={enhancedStreamValue}>
       {children}
     </StreamContext.Provider>
   );

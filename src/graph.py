@@ -17,6 +17,7 @@ load_dotenv()
 # Add local libraries to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph_supervisor-py'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langchain-mcp-adapters'))
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI

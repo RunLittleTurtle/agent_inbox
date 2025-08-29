@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useQueryParams } from "./hooks/use-query-params";
 import { IMPROPER_SCHEMA, VIEW_STATE_THREAD_QUERY_PARAM } from "./constants";
 import { logger } from "./utils/logger";
+import { AgentWorkflow } from "../streaming/AgentWorkflow";
 
 export function ThreadView<
   ThreadValues extends Record<string, any> = Record<string, any>,

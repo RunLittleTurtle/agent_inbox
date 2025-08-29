@@ -30,15 +30,8 @@ from langgraph.checkpoint.memory import MemorySaver
 # Local supervisor imports
 from langgraph_supervisor import create_supervisor
 
-# Calendar agent imports (with fallback)
-try:
-    from src.calendar_agent import create_calendar_agent_with_mcp
-    print("✅ DEBUG: Successfully imported create_calendar_agent_with_mcp")
-except ImportError as e:
-    print(f"❌ DEBUG: Import failed: {e}")
-    import traceback
-    print(f"❌ DEBUG: Full traceback: {traceback.format_exc()}")
-    create_calendar_agent_with_mcp = None
+# Calendar agent imports
+from src.calendar_agent import create_calendar_agent_with_mcp
 
 
 class EmailMessage(BaseModel):
@@ -239,9 +232,7 @@ async def create_supervisor_graph():
     if create_calendar_agent_with_mcp:
         try:
             # Import the function to get calendar tools
-            print("🔍 DEBUG: Importing get_calendar_tools_for_supervisor...")
             from src.calendar_agent.langchain_mcp_integration import get_calendar_tools_for_supervisor
-            print("🔍 DEBUG: Calling get_calendar_tools_for_supervisor...")
             calendar_tools = await get_calendar_tools_for_supervisor()
             print(f"✅ Loaded {len(calendar_tools)} calendar MCP tools")
         except Exception as e:
@@ -312,16 +303,21 @@ async def make_graph():
     """Factory function for LangGraph server"""
     try:
         # Use supervisor that handles any type of request
-        graph = await create_supervisor_graph()
+        graph_instance = await create_supervisor_graph()
         print("✅ Using supervisor with langgraph-supervisor library")
-        return graph
+        return graph_instance
     except Exception as e:
         print(f"⚠️ Supervisor creation failed: {e}")
         # Only fallback if supervisor truly fails
-        graph = create_email_graph()
-        graph.name = "email_agent"
-        return graph
+        graph_instance = create_email_graph()
+        graph_instance.name = "email_agent"
+        return graph_instance
 
-# For backwards compatibility and testing
-import asyncio
-graph = asyncio.run(make_graph())
+# Create graph factory function for LangGraph server
+def create_graph():
+    """Synchronous graph factory for LangGraph server"""
+    import asyncio
+    return asyncio.run(make_graph())
+
+# Export for LangGraph server
+graph = create_graph()

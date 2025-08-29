@@ -328,7 +328,7 @@ async def _run_email_workflow(sender: str, subject: str, body: str, wait: bool):
                 run_response = await client.post(
                     f"{LANGGRAPH_API}/threads/{thread_id}/runs",
                     json={
-                        "assistant_id": "email_agent",
+                        "assistant_id": "agent",
                         "input": {
                             "email": test_email,
                             "messages": []
@@ -609,7 +609,7 @@ async def _send_email_to_workflow(email_data):
             run_response = await client.post(
                 f"{LANGGRAPH_API}/threads/{thread_id}/runs",
                 json={
-                    "assistant_id": "email_agent",
+                    "assistant_id": "agent",
                     "input": initial_state,
                     "stream_mode": "values"
                 }

@@ -9,7 +9,7 @@ import sys
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional, List, Annotated
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Load environment variables for LangSmith integration
 load_dotenv()
@@ -32,7 +32,10 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph_supervisor import create_supervisor
 
 # Calendar agent imports
-from src.calendar_agent import create_calendar_agent_with_mcp
+try:
+    from src.calendar_agent import create_calendar_agent_with_mcp
+except ImportError:
+    from calendar_agent import create_calendar_agent_with_mcp
 
 
 class EmailMessage(BaseModel):
@@ -69,6 +72,11 @@ class AgentState(BaseModel):
 
     # Structured agent outputs
     output: List[AgentOutput] = Field(default_factory=list)
+
+    # Current date context - CRITICAL for all LLM operations (Pydantic v2)
+    current_date: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    current_datetime: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    current_timezone: str = Field(default="UTC")
 
     # Dynamic context and memory
     dynamic_context: Dict[str, Any] = Field(default_factory=lambda: {
@@ -233,7 +241,10 @@ async def create_supervisor_graph():
     if create_calendar_agent_with_mcp:
         try:
             # Import the function to get calendar tools
-            from src.calendar_agent.langchain_mcp_integration import get_calendar_tools_for_supervisor
+            try:
+                from src.calendar_agent.langchain_mcp_integration import get_calendar_tools_for_supervisor
+            except ImportError:
+                from calendar_agent.langchain_mcp_integration import get_calendar_tools_for_supervisor
             calendar_tools = await get_calendar_tools_for_supervisor()
             print(f"✅ Loaded {len(calendar_tools)} calendar MCP tools")
         except Exception as e:
@@ -268,12 +279,32 @@ async def create_supervisor_graph():
         name="email_agent"
     )
 
+    # Get current date for dynamic prompt context (Option 2: Enhanced System Prompts)
+    current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    current_datetime = datetime.now(timezone.utc).isoformat()
+    current_day_name = datetime.now(timezone.utc).strftime("%A")
+    current_formatted_date = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
+    
     # Create supervisor with multiple agents for ANY type of request
     supervisor = create_supervisor(
         agents=[calendar_agent, email_agent],
         model=model,
         tools=calendar_tools,  # Pass MCP tools to supervisor directly
-        prompt="""You are a multi-agent supervisor handling requests from various sources: chatbot users, email processing, and API calls.
+        prompt=f"""You are a multi-agent supervisor handling requests from various sources: chatbot users, email processing, and API calls.
+
+CRITICAL DATE CONTEXT:
+- Today's date: {current_date}
+- Current datetime: {current_datetime}
+- Day of week: {current_day_name}
+- Formatted date: {current_formatted_date}
+- Timezone: UTC
+
+IMPORTANT DATE RULES:
+- When users say "today", they mean {current_date}
+- When users say "tomorrow", they mean the day after {current_date}
+- When users say "this week", use {current_date} as the reference point
+- Always use {current_date} as the basis for any relative date calculations
+- Never assume dates from previous conversations - always use the current date above
 
 Available tools:
 - Google Calendar MCP tools: Use these for direct calendar operations (create events, list events, check availability)
@@ -289,7 +320,10 @@ Routing guidelines:
 - Mixed requests: handle directly with tools or delegate as needed
 - General questions: respond directly with helpful information
 
-IMPORTANT: Accept requests in any format - treat all inputs as natural language requests regardless of source.""",
+IMPORTANT: 
+1. Accept requests in any format - treat all inputs as natural language requests regardless of source
+2. Always reference the current date ({current_date}) when handling date-related queries
+3. Be explicit about dates in your responses to avoid confusion""",
         supervisor_name="supervisor",
         output_mode="last_message",
         add_handoff_messages=True

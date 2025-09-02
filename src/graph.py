@@ -119,94 +119,8 @@ def update_dynamic_context(state: AgentState, context_updates: Dict[str, Any]) -
     return state.model_copy(update={"dynamic_context": current_context})
 
 
-# Simple email processing node
-def process_email_node(state: AgentState) -> AgentState:
-    """Process incoming email and extract basic information"""
-
-    if not state.email:
-        return state.model_copy(update={
-            "status": "error",
-            "error_messages": ["No email provided"]
-        })
-
-    # Extract intent from subject and body
-    email_content = f"{state.email.subject} {state.email.body}".lower()
-
-    intent = "general"
-    if any(word in email_content for word in ["meeting", "schedule", "calendar", "appointment"]):
-        intent = "calendar"
-    elif any(word in email_content for word in ["document", "file", "attachment", "share"]):
-        intent = "document"
-    elif any(word in email_content for word in ["contact", "phone", "address", "info"]):
-        intent = "contact"
-
-    # Add processing message
-    processing_msg = AIMessage(
-        content=f"Processing email from {state.email.sender} about: {state.email.subject}",
-        name="email_processor"
-    )
-
-    # Create agent output
-    output = AgentOutput(
-        agent_name="email_processor",
-        confidence=0.9,
-        execution_time=0.1,
-        tools_used=["text_analysis"],
-        structured_data={"intent": intent, "processed": True},
-        reasoning=f"Analyzed email content and determined intent: {intent}"
-    )
-
-    return state.model_copy(update={
-        "messages": state.messages + [processing_msg],
-        "output": state.output + [output],
-        "intent": intent,
-        "status": "processed"
-    })
 
 
-# Human review node (Agent Inbox integration)
-def human_review_node(state: AgentState) -> AgentState:
-    """Human-in-the-loop review point"""
-
-    review_msg = AIMessage(
-        content="Email processed and ready for human review in Agent Inbox",
-        name="human_reviewer"
-    )
-
-    output = AgentOutput(
-        agent_name="human_reviewer",
-        confidence=1.0,
-        execution_time=0.05,
-        tools_used=["agent_inbox"],
-        structured_data={"requires_review": True},
-        reasoning="Reached human review checkpoint for Agent Inbox"
-    )
-
-    return state.model_copy(update={
-        "messages": state.messages + [review_msg],
-        "output": state.output + [output],
-        "status": "awaiting_review"
-    })
-
-
-# Create the main graph
-def create_email_graph():
-    """Create the main email processing graph with modern LangGraph patterns"""
-
-    # Initialize the state graph with proper typing
-    workflow = StateGraph(AgentState)
-
-    # Add nodes
-    workflow.add_node("process_email", process_email_node)
-    workflow.add_node("human_review", human_review_node)
-
-    # Define the flow
-    workflow.add_edge(START, "process_email")
-    workflow.add_edge("process_email", "human_review")
-    workflow.add_edge("human_review", END)
-
-    # Compile without custom checkpointer (use LangGraph's built-in persistence)
-    return workflow.compile()
 
 
 # Create supervisor with specialized agents (when they exist)
@@ -232,12 +146,12 @@ async def create_supervisor_graph():
 
     # Create calendar agent with MCP tools
     calendar_tools = []
-    
+
     # DEBUG: Check environment variables
     pipedream_url = os.getenv("PIPEDREAM_MCP_SERVER")
     print(f"🔍 DEBUG: PIPEDREAM_MCP_SERVER = {pipedream_url}")
     print(f"🔍 DEBUG: create_calendar_agent_with_mcp = {create_calendar_agent_with_mcp}")
-    
+
     if create_calendar_agent_with_mcp:
         try:
             # Import the function to get calendar tools
@@ -252,19 +166,19 @@ async def create_supervisor_graph():
             import traceback
             print(f"❌ Full traceback: {traceback.format_exc()}")
             calendar_tools = []
-    
+
     # Create calendar agent with tools (either MCP tools or empty)
     calendar_agent = create_react_agent(
         model=model,
-        tools=calendar_tools,  
+        tools=calendar_tools,
         name="calendar_agent"
     )
-    
+
     # Debug: Print calendar agent tools
     print(f"🔧 Calendar agent created with {len(calendar_tools)} tools:")
     for tool in calendar_tools:
         print(f"   📋 {tool.name}")
-    
+
     # Verify the agent has tools by checking its graph
     if hasattr(calendar_agent, 'get_graph') and hasattr(calendar_agent, 'nodes'):
         nodes = list(calendar_agent.get_graph().nodes.keys())
@@ -272,19 +186,34 @@ async def create_supervisor_graph():
         has_tools_node = 'tools' in nodes
         print(f"🔍 Calendar agent has tools node: {has_tools_node}")
 
-    # Create email agent for communication tasks
+    # Create email agent for communication and email processing tasks
     email_agent = create_react_agent(
         model=model,
-        tools=[],  # Add email tools here
+        tools=[],  # Email tools can be added here when available
         name="email_agent"
     )
 
-    # Get current date for dynamic prompt context (Option 2: Enhanced System Prompts)
-    current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    current_datetime = datetime.now(timezone.utc).isoformat()
-    current_day_name = datetime.now(timezone.utc).strftime("%A")
-    current_formatted_date = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
+    # Get current date for dynamic prompt context with user's timezone (simplified)
+    from zoneinfo import ZoneInfo
     
+    # Get user timezone from .env with Montreal fallback
+    user_timezone_str = os.getenv("USER_TIMEZONE", "America/Montreal")
+    try:
+        user_timezone = ZoneInfo(user_timezone_str)
+        current_timezone_name = user_timezone_str.replace("America/", "").replace("_", " ") + " Time"
+    except Exception:
+        user_timezone = ZoneInfo("America/Montreal")
+        current_timezone_name = "Montreal Time"
+    
+    current_date = datetime.now(user_timezone).strftime("%Y-%m-%d")
+    current_datetime = datetime.now(user_timezone).isoformat()
+    current_day_name = datetime.now(user_timezone).strftime("%A")
+    current_formatted_date = datetime.now(user_timezone).strftime("%A, %B %d, %Y")
+    current_time_12h = datetime.now(user_timezone).strftime("%I:%M %p")
+    
+    print(f"🌍 Using timezone: {user_timezone_str} ({current_timezone_name})")
+    print(f"📅 Current time: {current_time_12h} on {current_formatted_date}")
+
     # Create supervisor with multiple agents for ANY type of request
     supervisor = create_supervisor(
         agents=[calendar_agent, email_agent],
@@ -292,35 +221,51 @@ async def create_supervisor_graph():
         tools=calendar_tools,  # Pass MCP tools to supervisor directly
         prompt=f"""You are a multi-agent supervisor handling requests from various sources: chatbot users, email processing, and API calls.
 
-CRITICAL DATE CONTEXT:
+CRITICAL DATE & TIME CONTEXT:
 - Today's date: {current_date}
 - Current datetime: {current_datetime}
+- Current time: {current_time_12h}
 - Day of week: {current_day_name}
 - Formatted date: {current_formatted_date}
-- Timezone: UTC
+- User's timezone: {current_timezone_name}
 
-IMPORTANT DATE RULES:
+IMPORTANT TIME & DATE RULES:
 - When users say "today", they mean {current_date}
 - When users say "tomorrow", they mean the day after {current_date}
+- When users say "tonight", they mean {current_date} evening
 - When users say "this week", use {current_date} as the reference point
+- ALL TIMES mentioned by users are in {current_timezone_name} unless explicitly stated otherwise
+- When creating calendar events, ALWAYS specify times in {current_timezone_name}
+- NEVER convert user times to UTC in calendar requests - keep them in user's timezone
 - Always use {current_date} as the basis for any relative date calculations
 - Never assume dates from previous conversations - always use the current date above
+
+CRITICAL CALENDAR TIME FORMATTING:
+- User says "10pm" → Create event at 10:00 PM {current_timezone_name}
+- User says "2:30 PM" → Create event at 2:30 PM {current_timezone_name}  
+- User says "tonight at 8" → Create event at 8:00 PM {current_timezone_name} on {current_date}
+- ALWAYS include timezone context when creating calendar events
 
 Available tools:
 - Google Calendar MCP tools: Use these for direct calendar operations (create events, list events, check availability)
 
 Available agents:
-- calendar_agent: Handles complex calendar operations and analysis
-- email_agent: Handles email processing, communication tasks, and message drafting
+- calendar_agent: Handles calendar operations, scheduling, and time management
+- email_agent: Handles email processing, communication tasks, message drafting, and email analysis
 
 Routing guidelines:
-- For simple calendar operations: USE CALENDAR TOOLS DIRECTLY
-- For complex calendar tasks or analysis → calendar_agent  
-- Email/communication requests → email_agent
-- Mixed requests: handle directly with tools or delegate as needed
+- Calendar/scheduling requests → calendar_agent
+- Email processing, communication, drafting → email_agent
+- Mixed requests: delegate to appropriate agent or handle with tools
 - General questions: respond directly with helpful information
 
-IMPORTANT: 
+DYNAMIC DECISION MAKING:
+- Analyze each request to determine the best agent or approach
+- Consider request complexity and available tools
+- Route to specialized agents when their expertise is needed
+- Handle simple requests directly when appropriate
+
+IMPORTANT:
 1. Accept requests in any format - treat all inputs as natural language requests regardless of source
 2. Always reference the current date ({current_date}) when handling date-related queries
 3. Be explicit about dates in your responses to avoid confusion""",
@@ -336,17 +281,10 @@ IMPORTANT:
 # Export the main graph using supervisor
 async def make_graph():
     """Factory function for LangGraph server"""
-    try:
-        # Use supervisor that handles any type of request
-        graph_instance = await create_supervisor_graph()
-        print("✅ Using supervisor with langgraph-supervisor library")
-        return graph_instance
-    except Exception as e:
-        print(f"⚠️ Supervisor creation failed: {e}")
-        # Only fallback if supervisor truly fails
-        graph_instance = create_email_graph()
-        graph_instance.name = "email_agent"
-        return graph_instance
+    # Use supervisor that handles any type of request dynamically
+    graph_instance = await create_supervisor_graph()
+    print("✅ Using dynamic supervisor with langgraph-supervisor library")
+    return graph_instance
 
 # Create graph factory function for LangGraph server
 def create_graph():

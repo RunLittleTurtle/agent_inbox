@@ -148,9 +148,34 @@ NEVER claim to have successfully completed calendar operations when you have no 
                 messages_with_system = [{"role": "system", "content": system_message}] + state["messages"]
                 response = self.model.invoke(messages_with_system)
             else:
-                # Tools available - bind tools to model
+                # Tools available - bind tools to model with enhanced temporal and tool usage prompt
+                temporal_system_message = """You are a calendar agent with access to Google Calendar tools.
+
+CRITICAL TIME HANDLING RULES:
+- When users mention times (like "10pm", "2:30 PM"), ALWAYS assume they mean their LOCAL timezone
+- NEVER convert times to UTC in your tool calls
+- When creating calendar events, use the exact time the user specified
+- Always include timezone context in your responses
+- Structure temporal requests clearly before calling tools
+
+TOOL USAGE GUIDELINES:
+- Use google_calendar_tool for ALL calendar operations (it's a comprehensive tool)
+- For FINDING/SEARCHING events: Use instruction like "List all events containing '[keyword]'" or "Find events with [search_terms]"
+- For CHECKING availability: Use instruction like "Check for conflicts on [date/time]"
+- For CREATING events: Use appropriate creation instructions with [event_details]
+- The tool can handle multiple types of operations - be specific in your instruction parameter
+
+EXAMPLES:
+- User: "find my [EVENT_NAME]" → google_calendar_tool with instruction: "List all events containing '[EVENT_NAME]'"
+- User: "what's on my calendar [TIME_PERIOD]" → google_calendar_tool with instruction: "List all events for [TIME_PERIOD]"
+- User: "check if I'm free at [TIME]" → google_calendar_tool with instruction: "Check availability for [TIME]"
+- User: "book [EVENT_TYPE] at [TIME]" → Create event with appropriate details
+
+Remember: Users speak in their local time, keep it in their local time!"""
+                
+                messages_with_system = [{"role": "system", "content": temporal_system_message}] + state["messages"]
                 model_with_tools = self.model.bind_tools(self.tools)
-                response = model_with_tools.invoke(state["messages"])
+                response = model_with_tools.invoke(messages_with_system)
             
             return {"messages": [response]}
 
@@ -329,8 +354,49 @@ async def get_calendar_tools_for_supervisor() -> List[BaseTool]:
         import concurrent.futures
         
         sync_tools = []
+        
+        # Create tool name mapping for problematic names
+        tool_name_mapping = {
+            "google_calendar-query-free-busy-calendars": "calendar_check_availability"
+        }
+        
         for async_tool in tools:
-            # Create a truly synchronous tool function
+            # Handle problematic tool names (OpenAI 64-char limit)
+            if async_tool.name == "google_calendar-query-free-busy-calendars":
+                # Create wrapper with short name but preserve all functionality
+                def calendar_tool_sync(**kwargs) -> str:
+                    """Google Calendar tool - supports both availability checking and event listing"""
+                    try:
+                        # Run the original async tool
+                        loop = None
+                        try:
+                            loop = async_module.get_running_loop()
+                        except RuntimeError:
+                            pass
+                        
+                        if loop is None:
+                            result = async_module.run(async_tool.ainvoke(kwargs))
+                        else:
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                future = executor.submit(async_module.run, async_tool.ainvoke(kwargs))
+                                result = future.result(timeout=30)
+                        
+                        return str(result)
+                    except Exception as e:
+                        return f"Error executing calendar operation: {str(e)}"
+                
+                # Create single tool with comprehensive description
+                calendar_tool = StructuredTool(
+                    name="google_calendar_tool",  # 19 chars - well under limit
+                    description="Google Calendar operations: list events, search events by keyword (e.g. 'motocross'), check availability, find conflicts, and query calendar data. Use instruction parameter to specify what you want to do.",
+                    args_schema=async_tool.args_schema,
+                    func=calendar_tool_sync,
+                    return_direct=False
+                )
+                sync_tools.append(calendar_tool)
+                continue
+            
+            # Create a truly synchronous tool function for other tools
             def make_sync_tool(atool):
                 def sync_func(**kwargs) -> str:
                     """Synchronous function that runs async MCP tool"""

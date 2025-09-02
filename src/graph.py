@@ -259,6 +259,14 @@ Routing guidelines:
 - Mixed requests: delegate to appropriate agent or handle with tools
 - General questions: respond directly with helpful information
 
+CRITICAL CALENDAR PERSISTENCE RULES:
+- When handling availability requests, NEVER accept "no availability" after just one search
+- Always instruct calendar_agent or use tools to check MULTIPLE time slots systematically
+- If user requests scheduling and first option is unavailable, automatically check alternatives
+- Continue searching different dates, times, and durations until viable options are found
+- Be proactive in expanding search criteria (next day, different hours, shorter/longer meetings)
+- Only conclude "no availability" after exhaustive search of reasonable alternatives
+
 DYNAMIC DECISION MAKING:
 - Analyze each request to determine the best agent or approach
 - Consider request complexity and available tools

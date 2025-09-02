@@ -274,9 +274,9 @@ function EditAndOrAcceptComponent({
           defaultRows.current[k as keyof typeof defaultRows.current] ===
           undefined
         ) {
-          defaultRows.current[k as keyof typeof defaultRows.current] = !v.length
+          defaultRows.current[k as keyof typeof defaultRows.current] = !v || !v.length
             ? 3
-            : Math.max(v.length / 30, 7);
+            : Math.max((v?.length || 0) / 30, 7);
         }
         const numRows =
           defaultRows.current[k as keyof typeof defaultRows.current] || 8;

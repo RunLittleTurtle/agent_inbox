@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, X, Edit } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useStreamContext } from "@/providers/Stream";
 
 function isComplexValue(value: any): boolean {
   return Array.isArray(value) || (typeof value === "object" && value !== null);
@@ -45,6 +48,10 @@ export function GenericInterruptView({
   interrupt: Record<string, any> | Record<string, any>[];
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showModifyInput, setShowModifyInput] = useState(false);
+  const [modifyText, setModifyText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const thread = useStreamContext();
 
   const contentStr = JSON.stringify(interrupt, null, 2);
   const contentLines = contentStr.split("\n");
@@ -90,6 +97,72 @@ export function GenericInterruptView({
   };
 
   const displayEntries = processEntries();
+
+  // Check if this is an interrupt that allows actions
+  const interruptObj = Array.isArray(interrupt) ? interrupt[0] : interrupt;
+  const hasActions = interruptObj && 
+    typeof interruptObj === "object" && 
+    "config" in interruptObj &&
+    typeof interruptObj.config === "object";
+
+  // Action handlers
+  const handleAccept = async () => {
+    setIsSubmitting(true);
+    try {
+      thread.submit({}, {
+        command: {
+          resume: [{
+            type: "accept",
+            args: null
+          }]
+        }
+      });
+    } catch (error) {
+      console.error("Failed to accept:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReject = async () => {
+    setIsSubmitting(true);
+    try {
+      thread.submit({}, {
+        command: {
+          resume: [{
+            type: "ignore",
+            args: "Rejected by user"
+          }]
+        }
+      });
+    } catch (error) {
+      console.error("Failed to reject:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleModify = async () => {
+    if (!modifyText.trim()) return;
+    
+    setIsSubmitting(true);
+    try {
+      thread.submit({}, {
+        command: {
+          resume: [{
+            type: "response",
+            args: modifyText
+          }]
+        }
+      });
+      setShowModifyInput(false);
+      setModifyText("");
+    } catch (error) {
+      console.error("Failed to modify:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200">
@@ -153,6 +226,84 @@ export function GenericInterruptView({
           >
             {isExpanded ? <ChevronUp /> : <ChevronDown />}
           </motion.button>
+        )}
+
+        {/* Action Buttons for Interrupts */}
+        {hasActions && (
+          <div className="border-t border-gray-200 bg-white p-4 space-y-3">
+            {/* Modify Input */}
+            {showModifyInput && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="space-y-2"
+              >
+                <Textarea
+                  placeholder="Provide feedback or describe changes..."
+                  value={modifyText}
+                  onChange={(e) => setModifyText(e.target.value)}
+                  className="min-h-[80px] resize-none"
+                />
+              </motion.div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                onClick={handleAccept}
+                disabled={isSubmitting}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Accept
+              </Button>
+              
+              <Button 
+                onClick={handleReject}
+                disabled={isSubmitting}
+                variant="destructive"
+                size="sm"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Reject
+              </Button>
+              
+              {!showModifyInput ? (
+                <Button 
+                  onClick={() => setShowModifyInput(true)}
+                  disabled={isSubmitting}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Modify
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleModify}
+                    disabled={isSubmitting || !modifyText.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    Submit Feedback
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setShowModifyInput(false);
+                      setModifyText("");
+                    }}
+                    disabled={isSubmitting}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </motion.div>
     </div>

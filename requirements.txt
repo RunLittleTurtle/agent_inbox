@@ -8,6 +8,7 @@ langsmith>=0.2.0
 
 # LangGraph CLI & API (Required for development server)
 langgraph-cli[inmem]>=0.4.0
+langgraph-api>=0.4.7
 
 # LangGraph Supervisor Dependencies
 langgraph-supervisor>=0.0.29

@@ -112,11 +112,41 @@ class CalendarAgentWithMCP:
         """Initialize MCP client and load tools using official patterns"""
         try:
             # Use improved MCP connection with caching and timeout
-            self.tools = await self._get_mcp_tools()
+            all_tools = await self._get_mcp_tools()
 
-            print(f"Loaded {len(self.tools)} calendar tools from MCP server")
+            # Filter tools: separate booking tools from read-only tools
+            self.booking_tools = []
+            self.tools = []
+            
+            booking_tool_names = {
+                'google_calendar-quick-add-event',
+                'google_calendar-create-event', 
+                'google_calendar-delete-event',
+                'google_calendar-add-attendees-to-event',
+                'google_calendar-update-event'
+            }
+            
+            # Tools that don't work properly and should be excluded
+            excluded_tool_names = {
+                'google_calendar-query-free-busy-calendars'  # This tool doesn't work, use list-events instead
+            }
+            
+            for tool in all_tools:
+                if tool.name in excluded_tool_names:
+                    print(f"   EXCLUDED: {tool.name} (doesn't work properly)")
+                    continue
+                elif tool.name in booking_tool_names:
+                    self.booking_tools.append(tool)
+                else:
+                    self.tools.append(tool)
+
+            print(f"Loaded {len(self.tools)} read-only calendar tools")
             for tool in self.tools:
                 print(f"   {tool.name}: {tool.description}")
+            
+            print(f"Separated {len(self.booking_tools)} booking tools for approval workflow")
+            for tool in self.booking_tools:
+                print(f"   {tool.name}: [REQUIRES APPROVAL]")
 
             # Create the graph
             self.graph = await self._create_calendar_graph()
@@ -125,6 +155,7 @@ class CalendarAgentWithMCP:
             print(f"Failed to initialize MCP client: {e}")
             # Fallback to no tools if MCP connection fails
             self.tools = []
+            self.booking_tools = []
             self.graph = await self._create_calendar_graph()
 
     async def _create_calendar_graph(self):
@@ -144,7 +175,25 @@ When users request calendar operations:
 
 NEVER claim to have successfully completed calendar operations when you have no tools."""
         else:
-            prompt = """You are a calendar agent with access to Google Calendar tools.
+            # Get timezone context from .env USER_TIMEZONE
+            import os
+            from zoneinfo import ZoneInfo
+            from datetime import timedelta
+            timezone_name = os.getenv("USER_TIMEZONE", "America/Toronto")
+            current_time = datetime.now(ZoneInfo(timezone_name))
+            
+            prompt = f"""You are a helpful calendar management assistant with access to Google Calendar via MCP tools.
+
+CURRENT CONTEXT (always use this for relative time references):
+- Current time: {current_time.isoformat()}
+- Timezone: {timezone_name}
+- Today's date: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})
+- Tomorrow's date: {(current_time + timedelta(days=1)).strftime('%Y-%m-%d')}
+
+Your capabilities include:
+- Checking calendar availability and free/busy times
+- Reading existing calendar events  
+- Viewing calendar details and settings
 
 CRITICAL TIME HANDLING RULES:
 - When users mention times (like "10pm", "2:30 PM"), ALWAYS assume they mean their LOCAL timezone
@@ -155,32 +204,117 @@ CRITICAL TIME HANDLING RULES:
 
 TOOL USAGE GUIDELINES:
 - Use google_calendar-list-events to check availability and find conflicts
-- For availability checks: List events for the relevant time period, then analyze overlaps
-- Use google_calendar-create-event, google_calendar-update-event for event operations
 - Always use ISO 8601 format in instructions (e.g., '2025-01-15T09:00:00-05:00')
+- For availability checks: List events for the relevant time period, then analyze overlaps
+- Be thorough in checking for overlaps when scheduling new events
 
-AVAILABILITY CALCULATION STRATEGY:
+IMPORTANT: You have READ-ONLY access to calendar tools. For any booking, creating, updating, or deleting operations, you must inform the user that this requires booking approval and will transfer them to the booking approval workflow.
+
+When users request booking operations:
+1. First check availability using your read-only tools if possible (use the current context above for date/time calculations)
+2. If the time slot is available, respond with: "Time slot is available. This requires booking approval - I'll transfer you to the booking approval workflow."
+3. If the time slot is NOT available (conflict detected):
+   - IMMEDIATELY search for alternative time slots automatically
+   - Check at least 2-3 alternative times on the same day first
+   - Then check 2-3 times on the next day
+   - ALWAYS present concrete alternatives to the user, such as:
+     "The requested time slot has a conflict. Here are available alternatives I found:
+     
+     **Same Day Options:**
+     - 7:00 PM - 8:00 PM (available)
+     - 10:00 PM - 11:00 PM (available)
+     
+     **Tomorrow Options:**
+     - 9:00 PM - 10:00 PM (available)
+     
+     Which time would you prefer? Please let me know your choice and I'll proceed with booking approval."
+   - NEVER just ask the user to suggest a different time without providing concrete options
+   - BE PERSISTENT: Keep searching different time slots until you find at least 2 alternatives
+   - CRITICAL: When presenting alternatives, DO NOT route to booking approval yet - wait for user to choose specific time
+4. ONLY after user chooses a specific time slot from alternatives, then proceed with: "Perfect! I'll transfer you to the booking approval workflow for [chosen time]."
+5. CRITICAL: NEVER claim a meeting is booked/scheduled until it has completed the booking approval workflow
+6. NEVER say "meeting is now scheduled" or "meeting is booked" - you only check availability and route to approval
+7. The booking approval workflow will handle the actual calendar modifications
+
+CRITICAL AVAILABILITY SEARCH STRATEGY:
+- When conflicts are found, automatically expand your search
 - To check if time slots are free: Use list-events for the date/time range
 - Analyze the returned events to identify conflicts and free periods
 - Calculate available time slots by finding gaps between existing events
-- Be thorough in checking for overlaps when scheduling new events
-
-PERSISTENCE RULES:
+- Try same day: 1-2 hours earlier, 1-2 hours later
+- Try next day: same time, 1 hour earlier, 1 hour later
 - NEVER give up on availability searches after the first attempt
-- When searching for available time slots, systematically check multiple dates/times
-- Continue searching until you find AT LEAST one available option
-- Be proactive in suggesting alternative times when conflicts are found
+- Continue searching until you find AT LEAST 2 available options
+- Present all findings clearly to the user
 
-Remember: Users speak in their local time, keep it in their local time!"""
+Remember: Users speak in their local time, keep it in their local time!
 
-        # Use pure create_react_agent - let LangGraph handle all message flow
-        return create_react_agent(
+NEVER ask users for timezone information - always use the context provided above.
+Always be helpful and provide calendar information using your available tools."""
+
+        # Create the main calendar agent (read-only operations)
+        calendar_agent = create_react_agent(
             model=self.model,
             tools=self.tools,
             name="calendar_agent",
-            prompt=prompt,
-            checkpointer=MemorySaver()
+            prompt=prompt
         )
+        
+        # If no booking tools, just return the simple agent
+        if not self.booking_tools:
+            return calendar_agent
+        
+        # Create StateGraph wrapper for routing to booking node
+        from langgraph.graph import StateGraph, START, END
+        from .booking_node import BookingNode
+        
+        workflow = StateGraph(MessagesState)
+        
+        # Initialize booking node
+        booking_node = BookingNode(self.booking_tools, self.model)
+        
+        # Add nodes
+        workflow.add_node("calendar_agent", calendar_agent)
+        workflow.add_node("booking_node", booking_node.booking_approval_node)
+        
+        # Simplified routing - let calendar agent handle the decision
+        def route_intent(state: MessagesState):
+            """Route all requests to calendar agent first - it will determine if booking approval needed"""
+            return "calendar_agent"
+        
+        def route_after_calendar(state: MessagesState):
+            """Route after calendar agent completes"""
+            # Check if calendar agent indicates booking approval needed
+            messages = state.get("messages", [])
+            if messages:
+                last_msg = messages[-1]
+                if hasattr(last_msg, 'content'):
+                    content = last_msg.content
+                    # Handle both string and list content types
+                    if isinstance(content, list):
+                        content_str = " ".join(str(item) for item in content if item)
+                    else:
+                        content_str = str(content) if content else ""
+                    
+                    # Look for multiple booking trigger phrases
+                    booking_triggers = ["booking approval", "booking workflow", "approval workflow", "requires booking"]
+                    if any(trigger in content_str.lower() for trigger in booking_triggers):
+                        return "booking_node"
+            return END
+        
+        def route_after_booking(state: MessagesState):
+            """Route after booking node completes"""
+            return END
+        
+        # Set up clean routing flow - no separate human_feedback node needed
+        workflow.add_conditional_edges(START, route_intent, 
+                                     {"calendar_agent": "calendar_agent"})
+        workflow.add_conditional_edges("calendar_agent", route_after_calendar,
+                                     {"booking_node": "booking_node", END: END})
+        workflow.add_conditional_edges("booking_node", route_after_booking,
+                                     {END: END})
+        
+        return workflow.compile(checkpointer=MemorySaver(), name="calendar_agent")
 
     async def get_agent(self):
         """Get the LangGraph agent for supervisor integration"""

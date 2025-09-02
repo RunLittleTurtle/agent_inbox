@@ -15,9 +15,19 @@ import sys
 from dotenv import load_dotenv
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from typing import List
+from langchain_core.messages import BaseMessage
+from pydantic import BaseModel
 
 # Load environment variables for LangSmith integration
 load_dotenv()
+
+class WorkflowState(BaseModel):
+    """Enhanced state with timezone and temporal context for all agents"""
+    messages: List[BaseMessage]
+    current_time: str
+    timezone: str
+    timezone_name: str
 
 # Add local libraries to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph'))
@@ -63,6 +73,18 @@ async def create_calendar_agent():
     # Return the LangGraph agent (create_react_agent) for supervisor integration
     return await calendar_agent_instance.get_agent()
 
+
+def get_current_context():
+    """Get current time and timezone context using USER_TIMEZONE from .env"""
+    user_timezone = os.getenv("USER_TIMEZONE", "America/Toronto")
+    timezone_zone = ZoneInfo(user_timezone)
+    current_time = datetime.now(timezone_zone)
+    
+    return {
+        "current_time": current_time.isoformat(),
+        "timezone": str(timezone_zone),
+        "timezone_name": user_timezone
+    }
 
 def create_email_agent():
     """Create email agent for email operations using LangGraph create_react_agent"""

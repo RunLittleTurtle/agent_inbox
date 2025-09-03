@@ -193,14 +193,23 @@ Based on the request and context, extract:
 5. Location (if any)
 6. Attendees (if any)
 
+TOOL SELECTION RULES:
+Analyze the conversation context and choose the appropriate tool:
+- Use "google_calendar-create-event" for NEW bookings (first time booking)
+- Use "google_calendar-update-event" for CHANGES to existing bookings (time, title, location changes)
+- Use "google_calendar-add-attendees-to-event" for just ADDING people to existing events
+- Look for keywords like "change", "modify", "update", "instead", "move to", "reschedule", "made a mistake"
+- If conversation shows a previous booking was successful and user wants changes, use UPDATE
+
 Return a JSON object with these fields matching the Pipedream MCP tool format:
-- tool_name: "google_calendar-create-event"
+- tool_name: Choose appropriate tool based on conversation analysis above
 - title: string (descriptive title based on context)
 - start_time: ISO format with timezone (e.g., "2025-09-03T15:00:00-04:00")
 - end_time: ISO format with timezone
 - description: string or null
 - location: string or null
 - attendees: array of strings
+- requires_event_id: boolean (true if updating/modifying existing event)
 - original_args: object with simple MCP tool format:
   {{
     "summary": "Event title",
@@ -363,9 +372,22 @@ If context suggests this is modifying a previous booking, incorporate that into 
         if "end" not in args:
             args["end"] = booking_request.end_time
 
-        # ADD THE MISSING INSTRUCTION PARAMETER HERE:
+        # Add the missing instruction parameter that Pipedream MCP tools require
         if "instruction" not in args:
-            args["instruction"] = f"Create calendar event: {booking_request.title} from {booking_request.start_time} to {booking_request.end_time}"
+            if "update" in booking_request.tool_name:
+                args["instruction"] = f"Update calendar event: {booking_request.title} to {booking_request.start_time} - {booking_request.end_time}"
+            elif "add-attendees" in booking_request.tool_name:
+                args["instruction"] = f"Add attendees to calendar event: {booking_request.title}"
+            else:
+                args["instruction"] = f"Create calendar event: {booking_request.title} from {booking_request.start_time} to {booking_request.end_time}"
+
+        # Handle event ID for update/modify operations
+        if "update" in booking_request.tool_name or "add-attendees" in booking_request.tool_name:
+            # For now, we'll need to search for the most recent event that matches
+            # In a real implementation, we'd need to track event IDs from previous bookings
+            if "event_id" not in args:
+                print("⚠️  Warning: Update operation requires event_id - may need to implement event search")
+                # Could add logic here to search for recent events matching the criteria
 
         # Find the correct MCP tool
         tool_to_use = None

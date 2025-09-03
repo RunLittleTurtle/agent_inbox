@@ -32,6 +32,17 @@ class BookingRequest(BaseModel):
     description: Optional[str] = Field(None, description="Event description")
     attendees: Optional[List[str]] = Field(default_factory=list, description="Event attendees")
     location: Optional[str] = Field(None, description="Event location")
+    requires_event_id: bool = Field(default=False, description="Whether event ID is required for updates")
+    color_id: Optional[str] = Field(None, description="Event color ID (1-11)")
+    transparency: str = Field(default="opaque", description="Event transparency (opaque/transparent)")
+    visibility: str = Field(default="default", description="Event visibility (default/public/private)")
+    recurrence: Optional[List[str]] = Field(None, description="Recurrence rules (RRULE)")
+    reminders: Dict[str, Any] = Field(default_factory=lambda: {"useDefault": True}, description="Reminder settings")
+    guests_can_invite_others: bool = Field(default=True, description="Whether guests can invite others")
+    guests_can_modify: bool = Field(default=False, description="Whether guests can modify event")
+    guests_can_see_other_guests: bool = Field(default=True, description="Whether guests can see other guests")
+    anyone_can_add_self: bool = Field(default=False, description="Whether anyone can add themselves")
+    conference_data: Optional[Dict[str, Any]] = Field(None, description="Conference/video meeting data")
     original_args: Dict[str, Any] = Field(..., description="Original MCP tool arguments")
 
 
@@ -92,7 +103,18 @@ class BookingNode:
                 "start_time": booking_request.start_time,
                 "end_time": booking_request.end_time,
                 "location": booking_request.location or "None",
-                "description": booking_request.description or "None"
+                "description": booking_request.description or "None",
+                "tool_name": booking_request.tool_name,
+                "attendees": booking_request.attendees,
+                "requires_event_id": booking_request.requires_event_id,
+                "transparency": booking_request.transparency,
+                "visibility": booking_request.visibility,
+                "color_id": booking_request.color_id,
+                "guests_can_invite_others": booking_request.guests_can_invite_others,
+                "guests_can_modify": booking_request.guests_can_modify,
+                "reminders": booking_request.reminders,
+                "recurrence": booking_request.recurrence,
+                "conference_data": booking_request.conference_data
             },
             "instructions": "Please respond with 'approve', 'reject', or provide modification feedback"
         }
@@ -192,14 +214,15 @@ Based on the request and context, extract:
 4. Description (if any, or infer from conversation)
 5. Location (if any)
 6. Attendees (if any)
-
 TOOL SELECTION RULES:
 Analyze the conversation context and choose the appropriate tool:
 - Use "google_calendar-create-event" for NEW bookings (first time booking)
-- Use "google_calendar-update-event" for CHANGES to existing bookings (time, title, location changes)
-- Use "google_calendar-add-attendees-to-event" for just ADDING people to existing events
+- Use "google_calendar-add-attendees-to-event" for ADDING attendees (prioritize this when attendees are mentioned, even with other changes)
+- Use "google_calendar-update-event" for OTHER changes to existing bookings (time, title, location changes WITHOUT attendees)
 - Look for keywords like "change", "modify", "update", "instead", "move to", "reschedule", "made a mistake"
 - If conversation shows a previous booking was successful and user wants changes, use UPDATE
+- CRITICAL: If attendees are being added/mentioned, always use "google_calendar-add-attendees-to-event" even if other fields are changing
+- When both time AND attendees are changing, prioritize attendee addition as the primary operation
 
 Return a JSON object with these fields matching the Pipedream MCP tool format:
 - tool_name: Choose appropriate tool based on conversation analysis above
@@ -208,16 +231,36 @@ Return a JSON object with these fields matching the Pipedream MCP tool format:
 - end_time: ISO format with timezone
 - description: string or null
 - location: string or null
-- attendees: array of strings
+- attendees: array of email strings (CRITICAL: always include attendee emails when mentioned)
 - requires_event_id: boolean (true if updating/modifying existing event)
-- original_args: object with simple MCP tool format:
+- color_id: string or null (1-11 for different colors)
+- transparency: "transparent" or "opaque" (for availability)
+- visibility: "default", "public", or "private"
+- recurrence: array of RRULE strings or null (for recurring events)
+- reminders: object with useDefault boolean or overrides array
+- guests_can_invite_others: boolean (default true)
+- guests_can_modify: boolean (default false)
+- guests_can_see_other_guests: boolean (default true)
+- anyone_can_add_self: boolean (default false)
+- conference_data: object or null (for video meetings)
+- original_args: object with complete MCP tool format:
   {{
     "summary": "Event title",
     "start": "2025-09-03T15:00:00-04:00",
     "end": "2025-09-03T16:00:00-04:00",
     "description": "Event description",
     "location": "Location if any",
-    "attendees": []
+    "attendees": ["email1@domain.com", "email2@domain.com"],
+    "colorId": "2",
+    "transparency": "opaque",
+    "visibility": "default",
+    "recurrence": null,
+    "reminders": {{"useDefault": true}},
+    "guestsCanInviteOthers": true,
+    "guestsCanModify": false,
+    "guestsCanSeeOtherGuests": true,
+    "anyoneCanAddSelf": false,
+    "conferenceData": null
   }}
 
 CRITICAL: Use SIMPLE format - no nested objects, just direct field values.
@@ -372,14 +415,81 @@ If context suggests this is modifying a previous booking, incorporate that into 
         if "end" not in args:
             args["end"] = booking_request.end_time
 
+        # Ensure attendees are properly formatted as array of email strings
+        if "attendees" in args and args["attendees"]:
+            if isinstance(args["attendees"], list):
+                # Convert attendee objects to email strings if needed
+                formatted_attendees = []
+                for attendee in args["attendees"]:
+                    if isinstance(attendee, dict) and "email" in attendee:
+                        formatted_attendees.append(attendee["email"])
+                    elif isinstance(attendee, str):
+                        formatted_attendees.append(attendee)
+                args["attendees"] = formatted_attendees
+            elif isinstance(args["attendees"], str):
+                args["attendees"] = [args["attendees"]]
+
+        # Set default values for optional Google Calendar fields
+        if "colorId" not in args:
+            args["colorId"] = None
+        if "transparency" not in args:
+            args["transparency"] = "opaque"  # User is busy by default
+        if "visibility" not in args:
+            args["visibility"] = "default"
+        if "guestsCanInviteOthers" not in args:
+            args["guestsCanInviteOthers"] = True
+        if "guestsCanModify" not in args:
+            args["guestsCanModify"] = False
+        if "guestsCanSeeOtherGuests" not in args:
+            args["guestsCanSeeOtherGuests"] = True
+        if "anyoneCanAddSelf" not in args:
+            args["anyoneCanAddSelf"] = False
+        if "reminders" not in args:
+            args["reminders"] = {"useDefault": True}
+
         # Add the missing instruction parameter that Pipedream MCP tools require
+        # Include ALL available fields in the instruction for proper MCP tool data passing
         if "instruction" not in args:
+            # Build comprehensive instruction with all available fields
+            instruction_parts = []
+
             if "update" in booking_request.tool_name:
-                args["instruction"] = f"Update calendar event: {booking_request.title} to {booking_request.start_time} - {booking_request.end_time}"
+                instruction_parts.append(f"Update calendar event: {booking_request.title}")
+                instruction_parts.append(f"Time: {booking_request.start_time} to {booking_request.end_time}")
             elif "add-attendees" in booking_request.tool_name:
-                args["instruction"] = f"Add attendees to calendar event: {booking_request.title}"
+                instruction_parts.append(f"Add attendees to calendar event: {booking_request.title}")
+                if args.get("attendees"):
+                    instruction_parts.append(f"Attendees to add: {', '.join(args['attendees'])}")
             else:
-                args["instruction"] = f"Create calendar event: {booking_request.title} from {booking_request.start_time} to {booking_request.end_time}"
+                instruction_parts.append(f"Create calendar event: {booking_request.title}")
+                instruction_parts.append(f"Time: {booking_request.start_time} to {booking_request.end_time}")
+
+            # Add all optional fields to instruction if present
+            if args.get("description"):
+                instruction_parts.append(f"Description: {args['description']}")
+            if args.get("location"):
+                instruction_parts.append(f"Location: {args['location']}")
+            if args.get("attendees") and "add-attendees" not in booking_request.tool_name:
+                instruction_parts.append(f"Attendees: {', '.join(args['attendees'])}")
+            if args.get("colorId"):
+                instruction_parts.append(f"Color: {args['colorId']}")
+            if args.get("transparency"):
+                instruction_parts.append(f"Transparency: {args['transparency']}")
+            if args.get("visibility"):
+                instruction_parts.append(f"Visibility: {args['visibility']}")
+            if args.get("guestsCanInviteOthers") is not None:
+                instruction_parts.append(f"Guests can invite others: {args['guestsCanInviteOthers']}")
+            if args.get("guestsCanModify") is not None:
+                instruction_parts.append(f"Guests can modify: {args['guestsCanModify']}")
+            if args.get("guestsCanSeeOtherGuests") is not None:
+                instruction_parts.append(f"Guests can see other guests: {args['guestsCanSeeOtherGuests']}")
+            if args.get("anyoneCanAddSelf") is not None:
+                instruction_parts.append(f"Anyone can add self: {args['anyoneCanAddSelf']}")
+            if args.get("reminders"):
+                instruction_parts.append(f"Reminders: {args['reminders']}")
+
+            # Join all instruction parts with semicolons for clarity
+            args["instruction"] = "; ".join(instruction_parts)
 
         # Handle event ID for update/modify operations
         if "update" in booking_request.tool_name or "add-attendees" in booking_request.tool_name:

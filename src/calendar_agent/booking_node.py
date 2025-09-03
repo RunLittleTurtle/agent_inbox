@@ -65,7 +65,7 @@ class BookingNode:
 
         # Extract booking intent from routing context or conversation
         booking_intent, routing_context, conversation_summary = self._extract_routing_context(messages)
-        
+
         if not booking_intent:
             return {"messages": [AIMessage(content="No booking request found.")]}
 
@@ -101,21 +101,21 @@ class BookingNode:
         while True:
             # **CORE LANGGRAPH PATTERN**: interrupt() pauses and waits for human input
             human_response = interrupt(approval_prompt)
-            
+
             # Validate and process the human response
             validation_result = self._validate_human_response(human_response, booking_request)
-            
+
             if validation_result["valid"]:
                 action = validation_result["action"]
-                
+
                 if action == "approve":
                     # Execute the booking
                     result = await self._execute_booking(booking_request, validation_result.get("modifications", {}))
                     return {"messages": messages + [AIMessage(content=result)]}
-                    
+
                 elif action == "reject":
                     return {"messages": messages + [AIMessage(content="❌ Booking cancelled by user.")]}
-                    
+
                 elif action == "modify":
                     # Update booking request with modifications
                     try:
@@ -137,7 +137,7 @@ class BookingNode:
                             approval_prompt["message"] = "❌ Could not process modifications. Please try again."
                     except Exception as e:
                         approval_prompt["message"] = f"❌ Error processing modifications: {e}"
-                        
+
             else:
                 # Invalid response - update prompt with validation message
                 approval_prompt["message"] = f"❌ {validation_result['error']}. Please try again."
@@ -193,7 +193,7 @@ Based on the request and context, extract:
 5. Location (if any)
 6. Attendees (if any)
 
-Return a JSON object with these fields matching the MCP tool schema:
+Return a JSON object with these fields matching the Pipedream MCP tool format:
 - tool_name: "google_calendar-create-event"
 - title: string (descriptive title based on context)
 - start_time: ISO format with timezone (e.g., "2025-09-03T15:00:00-04:00")
@@ -201,17 +201,17 @@ Return a JSON object with these fields matching the MCP tool schema:
 - description: string or null
 - location: string or null
 - attendees: array of strings
-- original_args: object with MCP tool format including required "instruction" field:
+- original_args: object with simple MCP tool format:
   {{
-    "instruction": "Create calendar event with the following details",
     "summary": "Event title",
-    "start": {{"dateTime": "ISO_TIME", "timeZone": "{timezone_name}"}},
-    "end": {{"dateTime": "ISO_TIME", "timeZone": "{timezone_name}"}},
+    "start": "2025-09-03T15:00:00-04:00",
+    "end": "2025-09-03T16:00:00-04:00",
     "description": "Event description",
+    "location": "Location if any",
     "attendees": []
   }}
 
-CRITICAL: The original_args must include the "instruction" field as it's required by the MCP tool.
+CRITICAL: Use SIMPLE format - no nested objects, just direct field values.
 ALWAYS include timezone offset in ISO format. Use {timezone_name} timezone.
 If context suggests this is modifying a previous booking, incorporate that into the title.
 """
@@ -249,7 +249,7 @@ If context suggests this is modifying a previous booking, incorporate that into 
         conversation_summary = ""
         booking_intent = ""
 
-        # Look for routing context in recent messages  
+        # Look for routing context in recent messages
         for msg in reversed(messages[-10:]):
             if hasattr(msg, 'additional_kwargs') and msg.additional_kwargs:
                 kwargs = msg.additional_kwargs
@@ -295,24 +295,24 @@ If context suggests this is modifying a previous booking, incorporate that into 
                 return {"valid": False, "error": "Empty list response received"}
             # Take the first item from the list
             response = response[0]
-        
+
         if isinstance(response, str):
             response_lower = response.lower().strip()
-            
+
             # Check for approval keywords
             if response_lower in ['approve', 'approved', 'yes', 'confirm', 'ok', 'accept']:
                 return {"valid": True, "action": "approve"}
-                
-            # Check for rejection keywords  
+
+            # Check for rejection keywords
             elif response_lower in ['reject', 'rejected', 'no', 'cancel', 'deny']:
                 return {"valid": True, "action": "reject"}
-                
+
             # Any other text is treated as modification request
             elif len(response.strip()) > 0:
                 return {"valid": True, "action": "modify", "modifications": response}
             else:
                 return {"valid": False, "error": "Empty response received"}
-                
+
         elif isinstance(response, dict):
             # Handle structured responses (from UI)
             response_type = response.get('type', '').lower()
@@ -333,17 +333,17 @@ If context suggests this is modifying a previous booking, incorporate that into 
             # For now, return the original booking details
             # TODO: Implement LLM-based modification processing
             modification_text = response if isinstance(response, str) else str(response)
-            
+
             # Simple keyword-based modifications (can be enhanced with LLM)
             original_details = booking_request.dict()
-            
+
             # Basic time modification detection
             if "time" in modification_text.lower():
                 # Could use LLM here to extract new time
                 pass
-                
+
             return original_details
-            
+
         except Exception as e:
             print(f"Error processing modifications: {e}")
             return None
@@ -354,10 +354,18 @@ If context suggests this is modifying a previous booking, incorporate that into 
         # Apply any human modifications
         args = booking_request.original_args.copy()
         args.update(modifications)
-        
-        # Ensure required instruction field is present for MCP tool
+
+        # Ensure all required fields are present for Pipedream MCP tool
+        if "summary" not in args:
+            args["summary"] = booking_request.title
+        if "start" not in args:
+            args["start"] = booking_request.start_time
+        if "end" not in args:
+            args["end"] = booking_request.end_time
+
+        # ADD THE MISSING INSTRUCTION PARAMETER HERE:
         if "instruction" not in args:
-            args["instruction"] = f"Create calendar event: {booking_request.title}"
+            args["instruction"] = f"Create calendar event: {booking_request.title} from {booking_request.start_time} to {booking_request.end_time}"
 
         # Find the correct MCP tool
         tool_to_use = None
@@ -366,6 +374,7 @@ If context suggests this is modifying a previous booking, incorporate that into 
                 tool_to_use = tool
                 break
 
+
         if not tool_to_use:
             return f"❌ Booking tool {booking_request.tool_name} not available"
 
@@ -373,17 +382,17 @@ If context suggests this is modifying a previous booking, incorporate that into 
             # **LANGGRAPH BEST PRACTICE**: Use async ainvoke() for StructuredTool
             print(f"🔧 Executing booking with args: {args}")
             result = await tool_to_use.ainvoke(args)
-            
+
             # Check if result indicates success
             if "error" in str(result).lower() or "failed" in str(result).lower():
                 return f"❌ Booking failed: {result}"
-                
+
             return f"✅ Booking Confirmed Successfully!\n\n📅 **{booking_request.title}**\n🕒 {booking_request.start_time} - {booking_request.end_time}\n\n📋 Event Details:\n{result}"
-            
+
         except Exception as e:
             error_msg = str(e)
             print(f"❌ Tool execution error: {error_msg}")
-            
+
             # Parse common error patterns
             if "invalid_type" in error_msg and "instruction" in error_msg:
                 return f"❌ Booking failed: Missing required instruction field for MCP tool\nError: {error_msg}"

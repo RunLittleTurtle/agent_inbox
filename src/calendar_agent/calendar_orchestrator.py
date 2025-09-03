@@ -275,12 +275,9 @@ USER FEEDBACK AND INPUT
         # Initialize booking node
         booking_node = BookingNode(self.booking_tools, self.model)
 
-        # Add nodes
+        # Add nodes - SIMPLIFIED: Only 2 nodes needed for 3-button UI
         workflow.add_node("calendar_agent", calendar_agent)
         workflow.add_node("booking_approval", booking_node.booking_approval_node)
-        workflow.add_node("booking_execute", booking_node.booking_execute_node)
-        workflow.add_node("booking_cancel", booking_node.booking_cancel_node)
-        workflow.add_node("booking_modify", booking_node.booking_modify_node)
 
         # Smart LLM-based routing with conversation context analysis
         def route_intent(state: MessagesState):
@@ -302,7 +299,7 @@ USER FEEDBACK AND INPUT
                 reasoning: str = Field(
                     description="Brief explanation of the routing decision"
                 )
-                next_action: Literal["booking_approval", "booking_execute", "booking_cancel", "booking_modify", "end"] = Field(
+                next_action: Literal["booking_approval", "end"] = Field(
                     description="Next node to route to"
                 )
                 user_intent: str = Field(
@@ -333,35 +330,43 @@ USER FEEDBACK AND INPUT
             context_str = "\n".join(conversation_context)
 
             # Enhanced routing prompt with context extraction
+            # Enhanced routing prompt with context extraction
             routing_prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are a smart calendar workflow router. Analyze the conversation to determine if the user's request requires booking approval workflow.
+                ("system", """You are a smart calendar workflow router. Analyze the conversation to determine the next action needed.
 
-BOOKING APPROVAL NEEDED FOR:
-- Creating new calendar events/meetings
-- Scheduling appointments
-- Booking time slots
-- Updating existing events (time, date, attendees)
-- Moving/rescheduling events
-- Deleting events
-- Any calendar modifications
+            ANALYZE TWO TYPES OF SITUATIONS:
 
-READ-ONLY OPERATIONS (no approval needed):
-- Checking availability
-- Viewing calendar events
-- Asking about free time slots
-- General calendar inquiries
+            1. CALENDAR AGENT EXPLICITLY INDICATES BOOKING APPROVAL NEEDED:
+               - Look for phrases like "requires booking approval", "transfer you to booking approval", "booking approval workflow"
+               - If the calendar agent explicitly mentions booking approval is needed, route to booking_approval
+               - This takes priority over user intent analysis
 
-USER CONTEXT CLUES:
-- "book", "schedule", "create", "move", "change", "update", "delete"
-- Specific time requests like "move to 11pm", "schedule for tomorrow"
-- Confirmation of available time slots
-- Meeting setup requests
+            2. USER INTENT ANALYSIS (if no explicit booking approval mentioned):
+               - Creating new calendar events/meetings
+               - Scheduling appointments
+               - Booking time slots
+               - Updating existing events (time, date, attendees)
+               - Moving/rescheduling events
+               - Deleting events
+               - Any calendar modifications
 
-IMPORTANT: Extract the user's intent and full booking context for downstream processing.
+            READ-ONLY OPERATIONS (no approval needed):
+            - Checking availability
+            - Viewing calendar events
+            - Asking about free time slots
+            - General calendar inquiries
 
-Analyze the FULL conversation context, not just the last message."""),
-                ("user", "Conversation context:\n{context}\n\nBased on this conversation, does the user need booking approval workflow? Also extract the user intent and booking context.")
+            ROUTING DECISION PRIORITY:
+            1. First check if calendar agent explicitly mentioned "booking approval" or "approval workflow"
+            2. If yes, return next_action: "booking_approval"
+            3. If no explicit mention, analyze user intent
+            4. If user intent requires booking, return next_action: "booking_approval"
+            5. Otherwise return next_action: "end"
+
+            CRITICAL: Pay special attention to the calendar agent's responses that mention "booking approval workflow" or "requires booking approval"."""),
+                ("user", "Conversation context:\n{context}\n\nAnalyze this conversation. Does the calendar agent explicitly mention booking approval is needed? Or does the user intent require booking operations? Return the appropriate next_action.")
             ])
+
 
             try:
                 # Use the existing model from calendar agent
@@ -401,40 +406,103 @@ Analyze the FULL conversation context, not just the last message."""),
                     # Update state with preserved context
                     state["messages"] = state.get("messages", []) + [context_message]
 
-                return decision.next_action if decision.needs_booking_approval else END
+                    # **FIXED**: Return the specific next action, not just a boolean check
+                    print(f"📍 Routing to: {decision.next_action}")
+                    return decision.next_action
+                else:
+                    print("📍 Routing to: END (no booking approval needed)")
+                    return END
 
             except Exception as e:
                 print(f"⚠️ Smart routing failed, using fallback: {e}")
-                # Fallback to simple keyword detection
+                # Fallback to keyword detection if LLM fails
                 last_msg = messages[-1] if messages else None
                 if last_msg and hasattr(last_msg, 'content'):
                     content = str(last_msg.content).lower()
-                    booking_keywords = ["book", "schedule", "create", "move", "change", "update", "delete", "cancel", "set up"]
-                    if any(keyword in content for keyword in booking_keywords):
+                    # Look for explicit booking approval mentions
+                    if ("booking approval" in content or
+                        "approval workflow" in content or
+                        "requires booking" in content):
+                        print("🔄 Fallback: Detected booking approval needed")
                         return "booking_approval"
+
+                print("🔄 Fallback: Routing to END")
                 return END
 
         def route_after_booking(state: MessagesState):
-            """Route after booking node completes - allow booking_node to route back to itself"""
-            # Check if there's new human feedback that needs booking_node processing
+            """Route after booking node completes - handle 3-button UI flow properly"""
             messages = state.get("messages", [])
-            if messages:
-                last_msg = messages[-1]
-                # If last message is human feedback, route back to booking_node
-                if hasattr(last_msg, 'type') and last_msg.type == "human":
-                    print("🔄 Human feedback detected - routing back to booking_node")
+            if not messages:
+                return END
+
+            # Check the last few messages to understand the flow
+            last_msg = messages[-1]
+
+            # If last message is from booking node, check what it indicates
+            if hasattr(last_msg, 'content'):
+                content = str(last_msg.content)
+
+                # If booking was executed or cancelled, end the flow
+                if ("✅" in content and "Booking Confirmed Successfully" in content) or \
+                   ("Booking cancelled by user" in content):
+                    print("🔄 Booking completed or cancelled - ending flow")
+                    return END
+
+                # If booking node indicates feedback processing, route back to calendar_agent
+                if ("I understand you want to modify" in content or
+                    "I've updated the details based on your feedback" in content):
+                    print("🔄 Feedback processed - routing back to calendar_agent for re-evaluation")
+                    return "calendar_agent"
+
+            # Check if there's human feedback that needs processing
+            human_msgs = [msg for msg in messages[-3:] if isinstance(msg, HumanMessage)]
+            if human_msgs:
+                last_human_msg = human_msgs[-1]
+                response = last_human_msg.content.strip()
+
+                # If it's accept/reject, stay in booking flow
+                if response in ["accept", "reject"]:
+                    print("🔄 Accept/reject detected - staying in booking flow")
                     return "booking_approval"
+                else:
+                    # It's feedback - route back to calendar_agent with preserved context
+                    print("🔄 User feedback detected - routing back to calendar_agent")
+                    return "calendar_agent"
+
             return END
 
-        # Set up clean routing flow - human feedback loops back through booking_node
+        # Set up SIMPLIFIED routing flow - only 2 nodes needed
         workflow.add_conditional_edges(START, route_intent,
                                      {"calendar_agent": "calendar_agent"})
-        workflow.add_conditional_edges("calendar_agent", route_after_calendar,
-                                     {"booking_approval": "booking_approval", "booking_execute": "booking_execute", "booking_cancel": "booking_cancel", "booking_modify": "booking_modify", END: END})
-        workflow.add_conditional_edges("booking_approval", route_after_booking,
-                                     {"booking_approval": "booking_approval", "booking_execute": "booking_execute", "booking_cancel": "booking_cancel", "booking_modify": "booking_modify", END: END})
 
-        return workflow.compile(checkpointer=MemorySaver(), name="calendar_agent")
+        # Simplified: Only route between calendar_agent and booking_approval
+        workflow.add_conditional_edges(
+            "calendar_agent",
+            route_after_calendar,
+            {
+                "booking_approval": "booking_approval",
+                "end": END,
+                END: END
+            }
+        )
+
+        workflow.add_conditional_edges(
+            "booking_approval",
+            route_after_booking,
+            {
+                "booking_approval": "booking_approval",  # Stay for accept/reject
+                "calendar_agent": "calendar_agent",       # Route feedback back
+                END: END
+            }
+        )
+
+        return workflow.compile(
+            checkpointer=MemorySaver(),
+            name="calendar_agent"
+        )
+
+
+
 
     async def get_agent(self):
         """Get the LangGraph agent for supervisor integration"""

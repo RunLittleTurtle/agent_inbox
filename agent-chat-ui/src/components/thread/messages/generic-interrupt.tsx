@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Check, X, Edit } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useStreamContext } from "@/providers/Stream";
 
 function isComplexValue(value: any): boolean {
@@ -19,10 +18,96 @@ function isUrl(value: any): boolean {
   }
 }
 
-function renderInterruptStateItem(value: any): React.ReactNode {
+function parseInterruptText(text: string): { [key: string]: string } | null {
+  if (typeof text !== "string" || text.length < 30) return null;
+
+  const parsed: { [key: string]: string } = {};
+
+  // Parse the exact format: "🗓️ Booking approval required: Planning voyage Start: 2025-09-05T14:00:00-04:00 End: 2025-09-05T15:00:00-04:00 Location: None Description: Réunion pour planifier un voyage Approve (yes), modify, or reject?"
+
+  // Extract main request type (everything before the first colon after emoji)
+  const requestMatch = text.match(/^[^\w]*([^:]+):\s*(.+)/);
+  if (requestMatch) {
+    parsed["Request Type"] = requestMatch[1].trim();
+    const remainingText = requestMatch[2];
+
+    // Extract event details (everything before "Start:")
+    const eventMatch = remainingText.match(/^([^S]+?)(?=\s+Start:)/);
+    if (eventMatch) {
+      parsed["Event"] = eventMatch[1].trim();
+    }
+
+    // Extract start time
+    const startMatch = remainingText.match(/Start:\s*([\d-T:+]+)/);
+    if (startMatch) {
+      parsed["Start Time"] = formatDateTime(startMatch[1]);
+    }
+
+    // Extract end time
+    const endMatch = remainingText.match(/End:\s*([\d-T:+]+)/);
+    if (endMatch) {
+      parsed["End Time"] = formatDateTime(endMatch[1]);
+    }
+
+    // Extract location (only if not "None")
+    const locationMatch = remainingText.match(
+      /Location:\s*([^\s]+(?:\s+[^\s]+)*?)(?:\s+Description:|$)/,
+    );
+    if (locationMatch) {
+      const location = locationMatch[1].trim();
+      if (location && location !== "None") {
+        parsed["Location"] = location;
+      }
+    }
+
+    // Extract description
+    const descMatch = remainingText.match(
+      /Description:\s*([^A]+?)(?:\s+Approve|$)/,
+    );
+    if (descMatch) {
+      const desc = descMatch[1].trim();
+      if (desc) {
+        parsed["Description"] = desc;
+      }
+    }
+
+    // Extract approval prompt
+    const approveMatch = remainingText.match(/(Approve\s*\([^)]+\)[^?]*\?)/);
+    if (approveMatch) {
+      parsed["Action Required"] = approveMatch[1].trim();
+    }
+  }
+
+  return Object.keys(parsed).length > 2 ? parsed : null;
+}
+
+function formatDateTime(dateTimeStr: string): string {
+  try {
+    const date = new Date(dateTimeStr);
+    if (!isNaN(date.getTime())) {
+      return date.toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+      });
+    }
+  } catch (e) {
+    // Return original if parsing fails
+  }
+  return dateTimeStr;
+}
+
+function renderInterruptStateItem(value: any, key?: string): React.ReactNode {
+  if (value === null || value === undefined) {
+    return <span className="text-gray-400 italic">null</span>;
+  }
+
   if (isComplexValue(value)) {
     return (
-      <code className="rounded bg-gray-50 px-2 py-1 font-mono text-sm">
+      <code className="rounded bg-gray-50 px-2 py-1 font-mono text-sm whitespace-pre-wrap">
         {JSON.stringify(value, null, 2)}
       </code>
     );
@@ -38,7 +123,82 @@ function renderInterruptStateItem(value: any): React.ReactNode {
       </a>
     );
   } else {
-    return String(value);
+    const stringValue = String(value);
+
+    // Try to parse structured text for better display
+    if (key === "value" && stringValue.length > 30) {
+      // Always organize the data by splitting on key patterns
+      const parts = stringValue.split(
+        /(?=\s(?:Start|End|Location|Description|Approve)(?:\s|:))/i,
+      );
+
+      if (parts.length > 1) {
+        return (
+          <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+            {parts.map((part, idx) => {
+              const trimmed = part.trim();
+              if (!trimmed) return null;
+
+              // Check if this part has a field pattern (word followed by colon)
+              const colonMatch = trimmed.match(/^([^:]+?):\s*(.+)$/s);
+              if (colonMatch) {
+                const fieldName = colonMatch[1].replace(/^[^\w\s]*/, "").trim(); // Remove emoji
+                let fieldValue = colonMatch[2].trim();
+
+                // Clean up field values
+                if (
+                  fieldValue.includes(" Start:") ||
+                  fieldValue.includes(" End:") ||
+                  fieldValue.includes(" Location:") ||
+                  fieldValue.includes(" Description:")
+                ) {
+                  fieldValue = fieldValue
+                    .split(/\s(?:Start|End|Location|Description):/)[0]
+                    .trim();
+                }
+
+                // Format dates if detected
+                if (
+                  fieldName.toLowerCase().includes("start") ||
+                  fieldName.toLowerCase().includes("end")
+                ) {
+                  fieldValue = formatDateTime(fieldValue);
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    className="border-l-4 border-blue-500 bg-blue-50 py-2 pl-4"
+                  >
+                    <div className="mb-1 text-xs font-bold tracking-wider text-blue-800 uppercase">
+                      {fieldName}
+                    </div>
+                    <div className="text-sm leading-relaxed font-medium text-gray-900">
+                      {fieldValue}
+                    </div>
+                  </div>
+                );
+              } else {
+                // For text without colon, treat as general content
+                return (
+                  <div
+                    key={idx}
+                    className="rounded border-l-4 border-gray-300 bg-gray-50 p-3 text-sm text-gray-700"
+                  >
+                    {trimmed}
+                  </div>
+                );
+              }
+            })}
+          </div>
+        );
+      }
+    }
+
+    // Default rendering for other cases
+    return (
+      <span className="text-sm break-words text-gray-800">{stringValue}</span>
+    );
   }
 }
 
@@ -48,8 +208,6 @@ export function GenericInterruptView({
   interrupt: Record<string, any> | Record<string, any>[];
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showModifyInput, setShowModifyInput] = useState(false);
-  const [modifyText, setModifyText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const thread = useStreamContext();
 
@@ -86,13 +244,16 @@ export function GenericInterruptView({
   const processEntries = () => {
     if (Array.isArray(interrupt)) {
       return isExpanded ? interrupt : interrupt.slice(0, 5);
-    } else {
+    } else if (typeof interrupt === "object" && interrupt !== null) {
       const entries = Object.entries(interrupt);
       if (!isExpanded && shouldTruncate) {
         // When collapsed, process each value to potentially truncate it
         return entries.map(([key, value]) => [key, truncateValue(value)]);
       }
       return entries;
+    } else {
+      // Handle primitive values (strings, numbers, etc.) - don't treat as arrays
+      return [["value", interrupt]];
     }
   };
 
@@ -100,23 +261,28 @@ export function GenericInterruptView({
 
   // Check if this is an interrupt that allows actions
   const interruptObj = Array.isArray(interrupt) ? interrupt[0] : interrupt;
-  const hasActions = interruptObj && 
-    typeof interruptObj === "object" && 
-    "config" in interruptObj &&
-    typeof interruptObj.config === "object";
+
+  // More flexible action detection - always show actions for human interrupts
+  // This ensures users can always respond to interrupts requesting feedback
+  const hasActions = true; // Show actions for all human interrupts
 
   // Action handlers
   const handleAccept = async () => {
     setIsSubmitting(true);
     try {
-      thread.submit({}, {
-        command: {
-          resume: [{
-            type: "accept",
-            args: null
-          }]
-        }
-      });
+      thread.submit(
+        {},
+        {
+          command: {
+            resume: [
+              {
+                type: "accept",
+                args: null,
+              },
+            ],
+          },
+        },
+      );
     } catch (error) {
       console.error("Failed to accept:", error);
     } finally {
@@ -127,14 +293,19 @@ export function GenericInterruptView({
   const handleReject = async () => {
     setIsSubmitting(true);
     try {
-      thread.submit({}, {
-        command: {
-          resume: [{
-            type: "ignore",
-            args: "Rejected by user"
-          }]
-        }
-      });
+      thread.submit(
+        {},
+        {
+          command: {
+            resume: [
+              {
+                type: "ignore",
+                args: "Rejected by user",
+              },
+            ],
+          },
+        },
+      );
     } catch (error) {
       console.error("Failed to reject:", error);
     } finally {
@@ -142,27 +313,6 @@ export function GenericInterruptView({
     }
   };
 
-  const handleModify = async () => {
-    if (!modifyText.trim()) return;
-    
-    setIsSubmitting(true);
-    try {
-      thread.submit({}, {
-        command: {
-          resume: [{
-            type: "response",
-            args: modifyText
-          }]
-        }
-      });
-      setShowModifyInput(false);
-      setModifyText("");
-    } catch (error) {
-      console.error("Failed to modify:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200">
@@ -205,7 +355,7 @@ export function GenericInterruptView({
                           {key}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">
-                          {renderInterruptStateItem(value)}
+                          {renderInterruptStateItem(value, key)}
                         </td>
                       </tr>
                     );
@@ -230,78 +380,27 @@ export function GenericInterruptView({
 
         {/* Action Buttons for Interrupts */}
         {hasActions && (
-          <div className="border-t border-gray-200 bg-white p-4 space-y-3">
-            {/* Modify Input */}
-            {showModifyInput && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="space-y-2"
-              >
-                <Textarea
-                  placeholder="Provide feedback or describe changes..."
-                  value={modifyText}
-                  onChange={(e) => setModifyText(e.target.value)}
-                  className="min-h-[80px] resize-none"
-                />
-              </motion.div>
-            )}
-
-            {/* Action Buttons */}
+          <div className="border-t border-gray-200 bg-white p-4">
             <div className="flex flex-wrap gap-2">
-              <Button 
+              <Button
                 onClick={handleAccept}
                 disabled={isSubmitting}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 text-white hover:bg-green-700"
                 size="sm"
               >
-                <Check className="h-4 w-4 mr-1" />
+                <Check className="mr-1 h-4 w-4" />
                 Accept
               </Button>
-              
-              <Button 
+
+              <Button
                 onClick={handleReject}
                 disabled={isSubmitting}
                 variant="destructive"
                 size="sm"
               >
-                <X className="h-4 w-4 mr-1" />
+                <X className="mr-1 h-4 w-4" />
                 Reject
               </Button>
-              
-              {!showModifyInput ? (
-                <Button 
-                  onClick={() => setShowModifyInput(true)}
-                  disabled={isSubmitting}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Modify
-                </Button>
-              ) : (
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handleModify}
-                    disabled={isSubmitting || !modifyText.trim()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    size="sm"
-                  >
-                    Submit Feedback
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      setShowModifyInput(false);
-                      setModifyText("");
-                    }}
-                    disabled={isSubmitting}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         )}

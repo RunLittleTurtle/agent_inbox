@@ -51,17 +51,26 @@ async function checkGraphStatus(
   apiKey: string | null,
 ): Promise<boolean> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    
     const res = await fetch(`${apiUrl}/info`, {
+      signal: controller.signal,
       ...(apiKey && {
         headers: {
           "X-Api-Key": apiKey,
         },
       }),
     });
-
+    
+    clearTimeout(timeoutId);
     return res.ok;
-  } catch (e) {
-    console.error(e);
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      console.log('Health check timeout - server may be restarting');
+    } else {
+      console.log('Server unavailable - likely restarting after graph.py changes');
+    }
     return false;
   }
 }

@@ -6,6 +6,10 @@ import os
 import sys
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add local libraries to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
@@ -58,24 +62,70 @@ class BookingNode:
         if not messages:
             return {"messages": [AIMessage(content="No messages found.")]}
         
-        # Get the last human message that contains booking intent
-        last_message = None
-        for msg in reversed(messages):
-            if isinstance(msg, HumanMessage):
-                last_message = msg
-                break
+        # **ENHANCED**: Extract routing context from previous decisions
+        routing_context = None
+        booking_context = None
+        conversation_summary = ""
         
-        if not last_message:
-            return {"messages": [AIMessage(content="No booking request found.")]}
+        # Look for routing context in recent messages
+        for msg in reversed(messages[-10:]):  # Check last 10 messages
+            if hasattr(msg, 'additional_kwargs') and msg.additional_kwargs:
+                kwargs = msg.additional_kwargs
+                if 'routing_decision' in kwargs:
+                    routing_context = kwargs['routing_decision']
+                if 'booking_context' in kwargs:
+                    booking_context = kwargs['booking_context']
+                if 'conversation_summary' in kwargs:
+                    conversation_summary = kwargs['conversation_summary']
+                if 'user_intent' in kwargs:
+                    user_intent = kwargs['user_intent']
+                    break
         
-        # Extract booking intent from the last message
-        booking_intent = last_message.content
+        # Fallback: Extract from conversation if no routing context found
+        if not routing_context:
+            print("⚠️ No routing context found, analyzing conversation manually")
+            # Get the full conversation context for booking analysis
+            user_messages = []
+            for msg in messages:
+                if isinstance(msg, HumanMessage):
+                    # Handle both string and list content types
+                    content = msg.content
+                    if isinstance(content, list):
+                        content_str = " ".join(str(item) for item in content if item)
+                    else:
+                        content_str = str(content) if content else ""
+                    user_messages.append(content_str)
+            
+            if not user_messages:
+                return {"messages": [AIMessage(content="No booking request found.")]}
+            
+            # Use the conversation flow, not just last message
+            booking_intent = " ".join(user_messages[-3:])  # Last 3 user messages for context
+            conversation_summary = "\n".join([f"User: {msg}" for msg in user_messages[-5:]])
+        else:
+            # Use preserved routing context
+            booking_intent = routing_context.get('user_intent', '')
+            if not booking_intent and booking_context:
+                booking_intent = booking_context.get('original_intent', '')
+            
+            print(f"✅ Found routing context - Intent: {booking_intent}")
+            print(f"📊 Router reasoning: {routing_context.get('reasoning', 'N/A')}")
         
-        # Parse booking details using LLM
-        booking_details = await self._extract_booking_details(booking_intent, messages)
+        # Parse booking details using enhanced context
+        booking_details = await self._extract_booking_details_enhanced(
+            booking_intent, 
+            messages,
+            conversation_summary,
+            routing_context
+        )
         
         if not booking_details:
-            return {"messages": [AIMessage(content="Could not understand booking request. Please provide more details.")]}
+            # Provide more helpful error with context
+            error_msg = f"Could not understand booking request from: '{booking_intent}'"
+            if routing_context:
+                error_msg += f"\nRouter analysis: {routing_context.get('reasoning', 'N/A')}"
+            error_msg += "\nPlease provide more details about what you want to book."
+            return {"messages": [AIMessage(content=error_msg)]}
         
         # Create booking request for human approval
         booking_request = BookingRequest(**booking_details)
@@ -137,8 +187,14 @@ class BookingNode:
             else:
                 prompt = "Please respond with 'yes' to approve, 'no' to reject, or provide modification details."
     
-    async def _extract_booking_details(self, booking_intent: str, context_messages: List[BaseMessage]) -> Optional[Dict[str, Any]]:
-        """Extract structured booking details from natural language intent with conversation context"""
+    async def _extract_booking_details_enhanced(
+        self, 
+        booking_intent: str, 
+        context_messages: List[BaseMessage],
+        conversation_summary: str,
+        routing_context: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Enhanced booking detail extraction with full conversation context"""
         
         # Get timezone context from .env using async pattern
         import os
@@ -149,28 +205,41 @@ class BookingNode:
         # Use asyncio.to_thread to avoid blocking I/O in async context
         current_time = await asyncio.to_thread(lambda: datetime.now(ZoneInfo(timezone_name)))
         
+        # Enhanced extraction prompt with conversation context
         extraction_prompt = f"""Extract booking details from this request: "{booking_intent}"
 
-IMPORTANT CONTEXT:
+CONVERSATION CONTEXT:
+{conversation_summary}
+
+ROUTING ANALYSIS:
+{routing_context.get('reasoning', 'None') if routing_context else 'None'}
+
+CURRENT TIME CONTEXT:
 - Current time: {current_time.isoformat()}
 - Timezone: {timezone_name}
 - Today's date: {current_time.strftime('%Y-%m-%d')}
 - Current day: {current_time.strftime('%A')}
 
-Based on the request, extract:
-1. Event title/summary
+EXTRACTION RULES:
+1. Use the FULL conversation context to understand the booking intent
+2. If the request mentions "instead" or "change to", look for previous booking attempts
+3. Extract relative time references (tonight, tomorrow, next week)
+4. Infer missing details from conversation context
+
+Based on the request and context, extract:
+1. Event title/summary (infer from conversation if not explicit)
 2. Start date/time (convert relative terms using the current context above)
    - "tomorrow" = {(current_time + timedelta(days=1)).strftime('%Y-%m-%d')}
    - "tonight" = today ({current_time.strftime('%Y-%m-%d')}) evening
    - "next week" = week starting {(current_time + timedelta(days=7)).strftime('%Y-%m-%d')}
 3. End date/time (if not specified, assume 1 hour duration)
-4. Description (if any)
+4. Description (if any, or infer from conversation)
 5. Location (if any)
 6. Attendees (if any)
 
 Return a JSON object with these fields:
 - tool_name: "google_calendar-create-event"
-- title: string
+- title: string (descriptive title based on context)
 - start_time: ISO format with timezone (e.g., "2025-09-03T15:00:00-04:00")
 - end_time: ISO format with timezone  
 - description: string or null
@@ -179,6 +248,7 @@ Return a JSON object with these fields:
 - original_args: object with Google Calendar API format
 
 ALWAYS include timezone offset in ISO format. Use {timezone_name} timezone.
+If context suggests this is modifying a previous booking, incorporate that into the title.
 """
         
         try:
@@ -192,7 +262,16 @@ ALWAYS include timezone offset in ISO format. Use {timezone_name} timezone.
                 start = content.find('{')
                 end = content.rfind('}') + 1
                 json_str = content[start:end]
-                return json.loads(json_str)
+                result = json.loads(json_str)
+                
+                # Add context metadata
+                result['_context'] = {
+                    'routing_analysis': routing_context,
+                    'conversation_summary': conversation_summary,
+                    'extraction_source': 'enhanced_context'
+                }
+                
+                return result
         except Exception as e:
             print(f"Error extracting booking details: {e}")
         
@@ -203,10 +282,9 @@ ALWAYS include timezone offset in ISO format. Use {timezone_name} timezone.
         
         # Apply any human modifications
         args = booking_request.original_args.copy()
-        if modifications:
-            args.update(modifications)
+        args.update(modifications)
         
-        # Find the appropriate tool
+        # Find the correct MCP tool
         tool_to_use = None
         for tool in self.booking_tools:
             if tool.name == booking_request.tool_name:
@@ -222,3 +300,16 @@ ALWAYS include timezone offset in ISO format. Use {timezone_name} timezone.
             return f"✅ Booking confirmed: {booking_request.title}\n{result}"
         except Exception as e:
             return f"❌ Booking failed: {str(e)}"
+    
+    async def booking_execute_node(self, state: MessagesState) -> Dict[str, Any]:
+        """Execute approved booking after human approval"""
+        # This would be called after approval is given
+        return {"messages": [AIMessage(content="Booking execution not implemented yet.")]}
+    
+    async def booking_cancel_node(self, state: MessagesState) -> Dict[str, Any]:
+        """Handle booking cancellation"""
+        return {"messages": [AIMessage(content="Booking cancelled by user.")]}
+    
+    async def booking_modify_node(self, state: MessagesState) -> Dict[str, Any]:
+        """Handle booking modifications"""
+        return {"messages": [AIMessage(content="Booking modification not implemented yet.")]}

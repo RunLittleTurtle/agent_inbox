@@ -8,6 +8,10 @@ import asyncio
 import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.tools import BaseTool
@@ -20,6 +24,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langchain-mcp-adapters'))
 
+
 # Local LangGraph imports
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent
@@ -28,7 +33,7 @@ from langgraph.checkpoint.memory import MemorySaver
 # Local langchain-mcp-adapters imports
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-# from .state import CalendarAgentState  # Comment out for now to avoid import issues
+from .state import CalendarAgentState, RoutingDecision, BookingContext
 
 
 class CalendarAgentWithMCP:
@@ -117,20 +122,20 @@ class CalendarAgentWithMCP:
             # Filter tools: separate booking tools from read-only tools
             self.booking_tools = []
             self.tools = []
-            
+
             booking_tool_names = {
                 'google_calendar-quick-add-event',
-                'google_calendar-create-event', 
+                'google_calendar-create-event',
                 'google_calendar-delete-event',
                 'google_calendar-add-attendees-to-event',
                 'google_calendar-update-event'
             }
-            
+
             # Tools that don't work properly and should be excluded
             excluded_tool_names = {
                 'google_calendar-query-free-busy-calendars'  # This tool doesn't work, use list-events instead
             }
-            
+
             for tool in all_tools:
                 if tool.name in excluded_tool_names:
                     print(f"   EXCLUDED: {tool.name} (doesn't work properly)")
@@ -143,7 +148,7 @@ class CalendarAgentWithMCP:
             print(f"Loaded {len(self.tools)} read-only calendar tools")
             for tool in self.tools:
                 print(f"   {tool.name}: {tool.description}")
-            
+
             print(f"Separated {len(self.booking_tools)} booking tools for approval workflow")
             for tool in self.booking_tools:
                 print(f"   {tool.name}: [REQUIRES APPROVAL]")
@@ -160,12 +165,11 @@ class CalendarAgentWithMCP:
 
     async def _create_calendar_graph(self):
         """Create calendar agent using pure LangGraph create_react_agent pattern"""
-        
+
         # Create enhanced prompt for calendar operations
         if not self.tools:
             prompt = """You are a calendar agent in a multi-agent supervisor system.
 
-CRITICAL: You currently have NO working calendar tools available.
 
 When users request calendar operations:
 1. Acknowledge their specific request with details
@@ -181,76 +185,74 @@ NEVER claim to have successfully completed calendar operations when you have no 
             from datetime import timedelta
             timezone_name = os.getenv("USER_TIMEZONE", "America/Toronto")
             current_time = datetime.now(ZoneInfo(timezone_name))
-            
-            prompt = f"""You are a helpful calendar management assistant with access to Google Calendar via MCP tools.
 
-CURRENT CONTEXT (always use this for relative time references):
-- Current time: {current_time.isoformat()}
+            prompt = f"""You are a helpful Calendar Agent with READ-ONLY access to Google Calendar via MCP tools.
+
+CONTEXT (use for all relative references):
+- Now: {current_time.isoformat()}
 - Timezone: {timezone_name}
-- Today's date: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})
-- Tomorrow's date: {(current_time + timedelta(days=1)).strftime('%Y-%m-%d')}
+- Today: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})
+- Tomorrow: {(current_time + timedelta(days=1)).strftime('%Y-%m-%d')} ({(current_time + timedelta(days=1)).strftime('%A')})
 
-Your capabilities include:
-- Checking calendar availability and free/busy times
-- Reading existing calendar events  
-- Viewing calendar details and settings
+PRINCIPLES
+- Assume ALL user times are in the user’s LOCAL timezone.
+- Never ask for timezone; never convert to UTC in tool calls.
+- Operate only on the MAIN calendar.
+- Always include timezone context in your replies.
+- IMPORTANT: You have READ-ONLY access to calendar tools. For any booking, creating, updating, or deleting operations, you must inform the user that this requires booking approval and will transfer them to the booking approval workflow.
+- CRITICAL: Never call transfer_back_to_multi_agent_supervisor - the supervisor handles returns automatically.
+- When the request and tasks are completed, _end_, this will automatically transfer_back_to_multi_agent_supervisor, do not attempt to call tool to transfer back to supervisor.
 
-CRITICAL TIME HANDLING RULES:
-- When users mention times (like "10pm", "2:30 PM"), ALWAYS assume they mean their LOCAL timezone
-- NEVER convert times to UTC in your tool calls
-- IMPORTANT: Always use MAIN calendar for operations, not holiday/special calendars
-- When creating calendar events, use the exact time the user specified
-- Always include timezone context in your responses
+CAPABILITIES (read-only)
+- Check availability and free/busy by listing events in a time window.
+- Read existing events and basic calendar details/settings.
 
-TOOL USAGE GUIDELINES:
-- Use google_calendar-list-events to check availability and find conflicts
-- Always use ISO 8601 format in instructions (e.g., '2025-01-15T09:00:00-05:00')
-- For availability checks: List events for the relevant time period, then analyze overlaps
-- Be thorough in checking for overlaps when scheduling new events
+TOOL USAGE
+- Prefer `google_calendar-list-events` to inspect availability.
+- Use ISO-8601 with explicit offset (e.g., 2025-01-15T09:00:00-05:00).
+- For availability checks: list events covering the requested window; analyze overlaps and free gaps.
 
-IMPORTANT: You have READ-ONLY access to calendar tools. For any booking, creating, updating, or deleting operations, you must inform the user that this requires booking approval and will transfer them to the booking approval workflow.
+BOOKING REQUESTS (requires approval workflow)
+1) First, check availability with read-only tools using the context above and the AVAILABILITY SEARCH STRATEGY below with list-event.
+2) If the requested slot is free, respond exactly with:
+   "Time slot is available. This requires booking approval — I'll transfer you to the booking approval workflow."
+3) If there is a conflict:
+    - Automatically search alternatives (do not ask the user to propose times without options).
+    - Follow the AVAILABILITY SEARCH STRATEGY to find free slots.
+4) After the user chooses a specific slot, respond exactly with:
+   "Perfect! I'll transfer you to the booking approval workflow for [chosen time]."
+5) CRITICAL: Never claim that a meeting is booked/scheduled until it has completed the booking_node approval workflow. The booking_node approval workflow performs actual modifications and provides the event link.
 
-When users request booking operations:
-1. First check availability using your read-only tools if possible (use the current context above for date/time calculations)
-2. If the time slot is available, respond with: "Time slot is available. This requires booking approval - I'll transfer you to the booking approval workflow."
-3. If the time slot is NOT available (conflict detected):
-   - IMMEDIATELY search for alternative time slots automatically
-   - Check at least 2-3 alternative times on the same day first
-   - Then check 2-3 times on the next day
-   - ALWAYS present concrete alternatives to the user, such as:
-     "The requested time slot has a conflict. Here are available alternatives I found:
-     
-     **Same Day Options:**
-     - 7:00 PM - 8:00 PM (available)
-     - 10:00 PM - 11:00 PM (available)
-     
-     **Tomorrow Options:**
-     - 9:00 PM - 10:00 PM (available)
-     
-     Which time would you prefer? Please let me know your choice and I'll proceed with booking approval."
-   - NEVER just ask the user to suggest a different time without providing concrete options
-   - BE PERSISTENT: Keep searching different time slots until you find at least 2 alternatives
-   - CRITICAL: When presenting alternatives, DO NOT route to booking approval yet - wait for user to choose specific time
-4. ONLY after user chooses a specific time slot from alternatives, then proceed with: "Perfect! I'll transfer you to the booking approval workflow for [chosen time]."
-5. CRITICAL: NEVER claim a meeting is booked/scheduled until it has completed the booking approval workflow
-6. NEVER say "meeting is now scheduled" or "meeting is booked" - you only check availability and route to approval
-7. The booking approval workflow will handle the actual calendar modifications
+MODIFICATION REQUESTS (change/move existing events):
+- For ANY modification request (change time, move event, reschedule), respond exactly with:
+  "I understand you want to modify the event. This requires booking approval — proceeding to modification workflow."
+- NEVER transfer back to supervisor for modification requests
+- Let the internal routing handle booking modifications
 
-CRITICAL AVAILABILITY SEARCH STRATEGY:
+AVAILABILITY SEARCH STRATEGY
 - When conflicts are found, automatically expand your search
 - To check if time slots are free: Use list-events for the date/time range
-- Analyze the returned events to identify conflicts and free periods
-- Calculate available time slots by finding gaps between existing events
+- Derive free gaps by comparing the requested slot against returned events.
+- Persist until you can present AT LEAST 2 viable alternatives or until the day's search space is exhausted.
 - Try same day: 1-2 hours earlier, 1-2 hours later
 - Try next day: same time, 1 hour earlier, 1 hour later
 - NEVER give up on availability searches after the first attempt
 - Continue searching until you find AT LEAST 2 available options
-- Present all findings clearly to the user
+- Present findings compactly and concretely in LOCAL time.
 
-Remember: Users speak in their local time, keep it in their local time!
+COMMUNICATION
+- Be precise, proactive, and honest about read-only constraints.
+- Summarize assumptions in bullet points (date, time, duration, timezone) before proposing or confirming next steps.
+- IMPORTANT: Do NOT call transfer tools unless explicitly handling a completed booking workflow
+- Let the internal routing system handle workflow transitions to booking_node
 
-NEVER ask users for timezone information - always use the context provided above.
-Always be helpful and provide calendar information using your available tools."""
+USER FEEDBACK AND INPUT
+- When user feedback or future input from the user is received, clearly analyse the feedback.
+- Once analysed, provide the necessary routing.
+- Always follow your instruction, even if you did it in prior workflow.
+- The goal is to always help the user with the latest request.
+
+"""
 
         # Create the main calendar agent (read-only operations)
         calendar_agent = create_react_agent(
@@ -259,61 +261,179 @@ Always be helpful and provide calendar information using your available tools.""
             name="calendar_agent",
             prompt=prompt
         )
-        
+
         # If no booking tools, just return the simple agent
         if not self.booking_tools:
             return calendar_agent
-        
+
         # Create StateGraph wrapper for routing to booking node
         from langgraph.graph import StateGraph, START, END
         from .booking_node import BookingNode
-        
+
         workflow = StateGraph(MessagesState)
-        
+
         # Initialize booking node
         booking_node = BookingNode(self.booking_tools, self.model)
-        
+
         # Add nodes
         workflow.add_node("calendar_agent", calendar_agent)
-        workflow.add_node("booking_node", booking_node.booking_approval_node)
-        
-        # Simplified routing - let calendar agent handle the decision
+        workflow.add_node("booking_approval", booking_node.booking_approval_node)
+        workflow.add_node("booking_execute", booking_node.booking_execute_node)
+        workflow.add_node("booking_cancel", booking_node.booking_cancel_node)
+        workflow.add_node("booking_modify", booking_node.booking_modify_node)
+
+        # Smart LLM-based routing with conversation context analysis
         def route_intent(state: MessagesState):
-            """Route all requests to calendar agent first - it will determine if booking approval needed"""
+            """Route all calendar requests to calendar_agent first"""
             return "calendar_agent"
-        
+
         def route_after_calendar(state: MessagesState):
-            """Route after calendar agent completes"""
-            # Check if calendar agent indicates booking approval needed
+            """Smart LLM-based routing after calendar agent completes"""
+            from langchain_core.prompts import ChatPromptTemplate
+            from pydantic import BaseModel, Field
+            from typing import Literal
+
+            # Define structured output for routing decisions
+            class RoutingDecision(BaseModel):
+                """Routing decision based on conversation analysis"""
+                needs_booking_approval: bool = Field(
+                    description="True if the conversation indicates a booking, scheduling, creating, updating, or deleting calendar events"
+                )
+                reasoning: str = Field(
+                    description="Brief explanation of the routing decision"
+                )
+                next_action: Literal["booking_approval", "booking_execute", "booking_cancel", "booking_modify", "end"] = Field(
+                    description="Next node to route to"
+                )
+                user_intent: str = Field(
+                    description="Extracted user intent from conversation"
+                )
+                booking_context: Optional[str] = Field(
+                    default=None, description="Full booking context from conversation"
+                )
+
+            # Get conversation context
+            messages = state.get("messages", [])
+            if not messages:
+                return END
+
+            # Prepare conversation history for LLM analysis
+            conversation_context = []
+            for msg in messages[-6:]:  # Last 6 messages for context
+                if hasattr(msg, 'content'):
+                    content = msg.content
+                    if isinstance(content, list):
+                        content = " ".join(str(item) for item in content if item)
+                    elif not isinstance(content, str):
+                        content = str(content)
+
+                    role = getattr(msg, 'type', 'unknown')
+                    conversation_context.append(f"{role}: {content}")
+
+            context_str = "\n".join(conversation_context)
+
+            # Enhanced routing prompt with context extraction
+            routing_prompt = ChatPromptTemplate.from_messages([
+                ("system", """You are a smart calendar workflow router. Analyze the conversation to determine if the user's request requires booking approval workflow.
+
+BOOKING APPROVAL NEEDED FOR:
+- Creating new calendar events/meetings
+- Scheduling appointments
+- Booking time slots
+- Updating existing events (time, date, attendees)
+- Moving/rescheduling events
+- Deleting events
+- Any calendar modifications
+
+READ-ONLY OPERATIONS (no approval needed):
+- Checking availability
+- Viewing calendar events
+- Asking about free time slots
+- General calendar inquiries
+
+USER CONTEXT CLUES:
+- "book", "schedule", "create", "move", "change", "update", "delete"
+- Specific time requests like "move to 11pm", "schedule for tomorrow"
+- Confirmation of available time slots
+- Meeting setup requests
+
+IMPORTANT: Extract the user's intent and full booking context for downstream processing.
+
+Analyze the FULL conversation context, not just the last message."""),
+                ("user", "Conversation context:\n{context}\n\nBased on this conversation, does the user need booking approval workflow? Also extract the user intent and booking context.")
+            ])
+
+            try:
+                # Use the existing model from calendar agent
+                llm = self.model.with_structured_output(RoutingDecision)
+
+                decision = llm.invoke(routing_prompt.format_messages(context=context_str))
+
+                # Log routing decision for debugging
+                print(f"🤖 Smart Router Decision: {decision.next_action}")
+                print(f"📝 Reasoning: {decision.reasoning}")
+                print(f"🎯 User Intent: {decision.user_intent}")
+
+                # **CRITICAL**: Preserve routing decision in state
+                if decision.needs_booking_approval:
+                    # Create enriched booking context
+                    booking_context = BookingContext(
+                        original_intent=decision.user_intent,
+                        routing_analysis=decision,
+                        conversation_summary=context_str,
+                        previous_attempts=[],
+                        calendar_constraints=[],
+                        extracted_details=None
+                    )
+
+                    # Add routing decision and booking context to messages
+                    from langchain_core.messages import AIMessage
+                    context_message = AIMessage(
+                        content=f"🔄 ROUTING CONTEXT: {decision.reasoning}",
+                        additional_kwargs={
+                            "routing_decision": decision.dict(),
+                            "booking_context": booking_context.dict(),
+                            "user_intent": decision.user_intent,
+                            "conversation_summary": context_str
+                        }
+                    )
+
+                    # Update state with preserved context
+                    state["messages"] = state.get("messages", []) + [context_message]
+
+                return decision.next_action if decision.needs_booking_approval else END
+
+            except Exception as e:
+                print(f"⚠️ Smart routing failed, using fallback: {e}")
+                # Fallback to simple keyword detection
+                last_msg = messages[-1] if messages else None
+                if last_msg and hasattr(last_msg, 'content'):
+                    content = str(last_msg.content).lower()
+                    booking_keywords = ["book", "schedule", "create", "move", "change", "update", "delete", "cancel", "set up"]
+                    if any(keyword in content for keyword in booking_keywords):
+                        return "booking_approval"
+                return END
+
+        def route_after_booking(state: MessagesState):
+            """Route after booking node completes - allow booking_node to route back to itself"""
+            # Check if there's new human feedback that needs booking_node processing
             messages = state.get("messages", [])
             if messages:
                 last_msg = messages[-1]
-                if hasattr(last_msg, 'content'):
-                    content = last_msg.content
-                    # Handle both string and list content types
-                    if isinstance(content, list):
-                        content_str = " ".join(str(item) for item in content if item)
-                    else:
-                        content_str = str(content) if content else ""
-                    
-                    # Look for multiple booking trigger phrases
-                    booking_triggers = ["booking approval", "booking workflow", "approval workflow", "requires booking"]
-                    if any(trigger in content_str.lower() for trigger in booking_triggers):
-                        return "booking_node"
+                # If last message is human feedback, route back to booking_node
+                if hasattr(last_msg, 'type') and last_msg.type == "human":
+                    print("🔄 Human feedback detected - routing back to booking_node")
+                    return "booking_approval"
             return END
-        
-        def route_after_booking(state: MessagesState):
-            """Route after booking node completes"""
-            return END
-        
-        # Set up clean routing flow - no separate human_feedback node needed
-        workflow.add_conditional_edges(START, route_intent, 
+
+        # Set up clean routing flow - human feedback loops back through booking_node
+        workflow.add_conditional_edges(START, route_intent,
                                      {"calendar_agent": "calendar_agent"})
         workflow.add_conditional_edges("calendar_agent", route_after_calendar,
-                                     {"booking_node": "booking_node", END: END})
-        workflow.add_conditional_edges("booking_node", route_after_booking,
-                                     {END: END})
-        
+                                     {"booking_approval": "booking_approval", "booking_execute": "booking_execute", "booking_cancel": "booking_cancel", "booking_modify": "booking_modify", END: END})
+        workflow.add_conditional_edges("booking_approval", route_after_booking,
+                                     {"booking_approval": "booking_approval", "booking_execute": "booking_execute", "booking_cancel": "booking_cancel", "booking_modify": "booking_modify", END: END})
+
         return workflow.compile(checkpointer=MemorySaver(), name="calendar_agent")
 
     async def get_agent(self):
@@ -338,8 +458,11 @@ Always be helpful and provide calendar information using your available tools.""
 
     async def cleanup(self):
         """Clean up MCP client resources"""
-        if self.mcp_client:
-            await self.mcp_client.cleanup()
+        if self._mcp_client:
+            try:
+                await self._mcp_client.cleanup()
+            except Exception as e:
+                self.logger.warning(f"Error during cleanup: {e}")
 
 
 async def create_calendar_agent_with_mcp(
@@ -395,11 +518,11 @@ async def get_calendar_tools_for_supervisor() -> List[BaseTool]:
         # The google_calendar-query-free-busy-calendars tool has a name length > 64 characters
         # which causes "string too long" errors in the OpenAI API
         filtered_tools = [tool for tool in tools if tool.name != "google_calendar-query-free-busy-calendars"]
-        
+
         print(f"Retrieved {len(filtered_tools)} working calendar tools for supervisor")
         for tool in filtered_tools:
             print(f"   {tool.name}: {tool.description[:100]}...")
-        
+
         if len(tools) > len(filtered_tools):
             print(f"Filtered out {len(tools) - len(filtered_tools)} problematic tools")
 
@@ -454,11 +577,8 @@ async def get_calendar_tools_for_supervisor() -> List[BaseTool]:
         print(f"Created {len(sync_tools)} synchronous calendar tools")
         return sync_tools
 
-    except asyncio.TimeoutError:
-        print("Calendar tools loading timed out (30s)")
-        return []
     except Exception as e:
-        print(f"Failed to load calendar tools: {e}")
+        print(f"Error getting calendar tools for supervisor: {e}")
         return []
 
 
@@ -468,6 +588,7 @@ if __name__ == "__main__":
         print("Testing Calendar Agent with langchain-mcp-adapters...")
 
         agent = await create_calendar_agent_with_mcp()
+        graph = await agent.get_agent()
 
         test_requests = [
             "What's on my calendar today?",
@@ -479,16 +600,22 @@ if __name__ == "__main__":
         for request in test_requests:
             print(f"\nRequest: {request}")
 
-            result = await agent.process_request(request)
+            try:
+                # Use the LangGraph agent properly
+                config = {"configurable": {"thread_id": "test-thread"}}
+                result = await graph.ainvoke(
+                    {"messages": [{"role": "user", "content": request}]},
+                    config=config
+                )
 
-            if result["success"]:
-                print(f"Response: {result['response']}")
-                if result['tool_calls']:
-                    print(f"Tools used: {len(result['tool_calls'])}")
-                if result['tool_outputs']:
-                    print(f"Tool outputs: {len(result['tool_outputs'])}")
-            else:
-                print(f"Error: {result['error']}")
+                if result and "messages" in result:
+                    last_message = result["messages"][-1]
+                    print(f"Response: {last_message.content}")
+                else:
+                    print("No response received")
+
+            except Exception as e:
+                print(f"Error processing request: {e}")
 
         # Show available tools
         tools = await agent.get_available_tools()

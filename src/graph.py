@@ -47,7 +47,7 @@ from langgraph_supervisor import create_supervisor
 # This allows the system to work even if calendar tools aren't configured
 calendar_tools = []
 try:
-    from src.calendar_agent.langchain_mcp_integration import get_calendar_tools_for_supervisor
+    from src.calendar_agent.calendar_orchestrator import get_calendar_tools_for_supervisor
     print("Calendar agent import successful")
 except ImportError as e:
     print(f"Calendar agent not available: {e}")
@@ -55,8 +55,8 @@ except ImportError as e:
 
 async def create_calendar_agent():
     """Create calendar agent using pure LangGraph create_react_agent pattern"""
-    from src.calendar_agent.langchain_mcp_integration import CalendarAgentWithMCP
-    
+    from src.calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
+
     # Use Anthropic Claude for calendar operations
     # Claude handles longer tool names better than OpenAI models
     calendar_model = ChatAnthropic(
@@ -65,11 +65,11 @@ async def create_calendar_agent():
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
         streaming=False
     )
-    
+
     # Create calendar agent instance with MCP integration
     calendar_agent_instance = CalendarAgentWithMCP(model=calendar_model)
     await calendar_agent_instance.initialize()
-    
+
     # Return the LangGraph agent (create_react_agent) for supervisor integration
     return await calendar_agent_instance.get_agent()
 
@@ -79,7 +79,7 @@ def get_current_context():
     user_timezone = os.getenv("USER_TIMEZONE", "America/Toronto")
     timezone_zone = ZoneInfo(user_timezone)
     current_time = datetime.now(timezone_zone)
-    
+
     return {
         "current_time": current_time.isoformat(),
         "timezone": str(timezone_zone),
@@ -89,11 +89,11 @@ def get_current_context():
 def create_email_agent():
     """Create email agent for email operations using LangGraph create_react_agent"""
     # Use OpenAI GPT-4o-mini for email operations (cost-effective for text tasks)
-    email_model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    
-    email_prompt = """You are an email management expert. 
+    email_model = ChatOpenAI(model="gpt-4o", temperature=0)
+
+    email_prompt = """You are an email management expert.
     Help users with email composition, sending, reading, and organization."""
-    
+
     # Create pure LangGraph react agent (no tools configured yet)
     return create_react_agent(
         model=email_model,
@@ -105,12 +105,12 @@ def create_email_agent():
 
 async def create_supervisor_graph():
     """Create multi-agent supervisor using official langgraph_supervisor patterns"""
-    
+
     # Create agents using pure LangGraph create_react_agent patterns
     # Both agents follow the same architectural pattern for consistency
-    calendar_agent = await create_calendar_agent()  
+    calendar_agent = await create_calendar_agent()
     email_agent = create_email_agent()
-    
+
     # Use OpenAI GPT-4o for supervisor routing decisions
     # GPT-4o performs well at understanding user intent and routing requests
     supervisor_model = ChatOpenAI(
@@ -118,11 +118,11 @@ async def create_supervisor_graph():
         temperature=0,
         openai_api_key=os.getenv("OPENAI_API_KEY")
     )
-    
+
     # Add dynamic context to supervisor prompt for better decision making
     user_timezone = os.getenv("USER_TIMEZONE", "America/Toronto")
     current_time = datetime.now(ZoneInfo(user_timezone))
-    
+
     # Create supervisor prompt following langgraph_supervisor best practices
     supervisor_prompt = f"""You are a team supervisor managing specialized agents.
 
@@ -135,9 +135,16 @@ AGENT CAPABILITIES:
 - email_agent: Handles email composition, sending, reading, and organization
 
 ROUTING RULES:
+- ALWAYS look if the request is related to an agent first, onlyif not, handle it yourself
 - For calendar/scheduling requests → Use calendar_agent
 - For email requests → Use email_agent
 - For general questions → Handle directly or route to most appropriate agent
+
+BEHAVIOR:
+- When feedback comes back from an agent, analyze the feedback and adjust the routing rules accordingly
+- If more actions needs to be taken by an agent, route to the appropriate agent, DO NOT answer yourself
+- Your main job is to route to an agent
+- CRITICAL : You have no tools, you must route to the appropriate agent.
 
 Be decisive in your routing. Call the appropriate agent transfer tool immediately."""
 
@@ -151,7 +158,7 @@ Be decisive in your routing. Call the appropriate agent transfer tool immediatel
         output_mode="last_message",
         add_handoff_back_messages=True  # Automatic agent return handling
     )
-    
+
     # Compile the workflow into an executable graph
     compiled_graph = workflow.compile(name="multi_agent_system")
     print("Clean multi-agent supervisor created following official patterns")

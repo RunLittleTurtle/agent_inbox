@@ -70,6 +70,7 @@ class RoutingDecision(BaseModel):
     booking_context: Optional[str] = Field(default=None, description="Full booking context from conversation")
     original_request: str = Field(..., description="Original user request that triggered routing")
     timestamp: datetime = Field(default_factory=datetime.now, description="When routing decision was made")
+    mcp_tools_to_use: Optional[List[str]] = Field(default=None, description="List of MCP tools to use for completing booking tasks")
 
 
 class BookingContext(BaseModel):
@@ -82,6 +83,31 @@ class BookingContext(BaseModel):
     previous_attempts: List[str] = Field(default_factory=list, description="Previous booking attempts")
     calendar_constraints: List[str] = Field(default_factory=list, description="Calendar availability constraints")
     extracted_details: Optional[Dict[str, Any]] = Field(default=None, description="Extracted booking details")
+    mcp_tools_to_use: Optional[List[str]] = Field(default=None, description="List of MCP tools to use for completing booking tasks")
+
+
+class BookingRequest(BaseModel):
+    """Structured booking request for MCP tool execution."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    title: str = Field(..., description="Event title/summary")
+    start_time: str = Field(..., description="Start time in ISO format with timezone")
+    end_time: str = Field(..., description="End time in ISO format with timezone")
+    description: Optional[str] = Field(default=None, description="Event description")
+    location: Optional[str] = Field(default=None, description="Event location")
+    attendees: List[str] = Field(default_factory=list, description="List of attendee emails")
+    tool_name: str = Field(..., description="MCP tool to execute")
+    requires_event_id: bool = Field(default=False, description="Whether operation requires existing event ID")
+    color_id: Optional[str] = Field(default=None, description="Calendar color ID (1-11)")
+    transparency: str = Field(default="opaque", description="Event transparency for availability")
+    visibility: str = Field(default="default", description="Event visibility setting")
+    guests_can_invite_others: bool = Field(default=True, description="Allow guests to invite others")
+    guests_can_modify: bool = Field(default=False, description="Allow guests to modify event")
+    reminders: Dict[str, Any] = Field(default_factory=lambda: {"useDefault": True}, description="Event reminders")
+    recurrence: Optional[List[str]] = Field(default=None, description="Recurrence rules")
+    conference_data: Optional[Dict[str, Any]] = Field(default=None, description="Video conference data")
+    mcp_tools_to_use: Optional[List[str]] = Field(default=None, description="List of MCP tools needed for complete operation")
+    original_args: Dict[str, Any] = Field(default_factory=dict, description="Original MCP tool arguments")
 
 
 class AgentOutput(BaseModel):
@@ -201,7 +227,7 @@ class CalendarAgentState(BaseModel):
         description="Current booking context with reducer"
     )
 
-    class Config:
-        """Pydantic v2 configuration"""
-        arbitrary_types_allowed = True  # Required for BaseMessage types
-        extra = "forbid"  # Prevent extra fields for better validation
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,  # Required for BaseMessage types
+        extra="forbid"  # Prevent extra fields for better validation
+    )

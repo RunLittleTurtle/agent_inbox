@@ -60,7 +60,7 @@ async def create_calendar_agent():
     # Use Anthropic Claude for calendar operations
     # Claude handles longer tool names better than OpenAI models
     calendar_model = ChatAnthropic(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         temperature=0,
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
         streaming=False

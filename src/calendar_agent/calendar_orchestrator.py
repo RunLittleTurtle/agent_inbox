@@ -194,6 +194,7 @@ CONTEXT (use for all relative references):
 - Today: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})
 - Tomorrow: {(current_time + timedelta(days=1)).strftime('%Y-%m-%d')} ({(current_time + timedelta(days=1)).strftime('%A')})
 
+
 PRINCIPLES
 - Assume ALL user times are in the user’s LOCAL timezone.
 - Never ask for timezone; never convert to UTC in tool calls.
@@ -212,8 +213,9 @@ TOOL USAGE
 - Use ISO-8601 with explicit offset (e.g., 2025-01-15T09:00:00-05:00).
 - For availability checks: list events covering the requested window; analyze overlaps and free gaps.
 
+
 BOOKING REQUESTS (requires approval workflow)
-1) First, check availability with read-only tools using the context above and the AVAILABILITY SEARCH STRATEGY below with list-event.
+1) IMPORTANT: First, CHECK AVAILABILITY with read-only tools using the context above and the AVAILABILITY SEARCH STRATEGY below with list-event.
 2) If the requested slot is free, respond exactly with:
    "Time slot is available. This requires booking approval — I'll transfer you to the booking approval workflow."
 3) If there is a conflict:
@@ -308,6 +310,9 @@ USER FEEDBACK AND INPUT
                 booking_context: Optional[str] = Field(
                     default=None, description="Full booking context from conversation"
                 )
+                mcp_tools_to_use: Optional[List[str]] = Field(
+                    default=None, description="List of MCP tools to use for the completion of all booking tasks"
+                )
 
             # Get conversation context
             messages = state.get("messages", [])
@@ -329,55 +334,88 @@ USER FEEDBACK AND INPUT
 
             context_str = "\n".join(conversation_context)
 
-            # Enhanced routing prompt with context extraction
+            # Get available tools for dynamic prompt generation
+            available_tools_list = [f"- {tool.name}: {tool.description}" for tool in self.booking_tools] if self.booking_tools else ["- No MCP tools available"]
+            available_tools_text = "\n".join(available_tools_list)
+
             # Enhanced routing prompt with context extraction
             routing_prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are a smart calendar workflow router. Analyze the conversation to determine the next action needed.
+                            ("system", """You are a smart calendar workflow router. Analyze the conversation to determine the next actions and tools needed.
 
-            ANALYZE TWO TYPES OF SITUATIONS:
+                        ANALYZE TWO TYPES OF SITUATIONS:
 
-            1. CALENDAR AGENT EXPLICITLY INDICATES BOOKING APPROVAL NEEDED:
-               - Look for phrases like "requires booking approval", "transfer you to booking approval", "booking approval workflow"
-               - If the calendar agent explicitly mentions booking approval is needed, route to booking_approval
-               - This takes priority over user intent analysis
+                        1. CALENDAR AGENT EXPLICITLY INDICATES BOOKING APPROVAL NEEDED:
+                           - Look for phrases like "requires booking approval", "transfer you to booking approval", "booking approval workflow"
+                           - If the calendar agent explicitly mentions booking approval is needed, route to booking_approval
+                           - This takes priority over user intent analysis
 
-            2. USER INTENT ANALYSIS (if no explicit booking approval mentioned):
-               - Creating new calendar events/meetings
-               - Scheduling appointments
-               - Booking time slots
-               - Updating existing events (time, date, attendees)
-               - Moving/rescheduling events
-               - Deleting events
-               - Any calendar modifications
+                        2. USER INTENT ANALYSIS (if no explicit booking approval mentioned):
+                           - Creating new calendar events/meetings
+                           - Scheduling appointments
+                           - Booking time slots
+                           - Updating existing events (time, date, attendees)
+                           - Moving/rescheduling events
+                           - Deleting events
+                           - Any calendar modifications
 
-            READ-ONLY OPERATIONS (no approval needed):
-            - Checking availability
-            - Viewing calendar events
-            - Asking about free time slots
-            - General calendar inquiries
+                        READ-ONLY OPERATIONS (no approval needed):
+                        - Checking availability
+                        - Viewing calendar events
+                        - Asking about free time slots
+                        - General calendar inquiries
 
-            ROUTING DECISION PRIORITY:
-            1. First check if calendar agent explicitly mentioned "booking approval" or "approval workflow"
-            2. If yes, return next_action: "booking_approval"
-            3. If no explicit mention, analyze user intent
-            4. If user intent requires booking, return next_action: "booking_approval"
-            5. Otherwise return next_action: "end"
+                        ROUTING DECISION PRIORITY:
+                        1. First check if calendar agent explicitly mentioned "booking approval" or "approval workflow"
+                        2. If yes, return next_action: "booking_approval"
+                        3. If no explicit mention, analyze user intent
+                        4. If user intent requires booking, return next_action: "booking_approval"
+                        5. Otherwise return next_action: "end"
 
-            CRITICAL: Pay special attention to the calendar agent's responses that mention "booking approval workflow" or "requires booking approval"."""),
-                ("user", "Conversation context:\n{context}\n\nAnalyze this conversation. Does the calendar agent explicitly mention booking approval is needed? Or does the user intent require booking operations? Return the appropriate next_action.")
-            ])
+                        AVAILABLE MCP TOOLS (dynamically detected):
+                        {available_tools}
+
+                        TOOLS SELECTION RULES - Based on actual available tools:
+                        Analyze the user's request and select the appropriate tool(s) from the available tools above:
+
+                        OPERATION ANALYSIS:
+                        - NEW event creation → use 'google_calendar-create-event' if available
+                        - DELETE entire event → use 'google_calendar-delete-event' if available
+                        - QUICK text-based event → use 'google_calendar-quick-add-event' if available
+                        - UPDATE existing event (time/date/duration/title/description) → use 'google_calendar-update-event'
+                        - ADD attendees to existing event → use 'google_calendar-add-attendees-to-event' if available AND no other changes needed
+                        - It is not possible to REMOVE attendees. it is a restriction of the Google Calendar API. please inform the user.
+
+                        CRITICAL ANALYSIS FOR COMPLEX REQUESTS EXAMPLES:
+                        - If user wants ONLY to add attendees (no other changes) → ['google_calendar-add-attendees-to-event']
+                        - If user wants to ADD attendees and make other changes → ['google_calendar-add-attendees-to-event', 'google_calendar-update-event']
+                        - Multiple separate events → list multiple appropriate tools
+
+                        EXAMPLE ANALYSIS:
+                        "move time to 10am + ADD attendee + change duration + change description" →
+                        This needs TWO operations: ADD attendee + UPDATE other fields → ['google_calendar-add-attendees-to-event', 'google_calendar-update-event']
+
+                        IMPORTANT: Base your tool selection on the actual available tools listed above, not assumptions.
+
+
+                        CRITICAL: Pay special attention to the calendar agent's responses that mention "booking approval workflow" or "requires booking approval"."""),
+                            ("user", "Conversation context:\n{context}\n\nAnalyze this conversation. Does the calendar agent explicitly mention booking approval is needed? Or does the user intent require booking operations? Return the appropriate next_action.")
+                        ])
 
 
             try:
                 # Use the existing model from calendar agent
                 llm = self.model.with_structured_output(RoutingDecision)
 
-                decision = llm.invoke(routing_prompt.format_messages(context=context_str))
+                decision = llm.invoke(routing_prompt.format_messages(
+                    context=context_str,
+                    available_tools=available_tools_text
+                ))
 
                 # Log routing decision for debugging
                 print(f"🤖 Smart Router Decision: {decision.next_action}")
                 print(f"📝 Reasoning: {decision.reasoning}")
                 print(f"🎯 User Intent: {decision.user_intent}")
+                print(f"🎯 MCP tools to use: {decision.mcp_tools_to_use}")
 
                 # **CRITICAL**: Preserve routing decision in state
                 if decision.needs_booking_approval:
@@ -388,7 +426,8 @@ USER FEEDBACK AND INPUT
                         conversation_summary=context_str,
                         previous_attempts=[],
                         calendar_constraints=[],
-                        extracted_details=None
+                        extracted_details=None,
+                        mcp_tools_to_use=decision.mcp_tools_to_use
                     )
 
                     # Add routing decision and booking context to messages
@@ -399,7 +438,8 @@ USER FEEDBACK AND INPUT
                             "routing_decision": decision.dict(),
                             "booking_context": booking_context.dict(),
                             "user_intent": decision.user_intent,
-                            "conversation_summary": context_str
+                            "conversation_summary": context_str,
+                            "mcp_tools_to_use": decision.mcp_tools_to_use
                         }
                     )
 

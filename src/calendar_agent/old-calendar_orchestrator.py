@@ -383,7 +383,7 @@ USER FEEDBACK AND INPUT
                         - QUICK text-based event → use 'google_calendar-quick-add-event' if available
                         - UPDATE existing event (time/date/duration/title/description) → use 'google_calendar-update-event'
                         - ADD attendees to existing event → use 'google_calendar-add-attendees-to-event' if available AND no other changes needed
-                        - It is not possible to REMOVE attendees. it is a restriction of the Google Calendar API. please inform the user, BUT YOU MUST continue with other operations.
+                        - It is not possible to REMOVE attendees. it is a restriction of the Google Calendar API. please inform the user.
 
                         CRITICAL ANALYSIS FOR COMPLEX REQUESTS EXAMPLES:
                         - If user wants ONLY to add attendees (no other changes) → ['google_calendar-add-attendees-to-event']
@@ -470,38 +470,29 @@ USER FEEDBACK AND INPUT
                 return END
 
         def route_after_booking(state: MessagesState):
-            """Route after booking node completes - use real execution results for routing"""
+            """Route after booking node completes - handle 3-button UI flow properly"""
             messages = state.get("messages", [])
             if not messages:
                 return END
 
-            # Check for execution result from booking node
-            booking_execution_result = state.get("booking_execution_result")
-            last_tool_output = state.get("last_tool_output")
+            # Check the last few messages to understand the flow
+            last_msg = messages[-1]
 
-            # If we have a booking execution result, use it for routing decisions
-            if booking_execution_result:
-                from .execution_result import ExecutionStatus
+            # If last message is from booking node, check what it indicates
+            if hasattr(last_msg, 'content'):
+                content = str(last_msg.content)
 
-                if booking_execution_result.overall_status in [ExecutionStatus.SUCCESS, ExecutionStatus.PARTIAL_SUCCESS]:
-                    print(f"🔄 Booking completed successfully: {booking_execution_result.overall_status}")
-
-                    # Add the real tool output to state for supervisor visibility
-                    if last_tool_output:
-                        # Update the last message with clean tool output
-                        if messages and hasattr(messages[-1], 'content'):
-                            messages[-1].content = last_tool_output
-
+                # If booking was executed or cancelled, end the flow
+                if ("✅" in content and "Booking Confirmed Successfully" in content) or \
+                   ("Booking cancelled by user" in content):
+                    print("🔄 Booking completed or cancelled - ending flow")
                     return END
 
-                elif booking_execution_result.overall_status == ExecutionStatus.FAILED:
-                    print(f"🔄 Booking failed: {booking_execution_result.get_primary_error()}")
-                    return END
-
-            # Handle user cancellation
-            if last_tool_output == "Booking cancelled by user":
-                print("🔄 Booking cancelled by user")
-                return END
+                # If booking node indicates feedback processing, route back to calendar_agent
+                if ("I understand you want to modify" in content or
+                    "I've updated the details based on your feedback" in content):
+                    print("🔄 Feedback processed - routing back to calendar_agent for re-evaluation")
+                    return "calendar_agent"
 
             # Check if there's human feedback that needs processing
             human_msgs = [msg for msg in messages[-3:] if isinstance(msg, HumanMessage)]
@@ -517,18 +508,6 @@ USER FEEDBACK AND INPUT
                     # It's feedback - route back to calendar_agent with preserved context
                     print("🔄 User feedback detected - routing back to calendar_agent")
                     return "calendar_agent"
-
-            # Fallback to message content analysis for backward compatibility
-            last_msg = messages[-1]
-            if hasattr(last_msg, 'content'):
-                content = str(last_msg.content)
-
-                # Check for completion indicators
-                if ("successfully updated" in content.lower() or
-                    "booking cancelled by user" in content or
-                    "✅" in content):
-                    print("🔄 Operation completed - ending flow")
-                    return END
 
             return END
 
@@ -561,6 +540,8 @@ USER FEEDBACK AND INPUT
             checkpointer=MemorySaver(),
             name="calendar_agent"
         )
+
+
 
 
     async def get_agent(self):
@@ -610,6 +591,103 @@ async def create_calendar_agent_with_mcp(
     await agent.initialize()
     return agent
 
+
+# Integration function for supervisor
+async def get_calendar_tools_for_supervisor() -> List[BaseTool]:
+    """
+    Get calendar tools for supervisor integration.
+    Returns properly configured LangChain tools from Pipedream MCP server.
+    """
+    try:
+        # Use Pipedream MCP server URL from environment
+        pipedream_url = os.getenv("PIPEDREAM_MCP_SERVER")
+        if not pipedream_url:
+            print("PIPEDREAM_MCP_SERVER environment variable not set")
+            return []
+
+        mcp_servers = {
+            "pipedream_calendar": {
+                "url": pipedream_url,
+                "transport": "streamable_http"
+            }
+        }
+
+        print(f"Connecting to Pipedream MCP server: {pipedream_url}")
+
+        client = MultiServerMCPClient(mcp_servers)
+
+        # Add timeout to prevent hanging
+        tools = await asyncio.wait_for(
+            client.get_tools(),
+            timeout=30.0
+        )
+
+        # Filter out problematic tools that cause API errors
+        # The google_calendar-query-free-busy-calendars tool has a name length > 64 characters
+        # which causes "string too long" errors in the OpenAI API
+        filtered_tools = [tool for tool in tools if tool.name != "google_calendar-query-free-busy-calendars"]
+
+        print(f"Retrieved {len(filtered_tools)} working calendar tools for supervisor")
+        for tool in filtered_tools:
+            print(f"   {tool.name}: {tool.description[:100]}...")
+
+        if len(tools) > len(filtered_tools):
+            print(f"Filtered out {len(tools) - len(filtered_tools)} problematic tools")
+
+        # Convert async MCP tools to synchronous tools for LangGraph compatibility
+        # LangGraph supervisor requires synchronous tools, but MCP tools are async
+        # This wrapper handles the async-to-sync conversion safely
+        from langchain_core.tools import StructuredTool
+        from pydantic import BaseModel, Field
+        import asyncio as async_module
+        import concurrent.futures
+
+        sync_tools = []
+
+        for async_tool in filtered_tools:
+            # Create a synchronous wrapper for each async MCP tool
+            def make_sync_tool(atool):
+                def sync_func(**kwargs) -> str:
+                    """Synchronous wrapper that executes async MCP tool safely"""
+                    try:
+                        # Check if we're already in an event loop
+                        loop = None
+                        try:
+                            loop = async_module.get_running_loop()
+                        except RuntimeError:
+                            pass
+
+                        if loop is None:
+                            # No running loop, create new one
+                            result = async_module.run(atool.ainvoke(kwargs))
+                        else:
+                            # Running in existing loop, use thread pool to avoid blocking
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                future = executor.submit(async_module.run, atool.ainvoke(kwargs))
+                                result = future.result(timeout=30)
+
+                        return str(result)
+                    except Exception as e:
+                        return f"Error executing {atool.name}: {str(e)}"
+
+                # Create LangChain StructuredTool from MCP tool
+                sync_tool = StructuredTool(
+                    name=atool.name,
+                    description=atool.description,
+                    args_schema=atool.args_schema,
+                    func=sync_func,  # Synchronous function, not coroutine
+                    return_direct=False
+                )
+                return sync_tool
+
+            sync_tools.append(make_sync_tool(async_tool))
+
+        print(f"Created {len(sync_tools)} synchronous calendar tools")
+        return sync_tools
+
+    except Exception as e:
+        print(f"Error getting calendar tools for supervisor: {e}")
+        return []
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 This module implements a clean multi-agent architecture with:
 - Calendar agent for Google Calendar operations via MCP
 - Email agent for email management tasks
+- Job search agent for job search tasks
 - Supervisor using official langgraph_supervisor patterns
 - Automatic agent handoff and state management
 - LangSmith tracing for observability
@@ -12,22 +13,24 @@ All agents follow pure LangGraph create_react_agent patterns for consistency.
 
 import os
 import sys
+import asyncio
+import logging
 from dotenv import load_dotenv
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from typing import List
+from typing import List, Optional
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
+
+# Import the global state from state.py
+from src.state import WorkflowState
 
 # Load environment variables for LangSmith integration
 load_dotenv()
 
-class WorkflowState(BaseModel):
-    """Enhanced state with timezone and temporal context for all agents"""
-    messages: List[BaseMessage]
-    current_time: str
-    timezone: str
-    timezone_name: str
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Add local libraries to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph'))
@@ -36,148 +39,238 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langchain
 
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
-
-# LangGraph imports
 from langgraph.prebuilt import create_react_agent
-
-# Local supervisor imports
 from langgraph_supervisor import create_supervisor
-
-# Calendar agent import with graceful fallback if MCP integration unavailable
-# This allows the system to work even if calendar tools aren't configured
-calendar_tools = []
-try:
-    from src.calendar_agent.calendar_orchestrator import get_calendar_tools_for_supervisor
-    print("Calendar agent import successful")
-except ImportError as e:
-    print(f"Calendar agent not available: {e}")
-
-
-async def create_calendar_agent():
-    """Create calendar agent using pure LangGraph create_react_agent pattern"""
-    from src.calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
-
-    # Use Anthropic Claude for calendar operations
-    # Claude handles longer tool names better than OpenAI models
-    calendar_model = ChatAnthropic(
-        model="claude-sonnet-4-20250514",
-        temperature=0,
-        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-        streaming=False
-    )
-
-    # Create calendar agent instance with MCP integration
-    calendar_agent_instance = CalendarAgentWithMCP(model=calendar_model)
-    await calendar_agent_instance.initialize()
-
-    # Return the LangGraph agent (create_react_agent) for supervisor integration
-    return await calendar_agent_instance.get_agent()
-
 
 def get_current_context():
     """Get current time and timezone context using USER_TIMEZONE from .env"""
     user_timezone = os.getenv("USER_TIMEZONE", "America/Toronto")
-    timezone_zone = ZoneInfo(user_timezone)
-    current_time = datetime.now(timezone_zone)
+    try:
+        timezone_zone = ZoneInfo(user_timezone)
+        current_time = datetime.now(timezone_zone)
+        return {
+            "current_time": current_time.isoformat(),
+            "timezone": str(timezone_zone),
+            "timezone_name": user_timezone
+        }
+    except Exception as e:
+        logger.error(f"Error getting timezone context: {e}")
+        # Fallback to UTC
+        current_time = datetime.now(ZoneInfo("UTC"))
+        return {
+            "current_time": current_time.isoformat(),
+            "timezone": "UTC",
+            "timezone_name": "UTC"
+        }
 
-    return {
-        "current_time": current_time.isoformat(),
-        "timezone": str(timezone_zone),
-        "timezone_name": user_timezone
-    }
+async def create_calendar_agent():
+    """Create calendar agent with graceful fallback handling"""
+    try:
+        from src.calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
 
-def create_email_agent():
-    """Create email agent for email operations using LangGraph create_react_agent"""
-    # Use OpenAI GPT-4o-mini for email operations (cost-effective for text tasks)
-    email_model = ChatOpenAI(model="gpt-4o", temperature=0)
+        # Use Anthropic Claude for calendar operations
+        calendar_model = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
+            temperature=0,
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+            streaming=False
+        )
 
-    email_prompt = """You are an email management expert.
-    Help users with email composition, sending, reading, and organization."""
+        # Create calendar agent instance with MCP integration
+        calendar_agent_instance = CalendarAgentWithMCP(model=calendar_model)
+        await calendar_agent_instance.initialize()
 
-    # Create pure LangGraph react agent (no tools configured yet)
-    return create_react_agent(
-        model=email_model,
-        tools=[],  # No email tools configured yet
-        name="email_agent",
-        prompt=email_prompt
-    )
+        logger.info("Calendar agent with MCP integration initialized successfully")
+        return await calendar_agent_instance.get_agent()
 
+    except Exception as e:
+        logger.error(f"Failed to create calendar agent with MCP: {e}")
+        logger.info("Creating fallback calendar agent without MCP tools")
+
+        # Fallback: basic calendar agent without MCP tools
+        calendar_model = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
+            temperature=0,
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+            streaming=False
+        )
+
+        fallback_prompt = """You are a calendar assistant.
+        I apologize, but I cannot directly access your calendar at the moment due to a technical issue.
+        I can provide general scheduling advice and help you plan your time, but cannot create, modify, or view actual calendar events.
+        Please let me know how I can assist you with scheduling planning."""
+
+        return create_react_agent(
+            model=calendar_model,
+            tools=[],
+            name="calendar_agent_fallback",
+            prompt=fallback_prompt
+        )
+
+async def create_email_agent():
+    """Create email agent for email operations"""
+    try:
+        email_model = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0,
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
+
+        email_prompt = """You are an email management expert.
+        Help users with email composition, sending, reading, and organization.
+
+        Current capabilities:
+        - Email composition assistance
+        - Email etiquette and formatting guidance
+        - Email organization strategies
+
+        Note: Direct email sending is not yet configured."""
+
+        return create_react_agent(
+            model=email_model,
+            tools=[],
+            name="email_agent",
+            prompt=email_prompt
+        )
+    except Exception as e:
+        logger.error(f"Failed to create email agent: {e}")
+        raise
+
+async def create_job_search_agent():
+    """Create job search agent - placeholder for now"""
+    try:
+        job_model = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0,
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
+
+        job_prompt = """You are a job search specialist.
+        Help users with job search strategies, application preparation, and career guidance.
+
+        Current capabilities:
+        - Resume and cover letter advice
+        - Interview preparation
+        - Job search strategies
+        - Career planning guidance"""
+
+        return create_react_agent(
+            model=job_model,
+            tools=[],
+            name="job_search_agent",
+            prompt=job_prompt
+        )
+    except Exception as e:
+        logger.error(f"Failed to create job search agent: {e}")
+        raise
+
+def validate_environment():
+    """Validate required environment variables"""
+    required_vars = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+
+    if missing_vars:
+        raise EnvironmentError(f"Missing required environment variables: {missing_vars}")
+
+    logger.info("Environment validation passed")
 
 async def create_supervisor_graph():
-    """Create multi-agent supervisor using official langgraph_supervisor patterns"""
+    """Create multi-agent supervisor with improved error handling"""
+    try:
+        # Validate environment first
+        validate_environment()
 
-    # Create agents using pure LangGraph create_react_agent patterns
-    # Both agents follow the same architectural pattern for consistency
-    calendar_agent = await create_calendar_agent()
-    email_agent = create_email_agent()
+        # Create agents with individual error handling
+        logger.info("Creating agents...")
+        calendar_agent = await create_calendar_agent()
+        email_agent = await create_email_agent()
+        job_search_agent = await create_job_search_agent()
 
-    # Use OpenAI GPT-4o for supervisor routing decisions
-    # GPT-4o performs well at understanding user intent and routing requests
-    supervisor_model = ChatOpenAI(
-        model="gpt-4o",
-        temperature=0,
-        openai_api_key=os.getenv("OPENAI_API_KEY")
-    )
+        logger.info("All agents created successfully")
 
-    # Add dynamic context to supervisor prompt for better decision making
-    user_timezone = os.getenv("USER_TIMEZONE", "America/Toronto")
-    current_time = datetime.now(ZoneInfo(user_timezone))
+        # Create supervisor model
+        supervisor_model = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0,
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
 
-    # Create supervisor prompt following langgraph_supervisor best practices
-    supervisor_prompt = f"""You are a team supervisor managing specialized agents.
+        # Get dynamic context
+        context = get_current_context()
+
+        # Improved supervisor prompt with clearer instructions
+        supervisor_prompt = f"""You are a team supervisor managing specialized agents.
 
 CURRENT CONTEXT:
-- Today: {current_time.strftime("%Y-%m-%d")} at {current_time.strftime("%I:%M %p")}
-- Timezone: {user_timezone}
+- Today: {datetime.fromisoformat(context['current_time']).strftime("%Y-%m-%d")} at {datetime.fromisoformat(context['current_time']).strftime("%I:%M %p")}
+- Timezone: {context['timezone_name']}
 
 AGENT CAPABILITIES:
-- calendar_agent: Handles all calendar operations (scheduling, viewing events, availability)
-- email_agent: Handles email composition, sending, reading, and organization
+- calendar_agent: All calendar operations (create/view/modify events, check availability, scheduling)
+- email_agent: Email composition, formatting, etiquette guidance, organization strategies
+- job_search_agent: Job search strategies, resume/cover letter advice, interview prep, career guidance
+
+ROUTING STRATEGY:
+1. ANALYZE the user's request carefully
+2. IDENTIFY which agent is most appropriate
+3. ROUTE immediately to that agent
+4. Let the agent handle the task completely
 
 ROUTING RULES:
-- ALWAYS look if the request is related to an agent first, onlyif not, handle it yourself
-- For calendar/scheduling requests → Use calendar_agent
-- For email requests → Use email_agent
-- For general questions → Handle directly or route to most appropriate agent
+- Calendar/scheduling/appointments/meetings → calendar_agent
+- Email writing/sending/organization → email_agent
+- Job search/career/resume/interviews → job_search_agent
+- General questions → Choose most relevant agent or handle briefly
 
-BEHAVIOR:
-- When feedback comes back from an agent, analyze the feedback and adjust the routing rules accordingly
-- If more actions needs to be taken by an agent, route to the appropriate agent, DO NOT answer yourself
-- Your main job is to route to an agent
-- CRITICAL : You have no tools, you must route to the appropriate agent.
+CRITICAL GUIDELINES:
+- You are a ROUTER, not a problem solver
+- Route quickly and decisively
+- Trust your agents to handle their domains
+- Only provide direct answers for simple greetings or clarifications
 
-Be decisive in your routing. Call the appropriate agent transfer tool immediately."""
+When an agent completes their task, analyze if additional routing is needed."""
 
-    # Create supervisor using official langgraph_supervisor framework
-    # This handles all agent handoffs and message flow automatically
-    workflow = create_supervisor(
-        agents=[calendar_agent, email_agent],
-        model=supervisor_model,
-        prompt=supervisor_prompt,
-        supervisor_name="multi_agent_supervisor",
-        output_mode="last_message",
-        add_handoff_back_messages=True  # Automatic agent return handling
-    )
+        # Create supervisor workflow
+        workflow = create_supervisor(
+            agents=[calendar_agent, email_agent, job_search_agent],
+            model=supervisor_model,
+            prompt=supervisor_prompt,
+            supervisor_name="multi_agent_supervisor",
+            output_mode="last_message",
+            add_handoff_back_messages=True
+        )
 
-    # Compile the workflow into an executable graph
-    compiled_graph = workflow.compile(name="multi_agent_system")
-    print("Clean multi-agent supervisor created following official patterns")
-    return compiled_graph
+        # Compile the workflow
+        compiled_graph = workflow.compile(name="multi_agent_system")
+        logger.info("Multi-agent supervisor created successfully")
+        return compiled_graph
 
+    except Exception as e:
+        logger.error(f"Failed to create supervisor graph: {e}")
+        raise
 
-# Export the main graph using supervisor pattern
 async def make_graph():
-    """Factory function for LangGraph server integration"""
-    # Create the multi-agent supervisor that handles routing between agents
-    graph_instance = await create_supervisor_graph()
-    print("Using dynamic supervisor with langgraph-supervisor library")
-    return graph_instance
+    """Factory function for LangGraph server integration with error handling"""
+    try:
+        graph_instance = await create_supervisor_graph()
+        logger.info("Graph creation completed successfully")
+        return graph_instance
+    except Exception as e:
+        logger.error(f"Graph creation failed: {e}")
+        raise
 
-# Synchronous wrapper for LangGraph server compatibility
 def create_graph():
-    """Synchronous graph factory required by LangGraph server"""
-    import asyncio
-    return asyncio.run(make_graph())
+    """Synchronous graph factory with proper error handling"""
+    try:
+        return asyncio.run(make_graph())
+    except Exception as e:
+        logger.error(f"Synchronous graph creation failed: {e}")
+        raise
 
-# Main graph instance exported for LangGraph server
-graph = create_graph()
+# Create graph instance with error handling
+try:
+    graph = create_graph()
+    logger.info("Graph initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize graph: {e}")
+    graph = None

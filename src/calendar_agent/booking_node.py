@@ -23,6 +23,8 @@ from pydantic import BaseModel, Field
 from langgraph.prebuilt.interrupt import HumanInterruptConfig, HumanInterrupt
 
 from .state import BookingRequest
+from .execution_result import BookingExecutionResult, ExecutionStatus
+from .mcp_executor import MCPToolExecutor
 
 
 
@@ -45,6 +47,8 @@ class BookingNode:
             temperature=0,
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY")
         )
+        # Initialize the MCP executor
+        self.mcp_executor = MCPToolExecutor(booking_tools)
 
     async def booking_approval_node(self, state: MessagesState) -> Dict[str, Any]:
         """
@@ -56,15 +60,26 @@ class BookingNode:
         if not messages:
             return {"messages": [AIMessage(content="No messages found.")]}
 
+        # ADD TASK TRACKING if WorkflowState is available
+        current_task = None
+        if hasattr(state, 'add_task'):
+            from src.state import AgentType
+            current_task = state.add_task(
+                agent_name=AgentType.CALENDAR_AGENT,
+                description="Processing booking approval workflow",
+                user_request=str(messages[-1].content if messages else "Booking request")
+            )
+            current_task.status = "in_progress"
+
         # Extract booking intent from routing context or conversation
-        booking_intent, routing_context, conversation_summary, mcp_tools_to_use = self._extract_routing_context(messages)
+        booking_intent, routing_context, conversation_summary, event_id = self._extract_routing_context(messages)
 
         if not booking_intent:
             return {"messages": [AIMessage(content="No booking request found.")]}
 
         # Parse booking details using enhanced context
         booking_details = await self._extract_booking_details_enhanced(
-            booking_intent, messages, conversation_summary, routing_context
+            booking_intent, messages, conversation_summary, routing_context, event_id
         )
 
         if not booking_details:
@@ -113,12 +128,42 @@ class BookingNode:
                 action = validation_result["action"]
 
                 if action == "approve":
-                    # Execute the booking
-                    result = await self._execute_booking(booking_request, validation_result.get("modifications", {}))
-                    return {"messages": messages + [AIMessage(content=result)]}
+                    # Execute the booking using the new MCP executor
+                    execution_result = await self.mcp_executor.execute_booking_request(
+                        booking_request,
+                        validation_result.get("modifications", {})
+                    )
+
+                    # COMPLETE TASK TRACKING with accurate status
+                    if current_task:
+                        if execution_result.overall_status == ExecutionStatus.SUCCESS:
+                            current_task.complete(execution_result.get_task_result_summary())
+                        elif execution_result.overall_status == ExecutionStatus.PARTIAL_SUCCESS:
+                            current_task.complete(f"Partially successful: {execution_result.get_task_result_summary()}")
+                        else:
+                            current_task.fail(execution_result.get_task_result_summary())
+
+                    # Get the real tool output for user-facing message
+                    real_tool_output = self._extract_real_tool_output(execution_result)
+                    supervisor_message = real_tool_output if real_tool_output else execution_result.get_supervisor_message()
+
+                    # Pass execution result through state for route_after_booking access
+                    return {
+                        "messages": messages + [AIMessage(content=supervisor_message)],
+                        "booking_execution_result": execution_result,
+                        "last_tool_output": real_tool_output
+                    }
 
                 elif action == "reject":
-                    return {"messages": messages + [AIMessage(content="❌ Booking cancelled by user.")]}
+                    # COMPLETE TASK TRACKING for rejection
+                    if current_task:
+                        current_task.complete("Booking rejected by user")
+
+                    return {
+                        "messages": messages + [AIMessage(content="❌ Booking cancelled by user.")],
+                        "booking_execution_result": None,
+                        "last_tool_output": "Booking cancelled by user"
+                    }
 
                 elif action == "modify":
                     # Update booking request with modifications
@@ -147,12 +192,92 @@ class BookingNode:
                 approval_prompt["message"] = f"❌ {validation_result['error']}. Please try again."
                 approval_prompt["instructions"] = "Valid responses: 'approve', 'reject', or modification details"
 
+    def _extract_real_tool_output(self, execution_result) -> str:
+        """Extract the real tool output for user-facing messages"""
+        if not execution_result or not execution_result.tool_results:
+            return ""
+
+        # Get the most recent successful tool result
+        successful_results = [r for r in execution_result.tool_results if r.is_successful()]
+
+        if successful_results:
+            latest_result = successful_results[-1]
+            raw_output = str(latest_result.raw_result)
+
+            # Clean up the output to be user-friendly
+            if "successfully updated" in raw_output.lower():
+                # Extract key information from the output
+                if "event with ID" in raw_output and "has been successfully updated" in raw_output:
+                    return raw_output
+                elif "The calendar event" in raw_output and "updated" in raw_output:
+                    return raw_output
+
+            # For other successful operations, return cleaned output
+            return raw_output
+
+        # If no successful results, return error information
+        failed_results = [r for r in execution_result.tool_results if not r.is_successful()]
+        if failed_results:
+            return f"Operation failed: {failed_results[0].get_error_details()}"
+
+        return "Operation completed with unknown status"
+
+    def _extract_clean_text(self, text_input: str) -> str:
+        """Extract clean text from message objects or raw strings"""
+        import re
+        import json
+
+        # If it looks like a message dict string, extract the actual text
+        if "{'type':" in text_input and "'text':" in text_input:
+            try:
+                # Extract text content from message dict representation
+                text_match = re.search(r"'text':\s*'([^']*)'", text_input)
+                if text_match:
+                    return text_match.group(1)
+            except:
+                pass
+
+        # If it's a JSON-like string, try to parse it
+        if text_input.strip().startswith('{') and 'text' in text_input:
+            try:
+                # Handle both single and double quotes
+                normalized = text_input.replace("'", '"')
+                data = json.loads(normalized)
+                if isinstance(data, dict) and 'text' in data:
+                    return data['text']
+            except:
+                pass
+
+        # Remove common message wrapper patterns
+        clean_text = text_input
+
+        # Remove User: prefix and message wrappers
+        patterns_to_remove = [
+            r"^User:\s*",
+            r"^AI:\s*",
+            r"^Assistant:\s*",
+            r"^Human:\s*",
+            r"^\{'type':\s*'[^']*',\s*'text':\s*'([^']*)'\}$",
+            r"^\{[^}]*'text':\s*'([^']*)'[^}]*\}$"
+        ]
+
+        for pattern in patterns_to_remove:
+            match = re.search(pattern, clean_text, re.MULTILINE)
+            if match and match.groups():
+                clean_text = match.group(1)
+                break
+            elif re.match(pattern, clean_text, re.MULTILINE):
+                clean_text = re.sub(pattern, '', clean_text, flags=re.MULTILINE)
+
+        return clean_text.strip()
+
     async def _extract_booking_details_enhanced(
         self,
         booking_intent: str,
         context_messages: List[BaseMessage],
         conversation_summary: str,
-        routing_context: Optional[Dict[str, Any]] = None
+        routing_context: Optional[Dict[str, Any]] = None,
+        event_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """Enhanced booking detail extraction with full conversation context"""
 
@@ -165,14 +290,22 @@ class BookingNode:
         # Use asyncio.to_thread to avoid blocking I/O in async context
         current_time = await asyncio.to_thread(lambda: datetime.now(ZoneInfo(timezone_name)))
 
+        # Clean up the input text for better processing
+        clean_booking_intent = self._extract_clean_text(booking_intent)
+        clean_conversation_summary = self._extract_clean_text(conversation_summary)
+
         # Enhanced extraction prompt with MCP tool schema requirements
-        extraction_prompt = f"""Extract booking details from this request: "{booking_intent}"
+        extraction_prompt = f"""Extract booking details from this request: "{clean_booking_intent}"
 
 CONVERSATION CONTEXT:
-{conversation_summary}
+{clean_conversation_summary}
 
 ROUTING ANALYSIS:
 {routing_context.get('reasoning', 'user intent', 'mcp tools to use', 'None') if routing_context else 'None'}
+
+EVENT CONTEXT:
+- Event ID found: {event_id if event_id else 'None'}
+- This is {'an UPDATE operation' if event_id else 'a NEW event creation'}
 
 CURRENT TIME CONTEXT:
 - Current time: {current_time.isoformat()}
@@ -207,7 +340,7 @@ Analyze the conversation context and choose the appropriate tool or tools needed
 - If conversation shows a previous booking was successful and user wants changes, use UPDATE
 - CRITICAL: If attendees are being added/mentioned, always use "google_calendar-add-attendees-to-event" even if other fields are changing
 - When both time AND attendees are changing, use multiple tools
-- It is not possible to REMOVE attendees. it is a restriction of the Google Calendar API. please inform the user.
+- It is not possible to REMOVE attendees. it is a restriction of the Google Calendar API. please inform the user and continue other operations.
 
 Return a JSON object with these fields matching the Pipedream MCP tool format:
 - user_intent: Clear request made by the user based on context
@@ -252,6 +385,13 @@ Return a JSON object with these fields matching the Pipedream MCP tool format:
 CRITICAL: Use SIMPLE format - no nested objects, just direct field values.
 ALWAYS include timezone offset in ISO format. Use {timezone_name} timezone.
 If context suggests this is modifying a previous booking, incorporate that into the title.
+
+IMPORTANT INSTRUCTIONS FOR EVENT ID:
+- If event_id is provided ({event_id}), this is an UPDATE operation
+- Add "event_id": "{event_id}" to the original_args
+- Set requires_event_id: true
+- For UPDATE operations, preserve existing attendees unless explicitly removing them
+- When removing attendees, note the API restriction about manual removal
 """
 
         try:
@@ -276,11 +416,18 @@ If context suggests this is modifying a previous booking, incorporate that into 
                     # Single tool - also add to mcp_tools_to_use for consistency
                     result['mcp_tools_to_use'] = [result['tool_name']]
 
+                # Add event_id to original_args if found
+                if event_id and 'original_args' in result:
+                    result['original_args']['event_id'] = event_id
+                    result['requires_event_id'] = True
+                    print(f"🔧 Added event_id to booking request: {event_id}")
+
                 # Add context metadata
                 result['_context'] = {
                     'routing_analysis': routing_context,
                     'conversation_summary': conversation_summary,
-                    'extraction_source': 'enhanced_context'
+                    'extraction_source': 'enhanced_context',
+                    'found_event_id': event_id
                 }
 
                 return result
@@ -289,15 +436,16 @@ If context suggests this is modifying a previous booking, incorporate that into 
 
         return None
 
-    def _extract_routing_context(self, messages: List[BaseMessage]) -> tuple[str, Optional[Dict], str]:
+    def _extract_routing_context(self, messages: List[BaseMessage]) -> tuple[str, Optional[Dict], str, Optional[str]]:
         """Extract routing context from messages using LangGraph patterns"""
         routing_context = None
         booking_context = None
         conversation_summary = ""
         booking_intent = ""
         mcp_tools_to_use = []
+        event_id = None  # ADD EVENT ID EXTRACTION
 
-        # Look for routing context in recent messages
+        # Look for routing context in recent messages AND event ID
         for msg in reversed(messages[-10:]):
             if hasattr(msg, 'additional_kwargs') and msg.additional_kwargs:
                 kwargs = msg.additional_kwargs
@@ -313,12 +461,38 @@ If context suggests this is modifying a previous booking, incorporate that into 
                     mcp_tools_to_use = kwargs['mcp_tools_to_use']
                     break
 
+            # EXTRACT EVENT ID from calendar agent messages
+            if hasattr(msg, 'content') and isinstance(msg.content, str):
+                content = msg.content
+                # Look for event ID patterns like "Event ID:** k2a1uubdogqd08k1fetqrm4lhs"
+                import re
+                event_id_match = re.search(r'Event ID[:\*\s]*([a-zA-Z0-9]+)', content)
+                if event_id_match:
+                    event_id = event_id_match.group(1)
+                    print(f"🔍 Found event ID in calendar agent message: {event_id}")
+                    # Don't break here, continue looking for routing context
+
         # Fallback: Extract from conversation if no routing context found
         if not routing_context:
             user_messages = []
             for msg in messages:
                 if isinstance(msg, HumanMessage):
                     content = msg.content
+
+                    # CLEAN UP MALFORMED INPUT - Fix the {'type': 'text', 'text': '...'} issue
+                    if isinstance(content, str) and content.startswith("{'type': 'text', 'text':"):
+                        try:
+                            import ast
+                            parsed = ast.literal_eval(content)
+                            if isinstance(parsed, dict) and 'text' in parsed:
+                                content = parsed['text']
+                        except:
+                            # If parsing fails, try regex extraction
+                            import re
+                            match = re.search(r"'text': '([^']+)'", content)
+                            if match:
+                                content = match.group(1)
+
                     if isinstance(content, list):
                         content_str = " ".join(str(item) for item in content if item)
                     else:
@@ -335,7 +509,7 @@ If context suggests this is modifying a previous booking, incorporate that into 
                 if not booking_intent and booking_context:
                     booking_intent = booking_context.get('original_intent', '')
 
-        return booking_intent, routing_context, conversation_summary, mcp_tools_to_use
+        return booking_intent, routing_context, conversation_summary, event_id
 
     def _validate_human_response(self, response: Any, booking_request: BookingRequest) -> Dict[str, Any]:
         """Validate human response following LangGraph validation patterns"""
@@ -398,148 +572,7 @@ If context suggests this is modifying a previous booking, incorporate that into 
             print(f"Error processing modifications: {e}")
             return None
 
-    async def _execute_booking(self, booking_request: BookingRequest, modifications: Dict[str, Any]) -> str:
-        """Execute the approved booking using MCP tools following LangGraph best practices"""
-
-        # Apply any human modifications
-        args = booking_request.original_args.copy()
-        args.update(modifications)
-
-        # Ensure all required fields are present for Pipedream MCP tool
-        if "summary" not in args:
-            args["summary"] = booking_request.title
-        if "start" not in args:
-            args["start"] = booking_request.start_time
-        if "end" not in args:
-            args["end"] = booking_request.end_time
-
-        # Ensure attendees are properly formatted as array of email strings
-        if "attendees" in args and args["attendees"]:
-            if isinstance(args["attendees"], list):
-                # Convert attendee objects to email strings if needed
-                formatted_attendees = []
-                for attendee in args["attendees"]:
-                    if isinstance(attendee, dict) and "email" in attendee:
-                        formatted_attendees.append(attendee["email"])
-                    elif isinstance(attendee, str):
-                        formatted_attendees.append(attendee)
-                args["attendees"] = formatted_attendees
-            elif isinstance(args["attendees"], str):
-                args["attendees"] = [args["attendees"]]
-
-        # Set default values for optional Google Calendar fields
-        if "colorId" not in args:
-            args["colorId"] = None
-        if "transparency" not in args:
-            args["transparency"] = "opaque"  # User is busy by default
-        if "visibility" not in args:
-            args["visibility"] = "default"
-        if "guestsCanInviteOthers" not in args:
-            args["guestsCanInviteOthers"] = True
-        if "guestsCanModify" not in args:
-            args["guestsCanModify"] = False
-        if "guestsCanSeeOtherGuests" not in args:
-            args["guestsCanSeeOtherGuests"] = True
-        if "anyoneCanAddSelf" not in args:
-            args["anyoneCanAddSelf"] = False
-        if "reminders" not in args:
-            args["reminders"] = {"useDefault": True}
-
-        # Add the missing instruction parameter that Pipedream MCP tools require
-        # Include ALL available fields in the instruction for proper MCP tool data passing
-        if "instruction" not in args:
-            # Build comprehensive instruction with all available fields
-            instruction_parts = []
-
-            if "update" in booking_request.tool_name:
-                instruction_parts.append(f"Update calendar event: {booking_request.title}")
-                instruction_parts.append(f"Time: {booking_request.start_time} to {booking_request.end_time}")
-            elif "add-attendees" in booking_request.tool_name:
-                instruction_parts.append(f"Add attendees to calendar event: {booking_request.title}")
-                if args.get("attendees"):
-                    instruction_parts.append(f"Attendees to add: {', '.join(args['attendees'])}")
-            else:
-                instruction_parts.append(f"Create calendar event: {booking_request.title}")
-                instruction_parts.append(f"Time: {booking_request.start_time} to {booking_request.end_time}")
-
-            # Add all optional fields to instruction if present
-            if args.get("description"):
-                instruction_parts.append(f"Description: {args['description']}")
-            if args.get("location"):
-                instruction_parts.append(f"Location: {args['location']}")
-            if args.get("attendees") and "add-attendees" not in booking_request.tool_name:
-                instruction_parts.append(f"Attendees: {', '.join(args['attendees'])}")
-            if args.get("colorId"):
-                instruction_parts.append(f"Color: {args['colorId']}")
-            if args.get("transparency"):
-                instruction_parts.append(f"Transparency: {args['transparency']}")
-            if args.get("visibility"):
-                instruction_parts.append(f"Visibility: {args['visibility']}")
-            if args.get("guestsCanInviteOthers") is not None:
-                instruction_parts.append(f"Guests can invite others: {args['guestsCanInviteOthers']}")
-            if args.get("guestsCanModify") is not None:
-                instruction_parts.append(f"Guests can modify: {args['guestsCanModify']}")
-            if args.get("guestsCanSeeOtherGuests") is not None:
-                instruction_parts.append(f"Guests can see other guests: {args['guestsCanSeeOtherGuests']}")
-            if args.get("anyoneCanAddSelf") is not None:
-                instruction_parts.append(f"Anyone can add self: {args['anyoneCanAddSelf']}")
-            if args.get("reminders"):
-                instruction_parts.append(f"Reminders: {args['reminders']}")
-
-            # Join all instruction parts with semicolons for clarity
-            args["instruction"] = "; ".join(instruction_parts)
-
-        # Handle event ID for update/modify operations
-        if "update" in booking_request.tool_name or "add-attendees" in booking_request.tool_name:
-            # For now, we'll need to search for the most recent event that matches
-            # In a real implementation, we'd need to track event IDs from previous bookings
-            if "event_id" not in args:
-                print("⚠️  Warning: Update operation requires event_id - may need to implement event search")
-                # Could add logic here to search for recent events matching the criteria
-
-        # Get list of tools to execute (use mcp_tools_to_use if available)
-        tools_to_execute = booking_request.mcp_tools_to_use or [booking_request.tool_name]
-
-        # DEBUG: Show what tools we're trying to execute
-        print(f"🔍 DEBUG: Tools to execute: {tools_to_execute}")
-        print(f"🔍 DEBUG: Available booking tools: {[tool.name for tool in self.booking_tools]}")
-        print(f"🔍 DEBUG: Total booking tools count: {len(self.booking_tools)}")
-
-        results = []
-
-        for tool_name in tools_to_execute:
-            if not tool_name:
-                continue
-
-            # Find the tool
-            tool_to_use = None
-            for tool in self.booking_tools:
-                if tool.name == tool_name:
-                    tool_to_use = tool
-                    break
-
-            if not tool_to_use:
-                print(f"🔍 DEBUG: Could not find tool '{tool_name}' in available tools")
-                results.append(f"❌ Tool {tool_name} not available")
-                continue
-
-            try:
-                print(f"🔧 Executing {tool_name} with args: {args}")
-                result = await tool_to_use.ainvoke(args)
-
-                if "error" not in str(result).lower():
-                    results.append(f"✅ {tool_name}: Success")
-                else:
-                    results.append(f"❌ {tool_name}: {result}")
-
-            except Exception as e:
-                results.append(f"❌ {tool_name}: {str(e)}")
-
-        # Return combined results
-        if all("✅" in result for result in results):
-            return f"✅ Booking Confirmed Successfully!\n\n📅 **{booking_request.title}**\n🕒 {booking_request.start_time} - {booking_request.end_time}\n\n📋 Operations Completed:\n" + "\n".join([f"  • {r}" for r in results])
-        else:
-            return f"⚠️ Some operations failed:\n" + "\n".join(results)
+    # REMOVED: Old _execute_booking method replaced by MCPToolExecutor for better reliability
 
     async def booking_execute_node(self, state: MessagesState) -> Dict[str, Any]:
         """Execute approved booking after human approval"""

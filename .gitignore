@@ -47,6 +47,9 @@ Thumbs.db
 *.log
 logs/
 
+# Library dependencies (use pip install instead)
+library/
+
 # Git submodules (we'll include the code directly)
 agent-chat-ui/.git/
 agent-inbox/.git/

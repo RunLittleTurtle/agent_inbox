@@ -79,7 +79,7 @@ class BookingContext(BaseModel):
 
     original_intent: str = Field(..., description="Original booking intent")
     routing_analysis: Optional[RoutingDecision] = Field(default=None, description="Router analysis")
-    conversation_summary: str = Field(..., description="Relevant conversation context")
+    conversation_context: str = Field(..., description="Relevant conversation context extracted from MessagesState")
     previous_attempts: List[str] = Field(default_factory=list, description="Previous booking attempts")
     calendar_constraints: List[str] = Field(default_factory=list, description="Calendar availability constraints")
     extracted_details: Optional[Dict[str, Any]] = Field(default=None, description="Extracted booking details")
@@ -90,9 +90,9 @@ class BookingRequest(BaseModel):
     """Structured booking request for MCP tool execution."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    title: str = Field(..., description="Event title/summary")
-    start_time: str = Field(..., description="Start time in ISO format with timezone")
-    end_time: str = Field(..., description="End time in ISO format with timezone")
+    title: str = Field(default="Untitled Event", description="Event title/summary")
+    start_time: str = Field(default="", description="Start time in ISO format with timezone")
+    end_time: str = Field(default="", description="End time in ISO format with timezone")
     description: Optional[str] = Field(default=None, description="Event description")
     location: Optional[str] = Field(default=None, description="Event location")
     attendees: List[str] = Field(default_factory=list, description="List of attendee emails")

@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
@@ -34,6 +34,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from .state import CalendarAgentState, RoutingDecision, BookingContext
+from uuid import uuid4
 
 
 class CalendarAgentWithMCP:
@@ -264,6 +265,18 @@ USER FEEDBACK AND INPUT
             prompt=prompt
         )
 
+
+
+
+
+
+
+
+
+
+
+
+
         # If no booking tools, just return the simple agent
         if not self.booking_tools:
             return calendar_agent
@@ -292,47 +305,16 @@ USER FEEDBACK AND INPUT
             from pydantic import BaseModel, Field
             from typing import Literal
 
-            # Define structured output for routing decisions
-            class RoutingDecision(BaseModel):
-                """Routing decision based on conversation analysis"""
-                needs_booking_approval: bool = Field(
-                    description="True if the conversation indicates a booking, scheduling, creating, updating, or deleting calendar events"
-                )
-                reasoning: str = Field(
-                    description="Brief explanation of the routing decision"
-                )
-                next_action: Literal["booking_approval", "end"] = Field(
-                    description="Next node to route to"
-                )
-                user_intent: str = Field(
-                    description="Extracted user intent from conversation"
-                )
-                booking_context: Optional[str] = Field(
-                    default=None, description="Full booking context from conversation"
-                )
-                mcp_tools_to_use: Optional[List[str]] = Field(
-                    default=None, description="List of MCP tools to use for the completion of all booking tasks"
-                )
+            # Use RoutingDecision from state module
 
             # Get conversation context
             messages = state.get("messages", [])
             if not messages:
                 return END
 
-            # Prepare conversation history for LLM analysis
-            conversation_context = []
-            for msg in messages[-6:]:  # Last 6 messages for context
-                if hasattr(msg, 'content'):
-                    content = msg.content
-                    if isinstance(content, list):
-                        content = " ".join(str(item) for item in content if item)
-                    elif not isinstance(content, str):
-                        content = str(content)
-
-                    role = getattr(msg, 'type', 'unknown')
-                    conversation_context.append(f"{role}: {content}")
-
-            context_str = "\n".join(conversation_context)
+            # Use state messages directly - no manual extraction needed
+            # thread_id + MemorySaver already manages conversation history
+            context_str = "\n".join([f"{getattr(msg, 'type', 'message')}: {msg.content}" for msg in messages[-6:] if hasattr(msg, 'content')])
 
             # Get available tools for dynamic prompt generation
             available_tools_list = [f"- {tool.name}: {tool.description}" for tool in self.booking_tools] if self.booking_tools else ["- No MCP tools available"]
@@ -423,7 +405,7 @@ USER FEEDBACK AND INPUT
                     booking_context = BookingContext(
                         original_intent=decision.user_intent,
                         routing_analysis=decision,
-                        conversation_summary=context_str,
+                        conversation_context=context_str,
                         previous_attempts=[],
                         calendar_constraints=[],
                         extracted_details=None,
@@ -438,7 +420,20 @@ USER FEEDBACK AND INPUT
                             "routing_decision": decision.dict(),
                             "booking_context": booking_context.dict(),
                             "user_intent": decision.user_intent,
-                            "conversation_summary": context_str,
+                            "conversation_context": context_str,
+                            "mcp_tools_to_use": decision.mcp_tools_to_use
+                        }
+                    )
+
+                    # Add routing decision to messages with additional_kwargs for context preservation
+                    from langchain_core.messages import AIMessage
+                    context_message = AIMessage(
+                        content=f"🔄 ROUTING CONTEXT: {decision.reasoning}",
+                        additional_kwargs={
+                            "routing_decision": decision.dict(),
+                            "booking_context": booking_context.dict(),
+                            "user_intent": decision.user_intent,
+                            "conversation_context": context_str,
                             "mcp_tools_to_use": decision.mcp_tools_to_use
                         }
                     )
@@ -569,6 +564,20 @@ USER FEEDBACK AND INPUT
             await self.initialize()
         return self.graph
 
+    def create_thread_id(self, user_id: Optional[str] = None) -> str:
+        """Create a simple thread ID for conversation memory"""
+        if user_id:
+            # Simple deterministic thread for same user
+            from hashlib import md5
+            return f"user_{md5(user_id.encode()).hexdigest()[:8]}"
+        else:
+            # Random thread ID
+            return f"thread_{str(uuid4())[:8]}"
+
+    def build_config(self, thread_id: str) -> Dict[str, Any]:
+        """Build LangGraph config with thread ID"""
+        return {"configurable": {"thread_id": thread_id}}
+
     async def get_available_tools(self) -> List[Dict[str, str]]:
         """Get list of available tools"""
         if not self.tools:
@@ -631,8 +640,9 @@ if __name__ == "__main__":
             print(f"\nRequest: {request}")
 
             try:
-                # Use the LangGraph agent properly
-                config = {"configurable": {"thread_id": "test-thread"}}
+                # Use the LangGraph agent with thread ID
+                thread_id = agent.create_thread_id("test-user")
+                config = agent.build_config(thread_id)
                 result = await graph.ainvoke(
                     {"messages": [{"role": "user", "content": request}]},
                     config=config

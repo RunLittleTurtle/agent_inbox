@@ -137,8 +137,23 @@ async def create_email_agent():
         raise
 
 async def create_job_search_agent():
-    """Create job search agent - placeholder for now"""
+    """Create job search agent using the orchestrator"""
     try:
+        from src.job_search_agent.job_search_orchestrator import create_default_orchestrator
+
+        logger.info("Creating job search agent with clean orchestrator...")
+
+        # Create the compiled workflow directly
+        workflow = create_default_orchestrator()
+
+        logger.info("Job search agent created successfully with fixed orchestrator")
+        return workflow
+
+    except Exception as e:
+        logger.error(f"Failed to create job search agent: {e}")
+        # Fallback to simple react agent
+        logger.info("Creating fallback job search agent...")
+
         job_model = ChatOpenAI(
             model="gpt-4o",
             temperature=0,
@@ -152,17 +167,16 @@ async def create_job_search_agent():
         - Resume and cover letter advice
         - Interview preparation
         - Job search strategies
-        - Career planning guidance"""
+        - Career planning guidance
+
+        Note: Full job search workflow not available due to technical issues."""
 
         return create_react_agent(
             model=job_model,
             tools=[],
-            name="job_search_agent",
+            name="job_search_agent_fallback",
             prompt=job_prompt
         )
-    except Exception as e:
-        logger.error(f"Failed to create job search agent: {e}")
-        raise
 
 def validate_environment():
     """Validate required environment variables"""
@@ -208,7 +222,7 @@ CURRENT CONTEXT:
 AGENT CAPABILITIES:
 - calendar_agent: All calendar operations (create/view/modify events, check availability, scheduling)
 - email_agent: Email composition, formatting, etiquette guidance, organization strategies
-- job_search_agent: Job search strategies, resume/cover letter advice, interview prep, career guidance
+- job_search_agent: CV, Job Offer, Job search, resume/cover letter advice, interview prep
 
 ROUTING STRATEGY:
 1. ANALYZE the user's request carefully
@@ -219,11 +233,12 @@ ROUTING STRATEGY:
 ROUTING RULES:
 - Calendar/scheduling/appointments/meetings → calendar_agent
 - Email writing/sending/organization → email_agent
-- Job search/career/resume/interviews → job_search_agent
+- Job search/career/resume/interviews/CV → job_search_agent
 - General questions → Choose most relevant agent or handle briefly
 
 CRITICAL GUIDELINES:
 - You are a ROUTER, not a problem solver
+- NEVER answer a question that is not within your domain
 - Route quickly and decisively
 - Trust your agents to handle their domains
 - Only provide direct answers for simple greetings or clarifications

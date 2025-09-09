@@ -1,0 +1,18 @@
+{
+  "test_thread": {
+    "created_at": "2025-09-09T15:10:24.281405",
+    "last_activity": "2025-09-09T15:10:24.281414",
+    "preferences": {},
+    "generation_history": [],
+    "context": {},
+    "has_global_cv": true
+  },
+  "test_integration": {
+    "created_at": "2025-09-09T15:11:17.135963",
+    "last_activity": "2025-09-09T15:11:17.135976",
+    "preferences": {},
+    "generation_history": [],
+    "context": {},
+    "has_global_cv": true
+  }
+}

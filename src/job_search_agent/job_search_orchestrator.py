@@ -1,6 +1,6 @@
 """
 Job Search Orchestrator
-Clean LangGraph implementation using SimpleRAG
+Clean LangGraph implementation using simple_rag.py
 Following KISS principles and LangGraph best practices
 """
 
@@ -15,6 +15,7 @@ from langgraph.prebuilt import create_react_agent
 from .simple_rag import SimpleRAG
 from .config import LLM_CONFIG
 from .tools import get_job_search_tools
+from .prompt import REACT_AGENT_SYSTEM_PROMPT
 
 
 # =============================================================================
@@ -32,13 +33,10 @@ class JobSearchState(TypedDict):
 
 class JobSearchOrchestrator:
     """
-    Clean job search orchestrator using SimpleRAG and LangGraph best practices
+    Clean job search orchestrator using simple_rag.py
 
-    Workflow:
-    1. Initialize with default CV (automatically indexed)
-    2. User uploads job posting via tools
-    3. Generate tailored cover letter via tools
-    4. Support CV queries and job matching via tools
+    Note: tools.py manages its own SimpleRAG instance with default CV.
+    This orchestrator just provides the React agent framework.
     """
 
     def __init__(self, llm_config: Dict[str, Any] = None):
@@ -47,57 +45,20 @@ class JobSearchOrchestrator:
         self.llm = ChatOpenAI(**self.llm_config)
         self.checkpointer = MemorySaver()
 
-        # Initialize SimpleRAG with default CV
-        self.simple_rag = self._initialize_rag()
-
-        # Get tools
+        # Get tools (tools.py manages its own SimpleRAG instance)
         self.tools = get_job_search_tools()
 
         # Build workflow - React agent comes pre-compiled
         self.workflow = self._build_workflow()
 
-    def _initialize_rag(self) -> SimpleRAG:
-        """Initialize SimpleRAG with default CV"""
-        try:
-            import os
-
-            # Load default CV
-            docs_path = os.path.join(
-                os.path.dirname(__file__),
-                "docs",
-                "CV - Samuel Audette_Technical_Product_Manager_AI_2025_09.md"
-            )
-
-            if os.path.exists(docs_path):
-                with open(docs_path, 'r', encoding='utf-8') as f:
-                    default_cv = f.read()
-
-                # Initialize RAG and index CV
-                rag = SimpleRAG(self.llm_config)
-                success = rag.index_cv_content(default_cv)
-
-                if success:
-                    print("✅ SimpleRAG initialized with default CV")
-                else:
-                    print("⚠️ SimpleRAG initialized but CV indexing failed")
-
-                return rag
-            else:
-                print("⚠️ Default CV not found, initializing empty RAG")
-                return SimpleRAG(self.llm_config)
-
-        except Exception as e:
-            print(f"⚠️ RAG initialization error: {e}")
-            return SimpleRAG(self.llm_config)
-
     def _build_workflow(self):
         """Build simple React agent workflow"""
 
-        # Create React agent with tools - this is already a complete graph
-        # Create React agent with tools
+        # Create React agent with tools and anti-hallucination prompt
         react_agent = create_react_agent(
             model=self.llm,
             tools=self.tools,
+            prompt=REACT_AGENT_SYSTEM_PROMPT,
             name="job_search_agent"
         )
 
@@ -157,5 +118,5 @@ if __name__ == "__main__":
 
     print("🚀 Job Search Orchestrator Created Successfully")
     print("✅ Ready for LangGraph Studio")
-    print("✅ SimpleRAG initialized with default CV")
+    print("✅ Tools use dedicated simple_rag.py for CV operations")
     print("✅ React agent configured with job search tools")

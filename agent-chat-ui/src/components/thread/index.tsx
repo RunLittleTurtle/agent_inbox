@@ -47,7 +47,6 @@ import {
   useArtifactContext,
 } from "./artifact";
 import { AgentThoughts } from "../streaming/AgentThoughts";
-import { ProgressIndicator } from "../streaming/ProgressIndicator";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -429,12 +428,11 @@ export function Thread() {
                   {isLoading && !firstTokenReceived && (
                     <AssistantMessageLoading />
                   )}
-                  
+
                   {/* Streaming UI Components */}
                   {(isLoading || messages.length > 0) && (
-                    <div className="flex flex-col gap-4 w-full max-w-3xl mx-auto">
+                    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
                       <AgentThoughts />
-                      <ProgressIndicator />
                     </div>
                   )}
                 </>

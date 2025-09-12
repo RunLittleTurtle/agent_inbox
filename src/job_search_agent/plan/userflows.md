@@ -43,7 +43,7 @@ flowchart LR
 ````
 ````mermaid
 flowchart LR
-    
+    linkStyle default interpolate basis
     %% Main Flow
     subgraph FLOW
        direction LR
@@ -144,7 +144,7 @@ flowchart LR
 ````
 ````mermaid
 flowchart LR
-    
+    linkStyle default interpolate basis
     %% Main Flow - line 1
     subgraph FLOW - line 1
        direction LR
@@ -199,6 +199,7 @@ flowchart LR
 ````mermaid
 
 flowchart LR
+linkStyle default interpolate basis
 %% Main Flow - line 2
     subgraph FLOW - line 2
        direction LR
@@ -297,7 +298,7 @@ flowchart LR
 
 ````mermaid
 flowchart TD
-
+	linkStyle default interpolate basis
     %% Main Flow - line 1
     subgraph FLOW - line 1
        direction LR
@@ -433,7 +434,7 @@ flowchart LR
 ````mermaid
 flowchart LR
     
-    
+   linkStyle default interpolate basis
     %% First Line - Request Analysis & Validation
     subgraph LINE1["📋 PHASE 1: REQUEST ANALYSIS & VALIDATION"]
         direction LR
@@ -505,6 +506,7 @@ flowchart LR
 ````mermaid
 
     flowchart LR
+    linkStyle default interpolate basis
     %% Second Line - RAG & Generation
     subgraph LINE2["🚀 PHASE 2: RAG PROCESSING & GENERATION"]
         direction LR
@@ -607,6 +609,7 @@ flowchart LR
 ````
 ````mermaid
 flowchart LR
+linkStyle default interpolate basis
   subgraph LINE1["📋 PHASE 1: REQUEST ANALYSIS & JOB POSTING PROCESSING"]
     direction LR
     A[👤 User: Cover letter please<br/>and this is the job offer:<br/>pasted content]
@@ -640,6 +643,7 @@ flowchart LR
 
 ````mermaid
 flowchart LR
+linkStyle default interpolate basis
   subgraph LINE2["🔍 PHASE 2: CV VALIDATION & DOCUMENT LOADING"]
     direction LR
     CONNECTOR1[⬇️ PROCEED TO CV CHECK PHASE] --> H[🧵 Check Thread State<br/>📍 JobSearchState.cv_content]

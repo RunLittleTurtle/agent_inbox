@@ -3,6 +3,7 @@
 ```mermaid
 
 graph TD
+linkStyle default interpolate basis
     %% INITIALIZATION PHASE (One-time)
     subgraph INIT["🚀 INITIALIZATION PHASE (One-time)"]
         A[START] --> B[document_loader]

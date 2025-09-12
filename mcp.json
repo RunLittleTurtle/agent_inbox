@@ -1,0 +1,14 @@
+{
+  "langgraph-docs-mcp": {
+    "command": "uvx",
+    "args": [
+      "--from",
+      "mcpdoc",
+      "mcpdoc",
+      "--urls",
+      "LangGraph Python:https://langchain-ai.github.io/langgraph/llms.txt LangGraph JS:https://langchain-ai.github.io/langgraphjs/llms.txt LangChain Python:https://python.langchain.com/llms.txt LangChain JS:https://js.langchain.com/llms.txt",
+      "--transport",
+      "stdio"
+    ]
+  }
+}

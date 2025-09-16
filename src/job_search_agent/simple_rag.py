@@ -64,10 +64,10 @@ class SimpleRAG:
         self.vector_store = SimpleRAG._shared_vector_store
         self.llm = ChatOpenAI(**self.llm_config)
 
-        # Text splitter optimized for CV content
+        # Text splitter optimized for comprehensive CV context preservation
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=350,  # Smaller chunks for better precision
-            chunk_overlap=70,  # Less overlap to avoid duplicates
+            chunk_size=800,  # Larger chunks to preserve project context and descriptions
+            chunk_overlap=200,  # Substantial overlap (25%) to ensure continuity across chunks
             add_start_index=True,
             separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]  # Better CV structure recognition
         )
@@ -246,7 +246,7 @@ class SimpleRAG:
         """
         retrieved_docs = self.vector_store.similarity_search(
             state["question"],
-            k=4  # Top 4 most relevant chunks
+            k=8  # More chunks for comprehensive coverage with larger chunk sizes
         )
         return {"context": retrieved_docs}
 
@@ -365,6 +365,202 @@ class SimpleRAG:
                     "context": [],
                     "answer": f"Error processing your question: {error_msg}"
                 }
+
+    # =============================================================================
+    # JOB DATA MANAGEMENT (replaces document_store) - FILE-BASED PERSISTENCE
+    # =============================================================================
+
+    def _get_thread_data_path(self, thread_id: str) -> str:
+        """Get file path for thread data storage"""
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        thread_data_dir = os.path.join(project_root, "job_search_data", "threads")
+        os.makedirs(thread_data_dir, exist_ok=True)
+        return os.path.join(thread_data_dir, f"{thread_id}_data.json")
+
+    def _load_thread_data(self, thread_id: str) -> dict:
+        """Load thread data from file"""
+        try:
+            data_path = self._get_thread_data_path(thread_id)
+            if os.path.exists(data_path):
+                with open(data_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            print(f"Error loading thread data: {e}")
+            return {}
+
+    def _save_thread_data(self, thread_id: str, data: dict) -> bool:
+        """Save thread data to file"""
+        try:
+            data_path = self._get_thread_data_path(thread_id)
+            with open(data_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"Error saving thread data: {e}")
+            return False
+
+    def store_job_posting(self, thread_id: str, job_posting: str) -> bool:
+        """Store job posting for thread"""
+        try:
+            thread_data = self._load_thread_data(thread_id)
+            thread_data["job_posting"] = job_posting
+            return self._save_thread_data(thread_id, thread_data)
+        except Exception as e:
+            print(f"Error storing job posting: {e}")
+            return False
+
+    def get_job_posting(self, thread_id: str) -> str:
+        """Get job posting for thread"""
+        thread_data = self._load_thread_data(thread_id)
+        return thread_data.get("job_posting")
+
+    def store_job_analysis(self, thread_id: str, analysis: dict) -> bool:
+        """Store job analysis for thread"""
+        try:
+            thread_data = self._load_thread_data(thread_id)
+            thread_data["job_analysis"] = analysis
+            return self._save_thread_data(thread_id, thread_data)
+        except Exception as e:
+            print(f"Error storing job analysis: {e}")
+            return False
+
+    def get_job_analysis(self, thread_id: str) -> dict:
+        """Get job analysis for thread"""
+        thread_data = self._load_thread_data(thread_id)
+        return thread_data.get("job_analysis")
+
+    def store_cv_analysis(self, thread_id: str, analysis: dict) -> bool:
+        """Store CV analysis for thread"""
+        try:
+            thread_data = self._load_thread_data(thread_id)
+            thread_data["cv_analysis"] = analysis
+            return self._save_thread_data(thread_id, thread_data)
+        except Exception as e:
+            print(f"Error storing CV analysis: {e}")
+            return False
+
+    def get_cv_analysis(self, thread_id: str) -> dict:
+        """Get CV analysis for thread"""
+        thread_data = self._load_thread_data(thread_id)
+        return thread_data.get("cv_analysis")
+
+    def has_job_posting(self, thread_id: str) -> bool:
+        """Check if job posting exists for thread"""
+        return bool(self.get_job_posting(thread_id))
+
+    def clear_thread_data(self, thread_id: str) -> bool:
+        """Clear all data for thread"""
+        try:
+            data_path = self._get_thread_data_path(thread_id)
+            if os.path.exists(data_path):
+                os.remove(data_path)
+            return True
+        except Exception as e:
+            print(f"Error clearing thread data: {e}")
+            return False
+
+
+
+    def get_preferences(self, thread_id: str) -> dict:
+        """Get user preferences for thread"""
+        thread_data = self._load_thread_data(thread_id)
+        return thread_data.get("preferences", {})
+
+    def store_history_item(self, thread_id: str, history_item: dict) -> bool:
+        """Add item to generation history for thread"""
+        try:
+            thread_data = self._load_thread_data(thread_id)
+            if "history" not in thread_data:
+                thread_data["history"] = []
+            thread_data["history"].append(history_item)
+            return self._save_thread_data(thread_id, thread_data)
+        except Exception as e:
+            print(f"Error storing history item: {e}")
+            return False
+
+
+
+    def get_raw_cv_chunks(self, query: str, k: int = 10) -> List[str]:
+        """
+        Get raw CV chunks directly from vector store without LLM processing
+        Enhanced with Maximum Marginal Relevance for diverse results
+
+        Args:
+            query: Search query for relevant chunks
+            k: Number of chunks to retrieve
+
+        Returns:
+            List of raw chunk content strings
+        """
+        try:
+            # Use Maximum Marginal Relevance for diverse results - LangGraph best practice
+            retrieved_docs = self.get_diverse_cv_chunks(query, k)
+
+            # Return raw chunk content
+            return [doc.page_content for doc in retrieved_docs]
+
+        except Exception as e:
+            print(f"Error retrieving raw chunks: {e}")
+            return []
+
+    def get_diverse_cv_chunks(self, query: str, k: int = 10):
+        """
+        Get diverse CV chunks using Maximum Marginal Relevance for variety
+        Prevents retrieving too many similar chunks from same CV sections
+
+        Args:
+            query: Search query for relevant chunks
+            k: Number of chunks to retrieve
+
+        Returns:
+            List of document chunks with diversity
+        """
+        try:
+            # Use Maximum Marginal Relevance for diverse results
+            retrieved_docs = self.vector_store.max_marginal_relevance_search(
+                query,
+                k=k,
+                lambda_mult=0.7  # Balance relevance (0.0) vs diversity (1.0)
+            )
+            return retrieved_docs
+        except (AttributeError, Exception) as e:
+            # Fallback to regular similarity search if MMR not supported
+            print(f"MMR not available ({type(e).__name__}), using similarity search")
+            retrieved_docs = self.vector_store.similarity_search(query, k=k)
+            return retrieved_docs
+
+    def force_cv_reindex(self) -> bool:
+        """
+        Force re-indexing of CV content with new chunking parameters
+        Use this when chunking strategy has been updated
+        """
+        try:
+            # Get stored CV content
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            cv_path = os.path.join(project_root, "job_search_data", "documents", "global_cv.md")
+
+            if os.path.exists(cv_path):
+                with open(cv_path, 'r', encoding='utf-8') as f:
+                    cv_content = f.read()
+
+                print(f"🔄 Re-indexing CV with new chunking strategy...")
+                print(f"📊 Optimized chunking parameters: 800 chars with 200 overlap")
+
+                # Force replacement with new chunking
+                success = self.replace_cv_content(cv_content)
+                if success:
+                    print(f"✅ CV re-indexed successfully with optimized chunks")
+                    return True
+                else:
+                    print(f"❌ Failed to re-index CV")
+                    return False
+            else:
+                print(f"❌ CV file not found at {cv_path}")
+                return False
+        except Exception as e:
+            print(f"❌ Error during re-indexing: {e}")
+            return False
 
 
 # =============================================================================

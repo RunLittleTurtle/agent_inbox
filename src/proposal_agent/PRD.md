@@ -1,8 +1,4 @@
-# PRD – Automatisation des soumissions
-
-
-
-
+# PRD – Automatisation des soumissions - Siding Tools Industries
 
 
 
@@ -66,9 +62,9 @@ En somme, l’impact attendu est double : **une réduction claire des coûts int
   2. **Détection de mots-clés techniques** *(AI/LLM)*  
      - Explication : identifie quantités, dimensions, options, délais.  
      - Requis : dictionnaire produits, seuil confiance, correction manuelle possible.  
-  3. **Interface mobile enregistrement audio** *(UI, Dev)*  
-     - Explication : bouton unique pour enregistrer/envoyer, retour visuel immédiat.  
-     - Requis : upload en arrière-plan, réécoute rapide, rattachement client/opportunité.  
+  3. **Interface enregistrement audio via le agent chat UI** *(UI, Dev)*  
+     - Explication : bouton unique pour enregistrer/envoyer, retour visuel immédiat.
+     - Requis : upload en arrière-plan, réécoute rapide, rattachement client/opportunité.
 
 ---
 

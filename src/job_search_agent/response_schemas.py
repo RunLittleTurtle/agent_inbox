@@ -93,19 +93,10 @@ class PersonalInfoResponse:
         contact_info: str,
         location: str,
         languages: str,
-        name: str,
-        email: str,
         professional_title: str
     ) -> str:
         data = {
-            "contact_information": {
-                "raw_response": contact_info,
-                "parsed": {
-                    "name": name,
-                    "email": email,
-                    "location": location
-                }
-            },
+            "contact_information": contact_info,
             "location": location,
             "languages": languages,
             "professional_title": professional_title

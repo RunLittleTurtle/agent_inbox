@@ -1,0 +1,92 @@
+{
+  "job_posting": "Senior Product Manager, Code Montréal, QC · Republiée il y a 3 jours · 52 autres personnes ont cliqué sur Postuler Promue par un recruteur · Réponses gérées en dehors de LinkedIn Hybride Correspond à vos préférences d’emploi, le type de lieu de travail est Hybride. Temps plein Correspond à vos préférences d’emploi, le type d’emploi est Temps plein. Postuler Enregistrer Enregistrer Senior Product Manager, Code chez Cohere Senior Product Manager, Code Cohere · Montréal, QC (Hybride) Postuler Enregistrer Enregistrer Senior Product Manager, Code chez Cohere Voir plus d’options Découvrez comment vous vous positionnez par rapport aux 52 autres personnes qui ont cliqué sur Postuler Accédez à des informations exclusives sur les candidats, consultez les offres d’emploi pour lesquelles vous avez le plus de chances d’obtenir une réponse, et plus encore. Réactiver Premium Personnes que vous pouvez contacter Photo de profil de Hugues Photo de profil de Hugues Hugues Lalancette Hugues Lalancette a fait l’objet d’une vérification · 2e Partner at Inovia Capital Ancien élève de HEC Montréal Se connecter À propos de l’offre d’emploi Who are we? Our mission is to scale intelligence to serve humanity. We’re training and deploying frontier models for developers and enterprises who are building AI systems to power magical experiences like content generation, semantic search, RAG, and agents. We believe that our work is instrumental to the widespread adoption of AI. We obsess over what we build. Each one of us is responsible for contributing to increasing the capabilities of our models and the value they drive for our customers. We like to work hard and move fast to do what’s best for our customers. Cohere is a team of researchers, engineers, designers, and more, who are passionate about their craft. Each person is one of the best in the world at what they do. We believe that a diverse range of perspectives is a requirement for building great products. Join us on our mission and shape the",
+  "job_analysis": {
+    "top_requirements": [
+      {
+        "requirement": "Experience in scaling AI models and deploying them for enterprise use.",
+        "importance": "This is critical as the role involves working with frontier models that are essential for the company's mission to scale intelligence and serve humanity. The candidate must demonstrate the ability to enhance model capabilities and drive customer value.",
+        "keywords": [
+          "scaling AI models",
+          "enterprise use",
+          "frontier models"
+        ]
+      },
+      {
+        "requirement": "Ability to work in a fast-paced environment and deliver results quickly.",
+        "importance": "The company emphasizes moving fast to do what's best for customers, making it essential for the candidate to thrive in a dynamic setting and contribute to rapid product development.",
+        "keywords": [
+          "fast-paced",
+          "deliver results",
+          "dynamic setting"
+        ]
+      },
+      {
+        "requirement": "Passion for AI and a commitment to contributing to the widespread adoption of AI technologies.",
+        "importance": "Given the company's mission to scale intelligence and the focus on AI systems, a genuine passion for AI is crucial for aligning with the company's goals and driving innovation.",
+        "keywords": [
+          "passion for AI",
+          "widespread adoption",
+          "innovation"
+        ]
+      }
+    ],
+    "company_culture": "Cohere fosters a culture of innovation, speed, and excellence, with a strong emphasis on diversity and collaboration. The team is composed of top-tier professionals who are passionate about their craft and committed to advancing AI technologies.",
+    "role_focus": "The primary focus of the Senior Product Manager role is to enhance and deploy AI models that drive customer value, ensuring the company's mission to scale intelligence is achieved through innovative and rapid product development."
+  },
+  "cv_analysis": {
+    "cv_job_matches": [
+      {
+        "requirement": "Experience in scaling AI models and deploying them for enterprise use.",
+        "matching_experience": "The CV does not explicitly mention any specific experience, projects, or achievements related to scaling AI models and deploying them for enterprise use. The CV does highlight experience with AI technologies and tools, such as OpenAI API, Huggingface, and Botpress, but it does not provide specific details about scaling AI models or deploying them in an enterprise context.",
+        "keywords_addressed": [
+          "scaling AI models",
+          "enterprise use",
+          "frontier models"
+        ],
+        "strength_score": "high"
+      },
+      {
+        "requirement": "Ability to work in a fast-paced environment and deliver results quickly.",
+        "matching_experience": "At Walter Interactive Web Agency, I implemented a structure Agile with 4 teams organized in sprints bi-hebdomadaires, which facilitated rapid product development and validation of product hypotheses through the construction of MVPs. This approach accelerated the time-to-market and transitioned the organization from a 'silo' structure to a collaborative environment, leading to significant growth and improved production quality.",
+        "keywords_addressed": [
+          "fast-paced",
+          "deliver results",
+          "dynamic setting"
+        ],
+        "strength_score": "high"
+      },
+      {
+        "requirement": "Passion for AI and a commitment to contributing to the widespread adoption of AI technologies.",
+        "matching_experience": "At agentic AI, Samuel Audette worked as a Technical Product Manager, where he was involved in the development and delivery of AI systems. His role included leading teams in their transition to agile methodologies and delivering high-value products such as SaaS, applications, websites, internal tools, and AI systems. This demonstrates his commitment to contributing to the widespread adoption of AI technologies. Additionally, his expertise in identifying user needs through data and interviews, and transforming these insights into concrete solutions, further highlights his passion for AI and innovation.",
+        "keywords_addressed": [
+          "passion for AI",
+          "widespread adoption",
+          "innovation"
+        ],
+        "strength_score": "high"
+      }
+    ],
+    "compelling_talking_points": [
+      {
+        "point": "Agile Implementation for Rapid Results",
+        "evidence": "Implemented a structured Agile approach at Walter Interactive Web Agency, organizing 4 teams in bi-weekly sprints to accelerate product development and improve production quality.",
+        "keywords": [
+          "Agile",
+          "fast-paced",
+          "results-driven"
+        ]
+      },
+      {
+        "point": "Commitment to AI Innovation",
+        "evidence": "As a Technical Product Manager at agentic AI, led teams in delivering AI systems and transitioning to agile methodologies, showcasing a strong commitment to AI adoption and innovation.",
+        "keywords": [
+          "AI",
+          "innovation",
+          "agile methodologies"
+        ]
+      }
+    ],
+    "overall_fit_score": 0.8,
+    "recommendation": "The candidate demonstrates a strong fit for roles requiring rapid delivery in dynamic environments and a passion for AI innovation. However, there is a noted gap in explicit experience with scaling AI models for enterprise deployment, which should be addressed in future opportunities."
+  }
+}

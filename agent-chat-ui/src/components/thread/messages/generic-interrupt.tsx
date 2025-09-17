@@ -140,7 +140,7 @@ function renderInterruptStateItem(value: any, key?: string): React.ReactNode {
               if (!trimmed) return null;
 
               // Check if this part has a field pattern (word followed by colon)
-              const colonMatch = trimmed.match(/^([^:]+?):\s*(.+)$/s);
+              const colonMatch = trimmed.match(/^([^:]+?):\s*(.+)$/);
               if (colonMatch) {
                 const fieldName = colonMatch[1].replace(/^[^\w\s]*/, "").trim(); // Remove emoji
                 let fieldValue = colonMatch[2].trim();
@@ -312,7 +312,6 @@ export function GenericInterruptView({
       setIsSubmitting(false);
     }
   };
-
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200">

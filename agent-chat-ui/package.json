@@ -19,6 +19,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.1.2",
     "@langchain/core": "^0.3.44",
     "@langchain/langgraph": "^0.2.63",
     "@langchain/langgraph-sdk": "^0.0.73",
@@ -41,6 +42,7 @@
     "lucide-react": "^0.476.0",
     "next-themes": "^0.4.4",
     "nuqs": "^2.4.1",
+    "openai": "^5.20.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.0.1",
@@ -61,8 +63,8 @@
     "@tailwindcss/postcss": "^4.0.13",
     "@types/lodash": "^4.17.16",
     "@types/node": "^22.13.5",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.20",

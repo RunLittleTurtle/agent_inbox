@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useStreamContext } from "@/providers/Stream";
@@ -47,6 +47,7 @@ import {
   useArtifactContext,
 } from "./artifact";
 import { AgentThoughts } from "../streaming/AgentThoughts";
+import { VoiceRecorder } from "../ui/voice-recorder";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -153,6 +154,25 @@ export function Thread() {
     closeArtifact();
     setArtifactContext({});
   };
+
+  // Handle voice transcription
+  const handleVoiceTranscription = useCallback((transcribedText: string) => {
+    if (transcribedText.trim()) {
+      setInput((prev) => {
+        const newText = prev ? `${prev} ${transcribedText}` : transcribedText;
+        return newText;
+      });
+    }
+  }, []);
+
+  // Handle voice recording errors
+  const handleVoiceError = useCallback((error: string) => {
+    toast.error("Voice recording error", {
+      description: error,
+      richColors: true,
+      closeButton: true,
+    });
+  }, []);
 
   useEffect(() => {
     if (!stream.error) {
@@ -504,6 +524,13 @@ export function Thread() {
                             </Label>
                           </div>
                         </div>
+                        <VoiceRecorder
+                          onTranscription={handleVoiceTranscription}
+                          onError={handleVoiceError}
+                          disabled={isLoading}
+                          transcriptionMode="auto"
+                          preferOpenAI={true}
+                        />
                         <Label
                           htmlFor="file-input"
                           className="flex cursor-pointer items-center gap-2"

@@ -14,8 +14,6 @@ import { ThreadView } from "../agent-inbox";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { GenericInterruptView } from "./generic-interrupt";
 import { useArtifact } from "../artifact";
-import { shouldCollapseMessage } from "./supervisor-detector";
-import { CollapsibleMessage, getAgentDisplayName } from "./collapsible-message";
 
 function CustomComponent({
   message,
@@ -138,11 +136,6 @@ export function AssistantMessage({
   const hasAnthropicToolCalls = !!anthropicStreamedToolCalls?.length;
   const isToolResult = message?.type === "tool";
 
-  // Determine if this message should be collapsed (minimalistic display)
-  const shouldCollapse = message
-    ? shouldCollapseMessage(message, thread.messages)
-    : false;
-
   if (isToolResult && hideToolCalls) {
     return null;
   }
@@ -152,11 +145,9 @@ export function AssistantMessage({
       <div className="flex flex-col gap-2">
         {isToolResult ? (
           <>
-            <CollapsibleMessage
-              content={String(message.content)}
-              agentName={getAgentDisplayName(message?.name || "Tool Result")}
-              shouldCollapse={true}
-            />
+            <div className="py-1">
+              <MarkdownText>{String(message.content)}</MarkdownText>
+            </div>
             <Interrupt
               interruptValue={threadInterrupt?.value}
               isLastMessage={isLastMessage}
@@ -166,11 +157,8 @@ export function AssistantMessage({
         ) : (
           <>
             {contentString.length > 0 && (
-              <CollapsibleMessage
-                content={contentString}
-                agentName={getAgentDisplayName(message?.name || "")}
-                shouldCollapse={shouldCollapse}
-              >
+              <div className="py-1">
+                <MarkdownText>{contentString}</MarkdownText>
                 {!hideToolCalls && (
                   <>
                     {(hasToolCalls && toolCallsHaveContents && (
@@ -184,7 +172,7 @@ export function AssistantMessage({
                       ))}
                   </>
                 )}
-              </CollapsibleMessage>
+              </div>
             )}
 
             {!hideToolCalls && contentString.length === 0 && (

@@ -1,73 +1,4 @@
-```mermaid
-flowchart TD
-  %% --- Nodes with rectangles and <br> ---
-  Caller_Start["User<br>Incoming call<br>Input: phone → Output: call event (user)"]
-  Create_Session["System<br>Create session ID & metadata<br>Input: call → Output: session object (chain)"]
-  Retrieve_QA["System<br>Retrieve Q&A script<br>Input: session → Output: list of questions (chain)"]
-  Ask_Question["System<br>Select next question<br>Input: list + prev answers → Output: question text (chain)"]
-  TTS_Play["System<br>Ask user via TTS<br>Input: question text → Output: audio (LLM)"]
-  Caller_Speaks["User<br>Speaks answer<br>Input: heard question → Output: answer audio (user)"]
-  Listen_VAD["System<br>Split speech with VAD<br>Input: audio → Output: utterance chunks (chain)"]
-  Fast_ASR["Fast ASR<br>Transcribe audio streaming<br>Input: audio → Output: provisional text (LLM)"]
-  Validate_Answer["System<br>Validate answer & handle retries<br>Input: text + attempts → Output: validated / retry / escalate (chain)"]
-  Persist_Provisional["System<br>Save provisional Q&A<br>Input: validated text → Output: DB row (chain)"]
-  Enqueue_Background["System<br>Queue audio for full ASR<br>Input: audio → Output: background job (chain)"]
-  Next_Question["System<br>More questions?<br>Input: list/answered → Output: yes/no (chain)"]
-  Reask_Question["System<br>Re-ask question if retry needed<br>Input: question → Output: audio (chain)"]
-  Escalate_Human["System<br>Flag for human agent<br>Input: max attempts/low confidence → Output: flagged (chain)"]
-  Generate_Review["System<br>Generate & send review link<br>Input: final transcripts → Output: message sent (chain)"]
-  User_Review["User<br>Review & edit answers<br>Input: message → Output: edited answers (user)"]
-  Push_CRM["System<br>Push finalized contact to CRM<br>Input: accepted answers → Output: CRM updated (chain)"]
-  End_Session["System<br>End session & log<br>Input: CRM update/flag → Output: session closed (system)"]
 
-  Background_Full_ASR["Background<br>Full transcription + evaluation<br>Input: queued jobs → Output: diff/confidence → retry/escalate/finalize (background)"]
-
-  %% --- Edges ---
-  Caller_Start --> Create_Session
-  Create_Session --> Retrieve_QA
-  Retrieve_QA --> Ask_Question
-  Ask_Question --> TTS_Play
-  TTS_Play --> Caller_Speaks
-  Caller_Speaks --> Listen_VAD
-  Listen_VAD --> Fast_ASR
-  Fast_ASR --> Validate_Answer
-  Validate_Answer -->|valid| Persist_Provisional
-  Validate_Answer -->|retry| Reask_Question
-  Validate_Answer -->|escalate| Escalate_Human
-  Persist_Provisional --> Enqueue_Background
-  Enqueue_Background --> Next_Question
-
-  Next_Question -->|yes| Ask_Question
-  Next_Question -->|no| Generate_Review
-
-  Reask_Question --> TTS_Play
-
-  Enqueue_Background --> Background_Full_ASR
-  Background_Full_ASR -->|retry| Reask_Question
-  Background_Full_ASR -->|escalate| Escalate_Human
-  Background_Full_ASR -->|finalize| Generate_Review
-
-  Generate_Review --> User_Review
-  User_Review -->|accepted| Push_CRM
-  User_Review -->|not accepted| Escalate_Human
-  Push_CRM --> End_Session
-  Escalate_Human --> End_Session
-
-  %% --- Styling ---
-  classDef userAction fill:#e6ffed,stroke:#2a9d8f,stroke-width:2px;
-  classDef chainNode fill:#fff3e0,stroke:#f2994a,stroke-width:2px;
-  classDef llmNode fill:#f0edff,stroke:#7b61ff,stroke-width:2px;
-  classDef backgroundNode fill:#e6f0ff,stroke:#2b7cff,stroke-width:2px;
-  classDef systemNode fill:#f2f2f2,stroke:#9b9b9b,stroke-width:1.5px;
-
-  class Caller_Start,Caller_Speaks,User_Review,TTS_Play userAction;
-  class Create_Session,Retrieve_QA,Ask_Question,Listen_VAD,Validate_Answer,Persist_Provisional,Enqueue_Background,Next_Question,Reask_Question,Escalate_Human,Generate_Review,Push_CRM chainNode;
-  class Fast_ASR llmNode;
-  class Background_Full_ASR backgroundNode;
-  class End_Session systemNode;
-
-  linkStyle default stroke-linecap:round,stroke-width:1.6px;
-```
 
 ```mermaid
 flowchart TD
@@ -105,21 +36,36 @@ flowchart TD
     END["`**END**
     Session complete`"]
     
-    %% Background Processing
+    %% Background Processing & Validation
     BG_ASR["`**background_asr**
     High-quality transcription`"]
     
     BG_VALIDATE["`**validate_content**
-    Check against question requirements`"]
+    Check quality & completeness`"]
     
-    BG_DECIDE{"`**background_decision**
-    Content valid?`"}
-    
-    BG_FLAG["`**flag_for_review**
-    Mark for human attention`"]
+    BG_DECIDE{"`**validation_check**
+    Content acceptable?`"}
     
     BG_STORE["`**store_validated**
     Save final answer`"]
+    
+    %% Validation Feedback Loop
+    PUSH_BACK["`**push_back_to_user**
+    'Let me ask that again...'`"]
+    
+    RETRY_COUNT{"`**retry_limit**
+    Attempts < threshold?`"}
+    
+    %% Human Review UI Flow
+    CLICK_LINK["`**user_clicks_link**
+    Access review interface`"]
+    
+    VALIDATE_UI["`**validate_content_ui**
+    Review & edit answers`"]
+  
+    
+    FINAL_END["`**FINAL_END**
+    Process complete`"]
 
     %% Main Flow
     START --> INIT
@@ -140,31 +86,211 @@ flowchart TD
     
     REVIEW --> END
 
-    %% Background Flow (parallel)
+    %% Background Validation Flow
     QUEUE_ASR -.->|"async"| BG_ASR
     BG_ASR --> BG_VALIDATE
     BG_VALIDATE --> BG_DECIDE
     
-    BG_DECIDE -->|"invalid/low confidence"| BG_FLAG
-    BG_DECIDE -->|"valid"| BG_STORE
+    %% Validation Decision Paths
+    BG_DECIDE -->|"good quality"| BG_STORE
+    BG_DECIDE -->|"poor quality/noise"| PUSH_BACK
     
-    BG_FLAG -.->|"influence final review"| REVIEW
-    BG_STORE -.->|"update session data"| REVIEW
+    %% Retry Logic
+    PUSH_BACK --> RETRY_COUNT
+    RETRY_COUNT -->|"can retry"| ASK
+    RETRY_COUNT -->|"max attempts"| REVIEW
+    
+    %% Final States
+    BG_STORE -.->|"validated content"| NEXT_Q
+    
+    %% Human Review Flow
+    END --> CLICK_LINK
+    CLICK_LINK --> VALIDATE_UI
+    VALIDATE_UI --> FINAL_END
 
     %% Styling
     classDef conversationNode fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
     classDef backgroundNode fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef validationNode fill:#ffebee,stroke:#c62828,stroke-width:2px
     classDef decisionNode fill:#fff8e1,stroke:#ef6c00,stroke-width:2px
     classDef systemNode fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef uiNode fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
     
     class INIT,ASK,LISTEN,CLARIFY,ACCEPT,QUEUE_ASR,REVIEW conversationNode
-    class BG_ASR,BG_VALIDATE,BG_STORE,BG_FLAG backgroundNode
-    class CONV_CHECK,NEXT_Q,BG_DECIDE decisionNode
-    class START,END systemNode
+    class BG_ASR,BG_VALIDATE,BG_STORE backgroundNode
+    class PUSH_BACK validationNode
+    class CONV_CHECK,NEXT_Q,BG_DECIDE,RETRY_COUNT decisionNode
+    class START,END,FINAL_END systemNode
+    class CLICK_LINK,VALIDATE_UI,EDIT_UI,ACCEPT_UI uiNode
+```
 
-    %% Style async connections
-    linkStyle 12 stroke:#666,stroke-dasharray: 5 5
-    linkStyle 17 stroke:#666,stroke-dasharray: 5 5  
-    linkStyle 18 stroke:#666,stroke-dasharray: 5 5
+```mermaid
+flowchart TD
+    %% Entry Points
+    START["`**START**
+    📞 Incoming Call`"]
+    
+    %% Core LangGraph Nodes
+    INIT["`**initialize_session**
+    🔧 Load questions & state
+    *Tool: DB Query*`"]
+    
+    ASK["`**ask_question_node**
+    🎙️ Present question
+    *OpenAI TTS-1 Streaming*`"]
+    
+    LISTEN["`**active_listening_node**
+    👂 VAD + Real-time processing
+    *Whisper Large v3 Turbo*`"]
+    
+    CONV_AGENT{"`**conversation_agent**
+    🤖 GPT-4o mini
+    Speech finished? Complete?`"}
+    
+    CLARIFY["`**clarification_node**
+    ❓ Ask for clarification
+    *OpenAI TTS-1 Streaming*`"]
+    
+    ACCEPT["`**acceptance_node**
+    ✅ Acknowledge response
+    *OpenAI TTS-1 Streaming*`"]
+    
+    QUEUE_NODE["`**queue_processing_node**
+    📤 Queue for background ASR
+    *Tool: Queue Manager*`"]
+    
+    NEXT_CHECK{"`**next_question_check**
+    📋 More questions?
+    *Simple Logic*`"}
+    
+    REVIEW_NODE["`**send_review_node**
+    📨 Generate review link
+    *OpenAI TTS-1*`"]
+    
+    END_SESSION["`**END_SESSION**
+    🏁 Session Complete`"]
+    
+    %% Background Processing Subgraph
+    subgraph BACKGROUND ["`**Background Processing Subgraph**`"]
+        BG_ASR["`**background_asr_node**
+        🎯 Whisper Large v3 (Full)
+        High-quality transcription
+        1550M params, 32 layers`"]
+        
+        VALIDATE_AGENT{"`**validation_agent**
+        🔍 GPT-4o
+        Quality & completeness check`"}
+        
+        STORE_NODE["`**store_answer_node**
+        💾 Save validated answer
+        *Tool: Database*`"]
+        
+        FEEDBACK_NODE["`**feedback_node**
+        🔄 Push validation result
+        *Tool: State Update*`"]
+    end
+    
+    %% Streaming TTS Subgraph
+    subgraph STREAMING_TTS ["`**Streaming TTS Pipeline**`"]
+        TTS_QUEUE["`**tts_queue_node**
+        📝 Queue text chunks
+        *Tool: Text Chunker*`"]
+        
+        TTS_STREAM["`**tts_streaming_node**
+        🎵 OpenAI TTS-1 Stream
+        Ultra-low latency`"]
+        
+        AUDIO_BUFFER["`**audio_buffer_node**
+        🔊 Buffer & play audio
+        *Tool: Audio Manager*`"]
+    end
+    
+    %% Human Review Subgraph
+    subgraph HUMAN_REVIEW ["`**Human Review Subgraph**`"]
+        CLICK_LINK["`**link_access_node**
+        🖱️ User clicks review link
+        *Tool: Session Validator*`"]
+        
+        REVIEW_UI["`**review_interface_node**
+        🖥️ Present validation UI
+        *Tool: UI Generator*`"]
+        
+        PROCESS_EDITS["`**process_edits_node**
+        ✏️ Handle user corrections
+        *Tool: Database Update*`"]
+    end
+    
+    %% Retry Logic
+    RETRY_CHECK{"`**retry_check**
+    🔄 Attempts < threshold?
+    *Simple Counter*`"}
+    
+    FINAL_END["`**FINAL_END**
+    🎉 Process Complete`"]
+
+    %% Main Flow Connections
+    START --> INIT
+    INIT --> ASK
+    ASK --> LISTEN
+    LISTEN --> CONV_AGENT
+    
+    CONV_AGENT -->|"still speaking"| LISTEN
+    CONV_AGENT -->|"needs clarification"| CLARIFY
+    CONV_AGENT -->|"response complete"| ACCEPT
+    
+    CLARIFY --> LISTEN
+    ACCEPT --> QUEUE_NODE
+    QUEUE_NODE --> NEXT_CHECK
+    
+    NEXT_CHECK -->|"yes"| ASK
+    NEXT_CHECK -->|"no"| REVIEW_NODE
+    REVIEW_NODE --> END_SESSION
+
+    %% Streaming TTS Flow
+    ASK -.->|"text chunks"| TTS_QUEUE
+    CLARIFY -.->|"text chunks"| TTS_QUEUE
+    ACCEPT -.->|"text chunks"| TTS_QUEUE
+    REVIEW_NODE -.->|"text chunks"| TTS_QUEUE
+    
+    TTS_QUEUE --> TTS_STREAM
+    TTS_STREAM --> AUDIO_BUFFER
+    AUDIO_BUFFER -.->|"audio output"| LISTEN
+
+    %% Background Processing Flow
+    QUEUE_NODE -.->|"async trigger"| BG_ASR
+    BG_ASR --> VALIDATE_AGENT
+    VALIDATE_AGENT -->|"good quality"| STORE_NODE
+    VALIDATE_AGENT -->|"poor quality"| FEEDBACK_NODE
+    
+    STORE_NODE --> FEEDBACK_NODE
+    FEEDBACK_NODE -.->|"update state"| NEXT_CHECK
+    
+    %% Retry Logic
+    FEEDBACK_NODE -->|"if poor quality"| RETRY_CHECK
+    RETRY_CHECK -->|"can retry"| ASK
+    RETRY_CHECK -->|"max attempts"| REVIEW_NODE
+
+    %% Human Review Flow
+    END_SESSION --> CLICK_LINK
+    CLICK_LINK --> REVIEW_UI
+    REVIEW_UI --> PROCESS_EDITS
+    PROCESS_EDITS --> FINAL_END
+
+    %% Styling
+    classDef llmAgent fill:#ff9999,stroke:#cc0000,stroke-width:3px
+    classDef chainNode fill:#99ccff,stroke:#0066cc,stroke-width:2px
+    classDef toolNode fill:#99ff99,stroke:#00cc00,stroke-width:2px
+    classDef decisionNode fill:#ffcc99,stroke:#ff6600,stroke-width:2px
+    classDef systemNode fill:#cc99ff,stroke:#6600cc,stroke-width:2px
+    classDef whisperNode fill:#ffccff,stroke:#cc00cc,stroke-width:3px
+    classDef ttsNode fill:#ffffcc,stroke:#cccc00,stroke-width:3px
+    
+    class CONV_AGENT,VALIDATE_AGENT llmAgent
+    class CLARIFY,ACCEPT chainNode
+    class INIT,QUEUE_NODE,STORE_NODE,FEEDBACK_NODE,CLICK_LINK,REVIEW_UI,PROCESS_EDITS,TTS_QUEUE,AUDIO_BUFFER toolNode
+    class NEXT_CHECK,RETRY_CHECK decisionNode
+    class START,END_SESSION,FINAL_END systemNode
+    class LISTEN,BG_ASR whisperNode
+    class ASK,TTS_STREAM ttsNode
 ```
 

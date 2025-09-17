@@ -15,15 +15,13 @@ export function isFinalSupervisorResponse(message: Message): boolean {
   if (!isFromSupervisor) return false;
 
   // Check if this is the last AI message (indicating workflow completion)
-  const lastAIMessage = thread.messages
-    .filter(m => m.type === 'ai')
-    .pop();
+  const lastAIMessage = thread.messages.filter((m) => m.type === "ai").pop();
 
   const isLastAIMessage = lastAIMessage?.id === message.id;
 
   // Check if workflow appears to be complete (no more streaming)
-  const isWorkflowComplete = !thread.isLoading &&
-                            thread.streamingActivity?.agents.size === 0;
+  const isWorkflowComplete =
+    !thread.isLoading && thread.streamingActivity?.agents.size === 0;
 
   return isLastAIMessage && isWorkflowComplete;
 }
@@ -32,22 +30,28 @@ export function isFinalSupervisorResponse(message: Message): boolean {
  * Alternative approach: Check if this supervisor message is followed by workflow end
  * We look for patterns that indicate the workflow is ending after this message
  */
-export function isFinalSupervisorResponseAlt(message: Message, messages: Message[]): boolean {
+export function isFinalSupervisorResponseAlt(
+  message: Message,
+  messages: Message[],
+): boolean {
   // Find current message index
-  const currentIndex = messages.findIndex(m => m.id === message.id);
+  const currentIndex = messages.findIndex((m) => m.id === message.id);
   if (currentIndex === -1) return false;
 
   // Check if message is from supervisor
-  const isFromSupervisor = message.name === 'multi_agent_supervisor' ||
-                          message.name === 'supervisor';
+  const isFromSupervisor =
+    message.name === "multi_agent_supervisor" || message.name === "supervisor";
 
   if (!isFromSupervisor) return false;
 
   // Check if this is one of the last few messages and no more agent activity follows
   const remainingMessages = messages.slice(currentIndex + 1);
-  const hasMoreAgentActivity = remainingMessages.some(m =>
-    m.type === 'ai' &&
-    (m.name === 'calendar_agent' || m.name === 'email_agent' || m.name === 'job_search_agent')
+  const hasMoreAgentActivity = remainingMessages.some(
+    (m) =>
+      m.type === "ai" &&
+      (m.name === "calendar_agent" ||
+        m.name === "email_agent" ||
+        m.name === "job_search_agent"),
   );
 
   // If no more agent activity follows, this is likely the final response
@@ -59,14 +63,21 @@ export function isFinalSupervisorResponseAlt(message: Message, messages: Message
  */
 export function isIntermediateMessage(message: Message): boolean {
   // Individual agents are always intermediate
-  const individualAgents = ['calendar_agent', 'email_agent', 'job_search_agent'];
+  const individualAgents = [
+    "calendar_agent",
+    "email_agent",
+    "job_search_agent",
+  ];
 
-  if (individualAgents.includes(message.name || '')) {
+  if (individualAgents.includes(message.name || "")) {
     return true;
   }
 
   // Supervisor messages are final unless proven intermediate
-  if (message.name === 'multi_agent_supervisor' || message.name === 'supervisor') {
+  if (
+    message.name === "multi_agent_supervisor" ||
+    message.name === "supervisor"
+  ) {
     return false;
   }
 

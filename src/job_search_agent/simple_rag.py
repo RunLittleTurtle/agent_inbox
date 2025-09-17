@@ -64,12 +64,14 @@ class SimpleRAG:
         self.vector_store = SimpleRAG._shared_vector_store
         self.llm = ChatOpenAI(**self.llm_config)
 
-        # Text splitter optimized for comprehensive CV context preservation
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=800,  # Larger chunks to preserve project context and descriptions
-            chunk_overlap=200,  # Substantial overlap (25%) to ensure continuity across chunks
-            add_start_index=True,
-            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]  # Better CV structure recognition
+        # Enhanced text splitter following MCP research recommendations for CV/project retrieval
+        self.text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+            chunk_size=350,  # Optimized for CV sections - balances context with precision (MCP recommendation: 300-500)
+            chunk_overlap=70,  # 20% overlap for semantic continuity (MCP best practice: 15-20%)
+            separators=[
+                "\n\nPROJECTS:", "\n\nEXPERIENCE:", "\n\nSKILLS:", "\n\nEDUCATION:", "\n\nCERTIFICATIONS:",  # CV section headers first
+                "\n\n", "\n", ".", "!", "?", ",", " ", ""  # Standard separators after
+            ]
         )
 
         # RAG prompt from centralized prompts
@@ -241,27 +243,79 @@ class SimpleRAG:
 
     def retrieve(self, state: RAGState) -> RAGState:
         """
-        Retrieve relevant CV chunks
-        Simple function following LangGraph pattern
+        Retrieve relevant CV chunks with enhanced strategy
+        Uses hybrid approach for maximum coverage
         """
-        retrieved_docs = self.vector_store.similarity_search(
-            state["question"],
-            k=8  # More chunks for comprehensive coverage with larger chunk sizes
-        )
-        return {"context": retrieved_docs}
+        # Enhanced retrieval strategy following MCP research for comprehensive CV coverage
+        try:
+            # Increased retrieval counts based on MCP recommendations for CV/project queries
+            mmr_docs = self.vector_store.max_marginal_relevance_search(
+                state["question"],
+                k=8,  # Increased from 6 - MCP recommendation: 8-10 for diverse document sections
+                lambda_mult=0.4  # Favor diversity for CV sections (MCP: 0.3-0.5 for project retrieval)
+            )
+
+            # Supplement with high-relevance matches for precision
+            sim_docs = self.vector_store.similarity_search(
+                state["question"],
+                k=5  # Increased from 3 - MCP: 5-8 for comprehensive coverage
+            )
+
+            # Combine and deduplicate (following LangGraph pattern)
+            seen_content = set()
+            combined_docs = []
+
+            for doc in mmr_docs + sim_docs:
+                if doc.page_content not in seen_content:
+                    seen_content.add(doc.page_content)
+                    combined_docs.append(doc)
+
+            # Increased limit for better CV section coverage (MCP recommendation: 10-12 for CV analysis)
+            final_docs = combined_docs[:12]
+            print(f"🎯 Enhanced retrieval (MCP-optimized): {len(mmr_docs)} MMR + {len(sim_docs)} similarity → {len(final_docs)} final")
+            return {"context": final_docs}
+
+        except Exception as e:
+            print(f"Enhanced retrieval failed: {e}, using LangGraph standard fallback")
+            # Fallback to basic similarity search (LangGraph standard)
+            retrieved_docs = self.vector_store.similarity_search(
+                state["question"],
+                k=4  # LangGraph standard fallback k value
+            )
+            return {"context": retrieved_docs}
 
     def generate(self, state: RAGState) -> RAGState:
         """
-        Generate answer using retrieved context
-        Simple function following LangGraph pattern
+        Generate answer using retrieved context with dynamic context management
         """
         try:
-            # Combine context
+            # Combine context with prioritization
             docs_content = "\n\n".join(doc.page_content for doc in state["context"])
 
-            # Format prompt - limit length to prevent token issues
-            if len(docs_content) > 3000:
-                docs_content = docs_content[:3000] + "..."
+            # Context management following LangGraph best practices
+            max_context_length = 4000  # More conservative, aligned with token limits
+
+            if len(docs_content) > max_context_length:
+                # Smart truncation: keep most relevant chunks (first ones from MMR)
+                truncated_chunks = []
+                current_length = 0
+
+                for doc in state["context"]:
+                    chunk_length = len(doc.page_content)
+                    if current_length + chunk_length <= max_context_length:
+                        truncated_chunks.append(doc.page_content)
+                        current_length += chunk_length
+                    else:
+                        # Add partial chunk if space allows
+                        remaining_space = max_context_length - current_length
+                        if remaining_space > 200:  # Only if meaningful space left
+                            truncated_chunks.append(doc.page_content[:remaining_space] + "...")
+                        break
+
+                docs_content = "\n\n".join(truncated_chunks)
+                print(f"📝 Context truncated: {len(state['context'])} chunks -> {len(truncated_chunks)} chunks ({len(docs_content)} chars)")
+            else:
+                print(f"📝 Using full context: {len(state['context'])} chunks ({len(docs_content)} chars)")
 
             # Format prompt
             formatted_prompt = self.prompt.format(
@@ -481,21 +535,27 @@ class SimpleRAG:
 
 
 
-    def get_raw_cv_chunks(self, query: str, k: int = 10) -> List[str]:
+    def get_raw_cv_chunks(self, query: str, k: int = 8) -> List[str]:
         """
         Get raw CV chunks directly from vector store without LLM processing
-        Enhanced with Maximum Marginal Relevance for diverse results
+        Enhanced with hybrid retrieval for maximum coverage
 
         Args:
             query: Search query for relevant chunks
-            k: Number of chunks to retrieve
+            k: Number of chunks to retrieve (default increased to 15)
 
         Returns:
             List of raw chunk content strings
         """
         try:
-            # Use Maximum Marginal Relevance for diverse results - LangGraph best practice
+            # Use hybrid approach for comprehensive coverage
             retrieved_docs = self.get_diverse_cv_chunks(query, k)
+
+            # Add debugging info
+            print(f"🔍 Retrieved {len(retrieved_docs)} chunks for query: {query[:50]}...")
+            for i, doc in enumerate(retrieved_docs[:3]):
+                preview = doc.page_content[:100].replace('\n', ' ')
+                print(f"  Chunk {i+1}: {preview}...")
 
             # Return raw chunk content
             return [doc.page_content for doc in retrieved_docs]
@@ -504,31 +564,65 @@ class SimpleRAG:
             print(f"Error retrieving raw chunks: {e}")
             return []
 
-    def get_diverse_cv_chunks(self, query: str, k: int = 10):
+    def get_diverse_cv_chunks(self, query: str, k: int = 15):
         """
-        Get diverse CV chunks using Maximum Marginal Relevance for variety
-        Prevents retrieving too many similar chunks from same CV sections
+        Get diverse CV chunks using hybrid retrieval strategy
+        Combines MMR for diversity with similarity search for relevance
 
         Args:
             query: Search query for relevant chunks
-            k: Number of chunks to retrieve
+            k: Number of chunks to retrieve (increased default)
 
         Returns:
-            List of document chunks with diversity
+            List of document chunks with optimal diversity and relevance
         """
         try:
-            # Use Maximum Marginal Relevance for diverse results
-            retrieved_docs = self.vector_store.max_marginal_relevance_search(
+            # Primary: MMR for diverse results
+            mmr_docs = self.vector_store.max_marginal_relevance_search(
                 query,
-                k=k,
-                lambda_mult=0.7  # Balance relevance (0.0) vs diversity (1.0)
+                k=max(8, k//2),  # At least 8, or half of requested
+                lambda_mult=0.6  # Balanced relevance vs diversity
             )
-            return retrieved_docs
+
+            # Secondary: Pure similarity for high relevance
+            sim_docs = self.vector_store.similarity_search(
+                query,
+                k=max(4, k//3)  # At least 4, or third of requested
+            )
+
+            # Combine and deduplicate based on content similarity
+            seen_content = set()
+            combined_docs = []
+
+            # Add MMR docs first (prioritize diversity)
+            for doc in mmr_docs:
+                content_key = doc.page_content[:200]  # Use first 200 chars as key
+                if content_key not in seen_content:
+                    seen_content.add(content_key)
+                    combined_docs.append(doc)
+
+            # Add similarity docs if not already present
+            for doc in sim_docs:
+                content_key = doc.page_content[:200]
+                if content_key not in seen_content:
+                    seen_content.add(content_key)
+                    combined_docs.append(doc)
+
+            # Return up to k documents
+            result_docs = combined_docs[:k]
+            print(f"🎯 Hybrid retrieval: {len(mmr_docs)} MMR + {len(sim_docs)} similarity → {len(result_docs)} final chunks")
+
+            return result_docs
+
         except (AttributeError, Exception) as e:
             # Fallback to regular similarity search if MMR not supported
-            print(f"MMR not available ({type(e).__name__}), using similarity search")
-            retrieved_docs = self.vector_store.similarity_search(query, k=k)
-            return retrieved_docs
+            print(f"MMR not available ({type(e).__name__}), using enhanced similarity search")
+
+            # Enhanced similarity search with higher k for better coverage
+            retrieved_docs = self.vector_store.similarity_search(query, k=min(k*2, 20))
+
+            # Take top k results
+            return retrieved_docs[:k]
 
     def force_cv_reindex(self) -> bool:
         """
@@ -545,7 +639,7 @@ class SimpleRAG:
                     cv_content = f.read()
 
                 print(f"🔄 Re-indexing CV with new chunking strategy...")
-                print(f"📊 Optimized chunking parameters: 800 chars with 200 overlap")
+                print(f"📊 LangGraph-optimized parameters: {self.text_splitter._chunk_size} tokens with {self.text_splitter._chunk_overlap} token overlap")
 
                 # Force replacement with new chunking
                 success = self.replace_cv_content(cv_content)

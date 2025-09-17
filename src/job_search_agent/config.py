@@ -76,11 +76,11 @@ class ProcessingConfig:
 
 
 PROCESSING_CONFIG = {
-    "chunk_size": int(os.getenv("JOB_SEARCH_CHUNK_SIZE", "500")),
-    "chunk_overlap": int(os.getenv("JOB_SEARCH_CHUNK_OVERLAP", "50")),
+    "chunk_size": int(os.getenv("JOB_SEARCH_CHUNK_SIZE", "500")),  # LangGraph best practice with CV optimization
+    "chunk_overlap": int(os.getenv("JOB_SEARCH_CHUNK_OVERLAP", "100")),  # 20% overlap (LangGraph standard)
     "quality_threshold": int(os.getenv("JOB_SEARCH_QUALITY_THRESHOLD", "8")),
     "max_iterations": int(os.getenv("JOB_SEARCH_MAX_ITERATIONS", "3")),
-    "rag_top_k": int(os.getenv("JOB_SEARCH_RAG_TOP_K", "5")),
+    "rag_top_k": int(os.getenv("JOB_SEARCH_RAG_TOP_K", "8")),  # LangGraph-optimized (higher than standard for CV)
     "vector_dimensions": int(os.getenv("JOB_SEARCH_VECTOR_DIMENSIONS", "384"))
 }
 

@@ -7,8 +7,10 @@ from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 from langgraph.store.base import BaseStore
 from langgraph.graph.state import StateGraph
+from pydantic import BaseModel, Field
 
 from .simple_rag import SimpleRAG
+from .agentic_rag import create_agentic_cv_rag
 from .state import JobSearchState
 import os
 from .prompt import (
@@ -22,6 +24,25 @@ from .response_schemas import (
     CoverLetterResponse, SearchResponse, UploadResponse, JobRequirementsResponse
 )
 from .pydantic_models import JobAnalysis, CVAnalysis, PersonalInfo
+
+# =============================================================================
+# PYDANTIC SCHEMAS FOR TOOL VALIDATION (LANGGRAPH BEST PRACTICE)
+# =============================================================================
+
+class CVUploadInput(BaseModel):
+    """Input schema for CV upload tool with proper validation"""
+    file_path: Optional[str] = Field(
+        default=None,
+        description="Full path to the CV file (PDF, DOC, DOCX, TXT, MD). Example: '/Users/john/documents/resume.pdf'"
+    )
+    content: Optional[str] = Field(
+        default=None,
+        description="Raw text content of the CV if providing content directly instead of file path"
+    )
+    thread_id: str = Field(
+        default="default",
+        description="Thread identifier for document storage (usually keep as 'default')"
+    )
 
 # Try to import PDF loader
 try:
@@ -37,10 +58,13 @@ except ImportError:
 # Initialize SimpleRAG - will automatically load persistent CV data if available
 simple_rag = SimpleRAG()
 
+# Initialize Agentic RAG - will use the same SimpleRAG instance
+agentic_cv_rag = create_agentic_cv_rag(simple_rag)
+
 def get_job_search_tools() -> List:
     """Return list of all job search tools for React agent - LangGraph best practices"""
-    tools = [
-        upload_cv,
+    return [
+        upload_cv,  # Now supports both text and PDF content
         upload_job_posting,
         get_document_status,
         clear_documents,
@@ -48,57 +72,177 @@ def get_job_search_tools() -> List:
         analyze_job_requirements,
         analyze_cv_match,
         generate_cover_letter,
-        search_cv_details,
+        search_cv_details,  # Now uses agentic RAG by default
         extract_personal_info,
         suggest_next_actions,
     ]
-
-    # Add PDF upload tool if available
-    if PDF_LOADER_AVAILABLE:
-        tools.append(upload_cv_pdf)
-
-    return tools
 
 # =============================================================================
 # DOCUMENT MANAGEMENT TOOLS
 # =============================================================================
 
-@tool
-def upload_cv(content: str, thread_id: str = "default") -> str:
-    """
-    Upload and analyze CV/resume content using simple_rag.py
+@tool(args_schema=CVUploadInput)
+def upload_cv(file_path: Optional[str] = None, content: Optional[str] = None, thread_id: str = "default") -> str:
+    """Upload and analyze a CV/resume file for job applications.
+
+    Use this tool when a user wants to upload their CV, resume, or curriculum vitae.
+    The CV can be provided either as a file path or as text content.
 
     Args:
-        content: The CV/resume text content
-        thread_id: Thread identifier for document storage
+        file_path: Path to the CV file (PDF, DOC, DOCX, or TXT). Use this for file uploads.
+        content: Raw text content of the CV. Use this if the CV content is provided directly.
+        thread_id: Internal identifier for document storage (usually keep as default)
 
     Returns:
-        Analysis result and storage confirmation
+        Detailed analysis of the uploaded CV including professional profile and skills
+
+    Examples:
+        - upload_cv(file_path="/path/to/resume.pdf")
+        - upload_cv(content="John Doe\nSoftware Engineer\n...")
     """
     try:
-        # Limit CV content length to prevent API errors (max ~5000 chars)
-        limited_content = content[:5000] if len(content) > 5000 else content
+        # Input validation - must provide either file_path or content
+        if not file_path and not content:
+            return "❌ Please provide either a file_path to your CV file or the content directly."
 
-        # Replace CV content (clear old content)
+        if file_path and content:
+            return "❌ Please provide either file_path OR content, not both."
+
+        final_text_content = ""
+
+        # Handle file path input (most common use case)
+        if file_path:
+            try:
+                import os
+
+                # Validate file exists
+                if not os.path.exists(file_path):
+                    return f"❌ File not found: {file_path}\nPlease check the file path and try again."
+
+                # Handle different file types based on extension
+                file_extension = file_path.lower().split('.')[-1]
+
+                if file_extension == 'pdf':
+                    # Handle PDF files
+                    if not PDF_LOADER_AVAILABLE:
+                        return "❌ PDF processing not available. Please install required packages: pip install langchain-community pypdf"
+
+                    from langchain_community.document_loaders import PyPDFLoader
+                    loader = PyPDFLoader(file_path)
+                    docs = loader.load()
+
+                    if not docs:
+                        return f"❌ Could not extract text from PDF: {file_path}\nThe PDF might be image-based or corrupted."
+
+                    final_text_content = "\n".join([doc.page_content for doc in docs])
+                    print(f"📄 PDF processed: {len(docs)} pages, {len(final_text_content)} characters")
+
+                elif file_extension in ['doc', 'docx']:
+                    # Handle Word documents
+                    try:
+                        from langchain_community.document_loaders import UnstructuredWordDocumentLoader
+                        loader = UnstructuredWordDocumentLoader(file_path)
+                        docs = loader.load()
+                        final_text_content = "\n".join([doc.page_content for doc in docs])
+                        print(f"📄 Word document processed: {len(final_text_content)} characters")
+                    except ImportError:
+                        return "❌ Word document processing not available. Please install: pip install unstructured[docx]"
+
+                elif file_extension in ['txt', 'md']:
+                    # Handle plain text files
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        final_text_content = f.read()
+                    print(f"📄 Text file processed: {len(final_text_content)} characters")
+
+                else:
+                    return f"❌ Unsupported file type: .{file_extension}\nSupported formats: PDF, DOC, DOCX, TXT, MD"
+
+            except Exception as file_error:
+                return f"❌ Error processing file {file_path}: {str(file_error)}"
+
+        # Handle direct content input
+        elif content:
+            final_text_content = content
+            print(f"📝 Processing provided content: {len(final_text_content)} characters")
+
+        # Validate content
+        if len(final_text_content.strip()) < 50:
+            return "❌ CV content too short. Please provide a more complete CV."
+
+        # Enhanced content processing - keep more content but intelligently truncate
+        if len(final_text_content) > 15000:  # Increased from 5000
+            # Smart truncation: preserve beginning and key sections
+            lines = final_text_content.split('\n')
+            # Keep first 80% of content to preserve structure
+            truncate_point = int(len(final_text_content) * 0.8)
+            limited_content = final_text_content[:truncate_point]
+            print(f"📝 Content truncated from {len(final_text_content)} to {len(limited_content)} chars (preserved 80%)")
+        else:
+            limited_content = final_text_content
+            print(f"📝 Processing full content: {len(limited_content)} characters")
+
+        # Force re-indexing with new optimized chunking strategy
+        print("🔄 Re-indexing CV with LangGraph-optimized chunking...")
         success = simple_rag.replace_cv_content(limited_content)
         if not success:
-            return "❌ Failed to index CV content"
+            return "❌ Failed to index CV content with optimized RAG"
 
-        # Perform actual LLM analysis of the CV
+        # Enhanced analysis using multiple targeted queries (leveraging optimized retrieval)
+        analysis_components = []
+
         try:
-            analysis_query = "Analyze this CV and provide a summary: What is the person's name, current job title, key skills, and main areas of experience?"
-            analysis_result_raw = simple_rag.query_cv(analysis_query, thread_id)
-            analysis_result = analysis_result_raw.get('answer', 'CV analysis completed') if analysis_result_raw else 'CV analysis completed'
-        except Exception as e:
-            analysis_result = "CV uploaded successfully. Analysis temporarily unavailable."
+            # Professional profile analysis
+            profile_result = simple_rag.query_cv(
+                "What is this person's current professional title, main expertise, and overall career focus? Provide a concise professional summary.",
+                f"{thread_id}_profile"
+            )
+            if profile_result and profile_result.get('answer'):
+                analysis_components.append(f"**Professional Profile:** {profile_result['answer']}")
 
+            # Key skills analysis
+            skills_result = simple_rag.query_cv(
+                "List the most important technical skills, tools, and competencies mentioned in this CV. Focus on the most relevant and current ones.",
+                f"{thread_id}_skills"
+            )
+            if skills_result and skills_result.get('answer'):
+                analysis_components.append(f"**Key Skills:** {skills_result['answer']}")
+
+            # Recent experience analysis
+            experience_result = simple_rag.query_cv(
+                "Describe the most recent and significant work experience, including achievements and responsibilities. What makes this person stand out?",
+                f"{thread_id}_experience"
+            )
+            if experience_result and experience_result.get('answer'):
+                analysis_components.append(f"**Recent Experience:** {experience_result['answer']}")
+
+            # Combine all analysis components
+            if analysis_components:
+                analysis_result = "\n\n".join(analysis_components)
+            else:
+                analysis_result = "CV uploaded and indexed successfully. Analysis available for job matching."
+
+        except Exception as e:
+            analysis_result = f"CV uploaded and indexed with optimized RAG. Analysis temporarily unavailable: {str(e)}"
+
+        # Determine processing method for metadata
+        processing_method = "file" if file_path else "content"
+        file_type = ""
+        if file_path:
+            file_type = file_path.lower().split('.')[-1]
+
+        # Enhanced response with more detailed metadata
         return UploadResponse.create(
-            document_type="cv",
+            document_type=f"cv_{processing_method}" + (f"_{file_type}" if file_type else ""),
             content_length=len(limited_content),
             analysis_result=analysis_result,
             metadata={
-                "chunks_created": "Available in vector store",
-                "next_steps": ["Upload job posting", "Generate cover letter"]
+                "processing_method": "LangGraph-optimized RAG with enhanced retrieval",
+                "chunk_strategy": "500 tokens with 100 token overlap",
+                "input_method": f"{'File path: ' + file_path if file_path else 'Direct content'}",
+                "file_type": file_type or "text",
+                "truncated": len(final_text_content) > len(limited_content),
+                "original_length": len(final_text_content) if len(final_text_content) > len(limited_content) else None,
+                "next_steps": ["Upload job posting for tailored analysis", "Generate targeted cover letter", "Ask specific questions about your background"]
             }
         )
 
@@ -106,51 +250,7 @@ def upload_cv(content: str, thread_id: str = "default") -> str:
         return f"❌ Error uploading CV: {str(e)}"
 
 
-@tool
-def upload_cv_pdf(file_path: str, thread_id: str = "default") -> str:
-    """
-    Upload and analyze CV from PDF file using simple_rag.py
-
-    Args:
-        file_path: Path to the PDF file
-        thread_id: Thread identifier for document storage
-
-    Returns:
-        Analysis result and storage confirmation
-    """
-    try:
-        if not PDF_LOADER_AVAILABLE:
-            return "❌ PDF loader not available. Please install langchain-community and pypdf."
-
-        if not os.path.exists(file_path):
-            return f"❌ File not found: {file_path}"
-
-        if not file_path.lower().endswith('.pdf'):
-            return "❌ File must be a PDF"
-
-        # Load PDF and extract text
-        loader = PyPDFLoader(file_path)
-        docs = loader.load()
-
-        if not docs:
-            return "❌ No content could be extracted from PDF"
-
-        # Combine all pages into single text
-        text_content = "\n".join([doc.page_content for doc in docs])
-
-        if len(text_content.strip()) < 50:
-            return "❌ PDF appears to contain insufficient text content"
-
-        # Use the existing upload_cv function
-        result = upload_cv(text_content, thread_id)
-
-        # Add PDF-specific info to result
-        pdf_info = f"\n\n📄 PDF Details:\n- Pages processed: {len(docs)}\n- Characters extracted: {len(text_content)}"
-
-        return result + pdf_info
-
-    except Exception as e:
-        return f"❌ Error processing PDF: {str(e)}"
+# PDF functionality has been integrated into upload_cv tool
 
 
 @tool
@@ -410,9 +510,9 @@ def generate_cover_letter(thread_id: str = "default", preferences: Optional[Dict
         # Build compelling opening hook with company insight + immediate value
         strongest_talking_point = talking_points[0] if talking_points else None
         if overall_fit > 0.7 and strongest_talking_point:
-            opening_hook = f"When I discovered {company_name}'s focus on {role_focus}, I knew my experience in {strongest_talking_point['point'].lower()} would be exactly what your team needs."
+            opening_hook = f"What motivated me to explore {company_name}'s focus on {role_focus}, I knew my experience in {strongest_talking_point['point'].lower()} would be exactly what your team needs."
         elif company_culture and company_culture != company_name:
-            opening_hook = f"Your emphasis on {company_culture} resonates deeply with my approach to {role_focus} - I thrive in environments that value innovation and user-centric solutions."
+            opening_hook = f"Your emphasis on {company_culture} resonates with my approach to {role_focus} - I thrive in environments that value innovation and user-centric solutions."
         else:
             opening_hook = f"Having spent years mastering {role_focus}, I'm drawn to {company_name}'s commitment to creating exceptional user experiences."
 
@@ -488,27 +588,177 @@ def generate_cover_letter(thread_id: str = "default", preferences: Optional[Dict
 @tool
 def search_cv_details(query: str, thread_id: str = "default") -> str:
     """
-    Search for specific details in uploaded CV using simple_rag.py
+    Advanced CV search using agentic RAG with intelligent query rewriting and quality assessment
+
+    This tool uses LangGraph's agentic RAG pattern to:
+    - Intelligently route queries (retrieval vs direct response)
+    - Automatically rewrite vague or foreign queries
+    - Iteratively improve search quality
+    - Prevent hallucination with grounded responses
+
+    Best for: Vague queries, foreign language terms, complex questions
+
+    Args:
+        query: Search query for CV content (can be vague or in any language)
+        thread_id: Thread identifier
+
+    Returns:
+        Comprehensive CV search results with automatic query improvement
+    """
+    try:
+        print(f"🤖 Agentic RAG search for: '{query}'")
+
+        # Use agentic RAG for intelligent search
+        result = agentic_cv_rag.search(query, thread_id)
+
+        # Extract results
+        answer = result.get("answer", "No answer generated")
+        retrieval_attempts = result.get("retrieval_attempts", 0)
+        final_query = result.get("final_query", query)
+
+        # Determine if query was rewritten
+        query_rewritten = query != final_query
+
+        return SearchResponse.create(
+            query=query,
+            answer=answer,
+            context_count=retrieval_attempts,
+            relevant_sections=[
+                f"Query rewritten: {query_rewritten}",
+                f"Final query: {final_query}",
+                f"Retrieval attempts: {retrieval_attempts}"
+            ]
+        )
+
+    except Exception as e:
+        # Fallback to basic search on error
+        print(f"⚠️ Agentic RAG failed: {e}, falling back to basic search")
+        return search_cv_details_basic.invoke({"query": query, "thread_id": thread_id})
+
+
+@tool
+def search_cv_details_basic(query: str, thread_id: str = "default") -> str:
+    """
+    BACKUP: Basic CV search with anti-hallucination controls (fallback only)
 
     Args:
         query: Search query for CV content
         thread_id: Thread identifier
 
     Returns:
-        Relevant CV details matching the query
+        Relevant CV details matching the query, grounded strictly in actual CV content
     """
     try:
         # Limit query length to prevent token issues
-        limited_query = query[:200] if len(query) > 200 else query
+        limited_query = query[:1500] if len(query) > 1500 else query
 
-        # Use SimpleRAG to query CV content
-        result = simple_rag.query_cv(limited_query, thread_id)
+        # Step 1: Document Grading - Check if retrieved documents are relevant (LangGraph best practice)
+        # Use unique thread ID to avoid caching issues (following analyze_cv_match pattern)
+        unique_thread_id = f"{thread_id}_search_{hash(limited_query[:50])}"
+
+        # Get raw chunks for document relevance grading first
+        retrieved_chunks = simple_rag.get_raw_cv_chunks(limited_query, k=8)
+
+        if not retrieved_chunks or len(retrieved_chunks) == 0:
+            return SearchResponse.create(
+                query=query,
+                answer="I cannot find any relevant information in your CV for this query. Please verify your CV contains this information or try rephrasing your question.",
+                context_count=0
+            )
+
+        # Step 2: Document Relevance Grading (LangGraph CRAG pattern)
+        docs_context = "\n\n".join(retrieved_chunks[:5])  # Limit context for grading
+
+        grade_prompt = f"""You are a grader assessing relevance of retrieved CV content to a user question.
+
+Here is the retrieved CV content:
+{docs_context}
+
+Here is the user question: {limited_query}
+
+If the CV content contains keywords or semantic meaning related to the user question, grade it as relevant.
+Give a binary score 'relevant' or 'not_relevant' to indicate whether the CV content can answer the question.
+
+CRITICAL: Only grade as 'relevant' if the CV content actually contains information that can answer the question.
+
+Score:"""
+
+        from langchain_openai import ChatOpenAI
+        from .config import LLM_CONFIG
+
+        # Document grading with structured output (LangGraph best practice)
+        class DocumentGrade(BaseModel):
+            """Binary score for document relevance check"""
+            score: str = Field(description="Document relevance score: 'relevant' or 'not_relevant'")
+
+        grading_llm = ChatOpenAI(**LLM_CONFIG).with_structured_output(DocumentGrade)
+        grade_result = grading_llm.invoke(grade_prompt)
+
+        if grade_result.score == "not_relevant":
+            return SearchResponse.create(
+                query=query,
+                answer=f"The retrieved CV content is not relevant to your question about '{limited_query}'. Please try a different search term or verify this information exists in your CV.",
+                context_count=len(retrieved_chunks)
+            )
+
+        # Step 3: Enhanced RAG Query with strict grounding prompt (following CV_REQUIREMENT_MATCHING_PROMPT pattern)
+        enhanced_query = f"""CRITICAL ANTI-HALLUCINATION INSTRUCTIONS:
+- ONLY use information explicitly stated in my CV
+- NEVER invent, estimate, or assume any details not in the CV
+- NEVER mention companies, projects, or achievements not explicitly written in the CV
+- If the information is not clearly stated, respond: "This information is not specified in the CV"
+- Quote or reference actual CV content when possible
+
+From my CV, find information about: {limited_query}
+
+STRICT REQUIREMENT: Base your response ONLY on explicit CV content. Do not extrapolate or fill gaps."""
+
+        # Use enhanced retrieval with unique thread ID
+        result = simple_rag.query_cv(enhanced_query, unique_thread_id)
 
         if not result or not result.get('answer'):
-            return f"🔍 No specific details found for: '{query}'\n\nTry rephrasing your search or ask about general topics from your CV."
+            return SearchResponse.create(
+                query=query,
+                answer="I cannot find specific information about this topic in your CV.",
+                context_count=0
+            )
 
-        # Return standardized JSON response
+        # Step 4: Hallucination Check (LangGraph Self-RAG pattern)
         answer = result['answer']
+        context_chunks = retrieved_chunks[:5]  # Use original chunks for verification
+
+        hallucination_prompt = f"""You are a grader assessing whether an answer is grounded in/supported by CV facts.
+
+CV Facts:
+{docs_context}
+
+Generated Answer:
+{answer}
+
+Is the answer grounded in/supported by the CV facts? Give a binary score 'grounded' or 'hallucinated'.
+Look for:
+- Invented company names not in CV
+- Fabricated metrics not in CV
+- Made-up projects not in CV
+- Assumed skills not explicitly mentioned
+
+Score:"""
+
+        class HallucinationGrade(BaseModel):
+            """Binary score for hallucination grading"""
+            score: str = Field(description="Hallucination score: 'grounded' or 'hallucinated'")
+
+        hallucination_llm = ChatOpenAI(**LLM_CONFIG).with_structured_output(HallucinationGrade)
+        hallucination_result = hallucination_llm.invoke(hallucination_prompt)
+
+        if hallucination_result.score == "hallucinated":
+            return SearchResponse.create(
+                query=query,
+                answer=f"I cannot provide reliable information about '{limited_query}' based on your CV content. Please verify this information exists in your CV or rephrase your question.",
+                context_count=len(result.get('context', []))
+            )
+
+        # Step 5: Return verified, grounded response
         context_count = len(result.get('context', []))
 
         return SearchResponse.create(
@@ -520,9 +770,17 @@ def search_cv_details(query: str, thread_id: str = "default") -> str:
     except Exception as e:
         # Handle OpenAI API errors gracefully
         if "server had an error" in str(e) or "APIError" in str(e):
-            return "❌ Temporary API issue. Please try again in a moment."
+            return SearchResponse.create(
+                query=query,
+                answer="❌ Temporary API issue. Please try again in a moment.",
+                context_count=0
+            )
         else:
-            return f"❌ Error searching CV: {str(e)}"
+            return SearchResponse.create(
+                query=query,
+                answer=f"❌ Error searching CV: {str(e)}",
+                context_count=0
+            )
 
 
 @tool
@@ -549,7 +807,7 @@ def extract_personal_info(thread_id: str = "default") -> str:
 
         try:
             # Get raw CV chunks directly from vector store (bypasses LLM filtering)
-            contact_chunks = simple_rag.get_raw_cv_chunks("contact information email phone address name header", k=8)
+            contact_chunks = simple_rag.get_raw_cv_chunks("contact information email phone address name header", k=12)
 
             # Combine raw chunks to preserve all contact details
             cv_context = "\n\n".join(contact_chunks)

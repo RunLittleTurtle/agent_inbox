@@ -6,12 +6,10 @@ from typing import Dict, Any, List, Optional
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 from langgraph.store.base import BaseStore
-from langgraph.graph.state import StateGraph
 from pydantic import BaseModel, Field
 
 from .simple_rag import SimpleRAG
 from .agentic_rag import create_agentic_cv_rag
-from .state import JobSearchState
 import os
 from .prompt import (
     PROFILE_STATUS_QUERY, CONTACT_INFO_QUERY,
@@ -954,13 +952,19 @@ Also analyze the company culture and role focus."""
 @tool
 def analyze_cv_match(thread_id: str = "default") -> str:
     """
-    Analyze CV to find relevant experience matching job requirements
+    Analyze CV to find relevant experience matching job requirements using advanced agentic RAG
+
+    This tool uses LangGraph's agentic RAG pattern to:
+    - Intelligently rewrite job requirement queries for better CV matching
+    - Grade document relevance to ensure quality matches
+    - Iterate up to 3 times per requirement to find the best connections
+    - Provide detailed matching analysis with quality scoring
 
     Args:
         thread_id: Thread identifier
 
     Returns:
-        JSON with matching experience and compelling talking points
+        JSON with matching experience, compelling talking points, and agentic RAG metadata
     """
     try:
         # Check if job analysis is available (with retry for execution context issues)
@@ -998,17 +1002,36 @@ def analyze_cv_match(thread_id: str = "default") -> str:
                 keywords=', '.join(keywords)
             )
 
-            # Query CV for matching experience with unique thread ID to avoid caching issues
+            # Use agentic RAG for intelligent requirement matching with unique thread ID to avoid caching issues
             unique_thread_id = f"{thread_id}_req_{i}_{hash(requirement[:50])}"
-            match_result = simple_rag.query_cv(matching_query, unique_thread_id)
+            print(f"🤖 Using agentic RAG for requirement {i}: {requirement[:50]}...")
 
-            if match_result and match_result.get('answer'):
+            # Agentic RAG provides superior matching through query rewriting and quality assessment
+            match_result = agentic_cv_rag.search(matching_query, unique_thread_id)
+
+            # Extract answer from agentic RAG response structure
+            answer = match_result.get('answer', '') if match_result else ''
+            retrieval_attempts = match_result.get('retrieval_attempts', 0) if match_result else 0
+            final_query = match_result.get('final_query', matching_query) if match_result else matching_query
+
+            if answer and answer.strip():
+                # Determine strength based on answer quality and retrieval success
+                strength_score = "high" if len(answer) > 100 and retrieval_attempts <= 2 else "medium" if len(answer) > 50 else "low"
+
                 cv_matches.append({
                     "requirement": requirement,
-                    "matching_experience": match_result['answer'],
+                    "matching_experience": answer,
                     "keywords_addressed": keywords,
-                    "strength_score": "high" if len(match_result['answer']) > 100 else "medium"
+                    "strength_score": strength_score,
+                    "agentic_metadata": {
+                        "retrieval_attempts": retrieval_attempts,
+                        "query_rewritten": matching_query != final_query,
+                        "final_query": final_query
+                    }
                 })
+                print(f"✅ Found match for requirement {i} (attempts: {retrieval_attempts}, strength: {strength_score})")
+            else:
+                print(f"❌ No relevant experience found for requirement {i} after {retrieval_attempts} attempts")
 
         # CRITICAL FIX: Use the cv_matches data that was carefully built through individual RAG queries
         # Build cv_matches summary for structured aggregation
@@ -1043,13 +1066,16 @@ def analyze_cv_match(thread_id: str = "default") -> str:
         if not success:
             return StandardResponse.error("analyze_cv_match", "Failed to store CV analysis")
 
-        # Extract talking points count from results for message
+        # Extract talking points count and agentic RAG metrics from results for message
         talking_points_count = len(analysis_results.get("compelling_talking_points", []))
+        high_quality_matches = len([match for match in cv_matches if match.get("strength_score") == "high"])
+        total_retrieval_attempts = sum([match.get("agentic_metadata", {}).get("retrieval_attempts", 1) for match in cv_matches])
+        queries_rewritten = sum([1 for match in cv_matches if match.get("agentic_metadata", {}).get("query_rewritten", False)])
 
         return StandardResponse.success(
             "analyze_cv_match",
             analysis_results,
-            f"Found {talking_points_count} compelling talking points"
+            f"🤖 Agentic RAG Analysis Complete: {talking_points_count} compelling talking points found, {high_quality_matches} high-quality matches, {queries_rewritten} queries intelligently rewritten across {total_retrieval_attempts} retrieval attempts"
         )
 
     except Exception as e:

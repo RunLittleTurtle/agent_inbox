@@ -1,103 +1,101 @@
 {
-  "job_posting": "Department: Technology & Product\n\nEmployment Type: Permanent\n\nLocation: Remote, Canada\n\nReporting To: VP, Product - Contractor and Worker\n\nDescription\n\nThe Product manager - Platform Integration owns strategy, roadmap, and performance of the experiences in our Canadian products and the transformation of these towards our future state, for contractors — organizations that engage with our platform to meet client mandates, demonstrate regulatory compliance, or obtain third-party credentials to improve business viability.\n\nIn our network business model, many Contractors currently adopt the platform as a condition of doing business with our Client customers or in response to local regulatory schemes (particularly in the UK). However, this role also carries a strategic charter to evolve the Contractor product into a source of intrinsic value—something Contractors increasingly choose to adopt, independent of client mandates, because of the operational, reputational, or competitive advantage it provides, along with all of the additional value added services they can access through their relationship with Veriforce.\n\nThis role must balance the current GTM reality—where contractor acquisition is often Client- or regulation-driven—with a long-term roadmap that introduces innovations, features and benefits aligned to Contractor - led success and also charts a path to transform and migrate to our future state platform (CPRO). Regional adaptation, compliance sensitivity, and localized language and feature requirements remain essential to this role’s success.\n\nWhat that means day-to-day:\n\nSegment Strategy & Ownership\n\nOwn the product vision and roadmap for innovation for the Contractor segment in the Canadian products, ensuring alignment to current GTM models while laying the foundation for voluntary, value-based adoption\n\nBalance short-term delivery to support Client-driven and regulatory-mandated contractor participation with long-term product integration, differentiation and st",
+  "job_posting": "Product Manager - Artificial Intelligence & Machine Learning\nOttawa, ON · Republiée il y a 11 minutes · Plus de 100 personnes ont cliqué sur Postuler\nPromue par un recruteur · Réponses gérées en dehors de LinkedIn\n\nÀ distance\nCorrespond à vos préférences d’emploi, le type de lieu de travail est À distance.\n\nTemps plein\nCorrespond à vos préférences d’emploi, le type d’emploi est Temps plein.\n\nPostuler\n\nEnregistré\nEnregistrer Product Manager - Artificial Intelligence & Machine Learning chez SurveyMonkey\nProduct Manager - Artificial Intelligence & Machine Learning\nSurveyMonkey · Ottawa, ON (À distance)\n\nPostuler\n\nEnregistré\nEnregistrer Product Manager - Artificial Intelligence & Machine Learning chez SurveyMonkey\nVoir plus d’options\nDécouvrez comment vous vous positionnez par rapport aux 100 autres personnes qui ont cliqué sur Postuler\nAccédez à des informations exclusives sur les candidats, consultez les offres d’emploi pour lesquelles vous avez le plus de chances d’obtenir une réponse, et plus encore.\n\nRéactiver Premium\nÀ propos de l’offre d’emploi\nSurveyMonkey is the world’s most popular platform for surveys and forms, built for business—loved by users. We combine powerful capabilities with intuitive design, effectively serving every use case, from customer experience to employee engagement, market research to payment and registration forms. With built-in research expertise and AI-powered technology, it’s like having a team of expert researchers at your fingertips.\n\nTrusted by millions—from startups to Fortune 500 companies—SurveyMonkey helps teams gather insights and information that inspire better decisions, create experiences people love, and drive business growth. Discover how at surveymonkey.com.\n\nWhat We’re Looking For\n\nSurveyMonkey’s mission is to power the curious so they can shape what’s next. For brave and ambitious teams, organizations, and communities, SurveyMonkey helps turn insights into action, empowering you to grow, innovate, and change what’s possi",
   "job_analysis": {
     "top_requirements": [
       {
-        "requirement": "Own the product vision and roadmap for innovation for the Contractor segment in the Canadian products.",
-        "importance": "This requirement is critical as it ensures the product aligns with both current market demands and future strategic goals, driving the product's evolution and success.",
+        "requirement": "Experience in product management within AI and machine learning domains",
+        "importance": "This role requires a deep understanding of AI and machine learning to effectively manage and develop products that leverage these technologies, ensuring they meet market needs and drive business growth.",
         "keywords": [
-          "product vision",
-          "roadmap",
-          "innovation",
-          "Contractor segment",
-          "Canadian products"
+          "AI",
+          "machine learning",
+          "product management"
         ]
       },
       {
-        "requirement": "Balance short-term delivery to support Client-driven and regulatory-mandated contractor participation with long-term product integration, differentiation.",
-        "importance": "Balancing these aspects is essential to maintain current business operations while strategically positioning the product for future growth and competitive advantage.",
+        "requirement": "Ability to translate insights into actionable product strategies",
+        "importance": "SurveyMonkey's mission is to empower users to turn insights into action, making it crucial for the Product Manager to develop strategies that align with this goal and drive innovation.",
         "keywords": [
-          "short-term delivery",
-          "Client-driven",
-          "regulatory-mandated",
-          "product integration",
-          "differentiation"
+          "insights",
+          "actionable",
+          "product strategies"
         ]
       },
       {
-        "requirement": "Regional adaptation, compliance sensitivity, and localized language and feature requirements.",
-        "importance": "These elements are crucial for ensuring the product meets diverse market needs and regulatory standards, enhancing its adoption and effectiveness across different regions.",
+        "requirement": "Strong collaboration skills with cross-functional teams",
+        "importance": "The role involves working with various teams to gather insights and develop products, making collaboration essential to ensure cohesive and successful product development.",
         "keywords": [
-          "regional adaptation",
-          "compliance sensitivity",
-          "localized language",
-          "feature requirements"
+          "collaboration",
+          "cross-functional",
+          "teams"
         ]
       }
     ],
-    "company_culture": "The company culture appears to be forward-thinking and innovation-driven, with a strong emphasis on strategic growth and adaptability to market demands. There is a focus on creating intrinsic value and competitive advantage for clients and partners.",
-    "role_focus": "The primary focus of this role is to strategically manage and innovate the Contractor segment of the platform, ensuring it meets current regulatory and client-driven demands while evolving towards a future state that offers intrinsic value and competitive advantages."
+    "company_culture": "SurveyMonkey fosters a culture of curiosity and innovation, encouraging teams to be brave and ambitious in their pursuit of growth and change. The company values insights-driven decision-making and aims to empower its users to shape the future.",
+    "role_focus": "The primary focus of this role is to manage and develop AI and machine learning products that align with SurveyMonkey's mission to turn insights into action, driving innovation and business growth."
   },
   "cv_analysis": {
     "cv_job_matches": [
       {
-        "requirement": "Own the product vision and roadmap for innovation for the Contractor segment in the Canadian products.",
-        "matching_experience": "At Anekdote, I led the development of a mobile application aimed at enhancing cultural experiences in Quebec. My role involved owning the product vision and managing the roadmap, which included integrating advanced features like geolocation and AI-driven audio content. This experience demonstrates my ability to drive product innovation and align it with strategic goals in a Canadian context.",
+        "requirement": "Experience in product management within AI and machine learning domains",
+        "matching_experience": "Samuel has extensive experience in product management within the AI domain, demonstrated through his role at agentic AI and his technical skills in AI technologies.",
         "keywords_addressed": [
-          "product vision",
-          "roadmap",
-          "innovation",
-          "Contractor segment",
-          "Canadian products"
+          "AI",
+          "machine learning",
+          "product management"
         ],
         "strength_score": "high"
       },
       {
-        "requirement": "Balance short-term delivery to support Client-driven and regulatory-mandated contractor participation with long-term product integration, differentiation.",
-        "matching_experience": "At agentic AI, I collaborated closely with development teams to ensure the coherence of the overall architecture, which included the choice of technology stacks, cloud solutions, and the design of modular infrastructure and artificial intelligence. This experience demonstrates my ability to balance short-term delivery needs with long-term product integration and differentiation. Additionally, I constructed MVPs for both internal and client use to quickly validate product hypotheses and accelerate time-to-market, aligning with client-driven requirements while strategically positioning the product for future growth.",
+        "requirement": "Ability to translate insights into actionable product strategies",
+        "matching_experience": "Samuel led the development of a mobile application at Anekdote, aligning product strategies with user insights and needs.",
         "keywords_addressed": [
-          "short-term delivery",
-          "Client-driven",
-          "regulatory-mandated",
-          "product integration",
-          "differentiation"
+          "insights",
+          "actionable",
+          "product strategies"
         ],
         "strength_score": "high"
       },
       {
-        "requirement": "Regional adaptation, compliance sensitivity, and localized language and feature requirements.",
-        "matching_experience": "The CV does not explicitly mention any experience, skills, projects, or achievements related to regional adaptation, compliance sensitivity, or localized language and feature requirements.",
+        "requirement": "Strong collaboration skills with cross-functional teams",
+        "matching_experience": "Samuel's roles at Glowtify and Walter Interactive highlight his strong collaboration skills with cross-functional teams, ensuring cohesive product development.",
         "keywords_addressed": [
-          "regional adaptation",
-          "compliance sensitivity",
-          "localized language",
-          "feature requirements"
+          "collaboration",
+          "cross-functional",
+          "teams"
         ],
-        "strength_score": "low"
+        "strength_score": "high"
       }
     ],
     "compelling_talking_points": [
       {
-        "point": "Driving Product Innovation in Canadian Markets",
-        "evidence": "Led the development of a mobile application at Anekdote, owning the product vision and managing the roadmap for cultural experiences in Quebec.",
+        "point": "AI Product Management Expertise",
+        "evidence": "Samuel's role at agentic AI and his technical skills in AI technologies demonstrate his expertise in product management within the AI domain.",
         "keywords": [
-          "product vision",
-          "roadmap",
-          "innovation",
-          "Canadian products"
+          "AI",
+          "product management",
+          "technical skills"
         ]
       },
       {
-        "point": "Balancing Short-term and Long-term Product Goals",
-        "evidence": "Collaborated with development teams at agentic AI to ensure architectural coherence and constructed MVPs for quick validation and strategic growth.",
+        "point": "Strategic Product Development",
+        "evidence": "At Anekdote, Samuel translated user insights into actionable product strategies, leading the development of a culturally enriching mobile application.",
         "keywords": [
-          "short-term delivery",
-          "product integration",
-          "differentiation"
+          "insights",
+          "product strategies",
+          "user experience"
+        ]
+      },
+      {
+        "point": "Cross-Functional Collaboration",
+        "evidence": "Samuel's experience at Glowtify and Walter Interactive showcases his ability to collaborate with cross-functional teams, enhancing product development processes.",
+        "keywords": [
+          "collaboration",
+          "cross-functional",
+          "teamwork"
         ]
       }
     ],
-    "overall_fit_score": 0.6333333333333333,
-    "recommendation": "The candidate demonstrates strong capabilities in driving product innovation and balancing short-term and long-term product goals, particularly in Canadian contexts. However, there is a notable gap in experience related to regional adaptation and compliance sensitivity. Overall, the candidate is a strong fit for roles emphasizing innovation and strategic product management, but may need to develop skills in regional compliance and localization."
+    "overall_fit_score": 0.8,
+    "recommendation": "Samuel is a strong candidate for roles requiring expertise in AI product management, strategic product development, and cross-functional collaboration. His high match strength across all requirements indicates a robust fit for positions in these domains."
   }
 }

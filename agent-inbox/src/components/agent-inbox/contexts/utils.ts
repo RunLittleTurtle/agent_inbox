@@ -2,6 +2,7 @@ import { Thread, ThreadState } from "@langchain/langgraph-sdk";
 import { AgentInbox, HumanInterrupt, ThreadData } from "../types";
 import { validate } from "uuid";
 import { IMPROPER_SCHEMA } from "../constants";
+import { normalizeInterrupts } from "../utils";
 
 // TODO: Delete this once interrupt issue fixed.
 export const tmpCleanInterrupts = (interrupts: Record<string, any[]>) => {

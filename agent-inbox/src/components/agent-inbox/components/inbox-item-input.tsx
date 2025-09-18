@@ -276,7 +276,7 @@ function EditAndOrAcceptComponent({
           defaultRows.current[k as keyof typeof defaultRows.current] ===
           undefined
         ) {
-          defaultRows.current[k as keyof typeof defaultRows.current] = !v || !v.length
+          defaultRows.current[k as keyof typeof defaultRows.current] = !v.length
             ? 3
             : Math.max(v.length / 30, 7);
         }

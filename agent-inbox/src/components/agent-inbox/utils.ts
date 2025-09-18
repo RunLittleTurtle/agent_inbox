@@ -9,6 +9,10 @@ import {
 } from "./types";
 import { logger } from "./utils/logger";
 import { validate } from "uuid";
+import {
+  processInterrupts,
+  isLegacyInterrupt,
+} from "./adapters/interrupt-adapter";
 
 export function prettifyText(action: string) {
   return startCase(action.replace(/_/g, " "));
@@ -336,4 +340,24 @@ export function extractProjectId(inboxId: string): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Normalizes interrupts to Agent Inbox format, handling legacy formats
+ */
+export function normalizeInterrupts(interrupts: any[]): HumanInterrupt[] {
+  if (!Array.isArray(interrupts)) {
+    logger.warn("Invalid interrupts format, expected array:", interrupts);
+    return [];
+  }
+
+  try {
+    return processInterrupts(interrupts);
+  } catch (error) {
+    logger.error("Error processing interrupts:", error);
+    return interrupts.filter(
+      (interrupt) =>
+        interrupt && typeof interrupt === "object" && interrupt.action_request
+    ) as HumanInterrupt[];
+  }
 }

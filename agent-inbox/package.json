@@ -73,10 +73,10 @@
     "langsmith": "^0.1.61",
     "lodash": "^4.17.21",
     "lucide-react": "^0.468.0",
-    "next": "14.2.25",
-    "react": "^18",
+    "next": "^15.2.3",
+    "react": "^19.0.0",
     "react-colorful": "^5.6.1",
-    "react-dom": "^18",
+    "react-dom": "^19.0.0",
     "react-icons": "^5.3.0",
     "react-json-view": "^1.21.3",
     "react-markdown": "^9.0.1",
@@ -96,14 +96,14 @@
     "@types/eslint__js": "^8.42.3",
     "@types/js-cookie": "^3.0.6",
     "@types/lodash": "^4.17.12",
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/node": "^22.13.5",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.12.2",
     "@typescript-eslint/parser": "^8.8.1",
     "eslint": "^8",
-    "eslint-config-next": "14.2.10",
+    "eslint-config-next": "15.2.2",
     "postcss": "^8",
     "prettier": "^3.3.3",
     "tailwind-scrollbar": "^3.1.0",
@@ -111,6 +111,9 @@
     "tsx": "^4.19.1",
     "typescript": "^5",
     "typescript-eslint": "^8.8.1"
+  },
+  "overrides": {
+    "react-is": "^19.0.0-rc-69d4b800-20241021"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

@@ -1,10 +1,10 @@
 # LangGraph Development Principles
 
-If you are coding with LangGraph, follow these principles and patterns.
+ALWAYS use LangGraph, follow these principles and patterns.
 
 For more extensive information check : src/CLAUDE-large.md
 
-You have access to the LangGraph MCP server, use it : src/mcp.json
+You have access to the LangGraph MCP server, ALWAYS use it : src/mcp.json
 
 Always follow the KISS principle, and work by iterations.
 

@@ -24,11 +24,15 @@ python cli.py email --help
 python cli.py setup-oauth               # Setup Google OAuth for Gmail access
 
 # Fetch latest Gmail emails and trigger workflow
-python cli.py gmail                     # Fetch 1 latest email and send to workflow
-python cli.py gmail --count 5           # Fetch 5 latest emails
-python cli.py gmail --no-process        # Fetch without triggering workflow
-python cli.py gmail --no-body           # Fetch without showing body
+python cli.py gmail                     # Fetch 1 latest email and send to main agent workflow
+python cli.py gmail --count 5           # Fetch 5 latest emails and send to main agent workflow
+python cli.py gmail --executive         # Fetch 1 latest email and send to executive-ai-assistant workflow
+python cli.py gmail --executive --count 3  # Fetch 3 latest emails and send to executive-ai-assistant workflow
 
+
+
+# Clean up auto-configured inboxes (run in browser console on Agent Inbox page)
+# Copy and paste the contents of cleanup_inboxes.js into browser console at http://localhost:3000
 
 # venv
 source .venv/bin/activate

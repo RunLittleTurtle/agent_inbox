@@ -94,6 +94,19 @@ const getClient = ({ agentInboxes, getItem, toast }: GetClientArgs) => {
     return;
   }
 
+  // Validate that deploymentUrl is a valid URL
+  try {
+    new URL(deploymentUrl);
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: `Invalid deployment URL: ${deploymentUrl}. Please check your inbox configuration.`,
+      variant: "destructive",
+      duration: 5000,
+    });
+    return;
+  }
+
   const langchainApiKeyLS =
     getItem(LANGCHAIN_API_KEY_LOCAL_STORAGE_KEY) || undefined;
   // Only show this error if the deployment URL is for a deployed LangGraph instance.

@@ -392,6 +392,15 @@ def generate_cover_letter(thread_id: str = "default", preferences: Optional[Dict
         thread_id: Thread identifier
         preferences: User preferences for generation (tone, length, etc.)
 
+        This is an EXEMPLE of a god thing to add in a cover letter:
+
+            At Walter Interactive, I served as a Product Manager & Operations Director, where I successfully created internal automated platforms for managing hours, sprints, and billing, reducing errors and processing time by 70%. Building on this experience, I developed a prototype of a multi-functional assistant based on agentic AI for intelligent email management, calendar, and various task automation. My automations integrate tools like Jira, Notion, Google Drive, and GitHub, as well as knowledge base RAG applications, using the Langchain ecosystem and Pipedream, showcasing my ability to design and connect end-to-end automation workflows.
+
+            My process is straightforward: I start by identifying a problem and a high-value user need. I measure the cost of these tasks in both time and money, then design an automation architecture for an MVP. I create a prototype, test it with real users, optimize it, and then the development team builds a final version to deploy for the team. I track results using defined KPIs, continuously improving until the ROI starts to decline, at which point I move on to the next high-value workflow to automate.
+
+            As an end-to-end Product Manager, I cover the entire lifecycle: identifying needs, building prototypes, testing solutions, analyzing data, and handing them off to the development team for full implementation with clear PRD's Epic and User Stories.
+
+
     Returns:
         Generated cover letter or error message
     """
@@ -491,7 +500,7 @@ def generate_cover_letter(thread_id: str = "default", preferences: Optional[Dict
         header_lines.extend([
             current_date,
             "",
-            "Dear Hiring Manager,",
+            "Hi Team,",
             ""
         ])
 

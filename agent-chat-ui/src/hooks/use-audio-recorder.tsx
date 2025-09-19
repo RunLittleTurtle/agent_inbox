@@ -29,6 +29,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     error: null,
   });
 
+  const [isSupported, setIsSupported] = useState(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -38,15 +40,22 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
   const startTimeRef = useRef<number | null>(null);
   const isRecordingRef = useRef(false);
 
-  // Check if audio recording is supported
-  const isSupported = !!(
-    typeof navigator !== "undefined" &&
-    navigator.mediaDevices &&
-    typeof navigator.mediaDevices.getUserMedia === "function" &&
-    typeof window !== "undefined" &&
-    window.MediaRecorder &&
-    window.AudioContext
-  );
+  // Check if audio recording is supported (client-side only to prevent hydration mismatch)
+  useEffect(() => {
+    const checkSupport = () => {
+      const supported = !!(
+        typeof navigator !== "undefined" &&
+        navigator.mediaDevices &&
+        typeof navigator.mediaDevices.getUserMedia === "function" &&
+        typeof window !== "undefined" &&
+        window.MediaRecorder &&
+        window.AudioContext
+      );
+      setIsSupported(supported);
+    };
+
+    checkSupport();
+  }, []);
 
   // Update audio level and duration
   const updateAudioVisualization = useCallback(() => {

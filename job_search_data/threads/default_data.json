@@ -1,101 +1,108 @@
 {
-  "job_posting": "Product Manager - Artificial Intelligence & Machine Learning\nOttawa, ON · Republiée il y a 11 minutes · Plus de 100 personnes ont cliqué sur Postuler\nPromue par un recruteur · Réponses gérées en dehors de LinkedIn\n\nÀ distance\nCorrespond à vos préférences d’emploi, le type de lieu de travail est À distance.\n\nTemps plein\nCorrespond à vos préférences d’emploi, le type d’emploi est Temps plein.\n\nPostuler\n\nEnregistré\nEnregistrer Product Manager - Artificial Intelligence & Machine Learning chez SurveyMonkey\nProduct Manager - Artificial Intelligence & Machine Learning\nSurveyMonkey · Ottawa, ON (À distance)\n\nPostuler\n\nEnregistré\nEnregistrer Product Manager - Artificial Intelligence & Machine Learning chez SurveyMonkey\nVoir plus d’options\nDécouvrez comment vous vous positionnez par rapport aux 100 autres personnes qui ont cliqué sur Postuler\nAccédez à des informations exclusives sur les candidats, consultez les offres d’emploi pour lesquelles vous avez le plus de chances d’obtenir une réponse, et plus encore.\n\nRéactiver Premium\nÀ propos de l’offre d’emploi\nSurveyMonkey is the world’s most popular platform for surveys and forms, built for business—loved by users. We combine powerful capabilities with intuitive design, effectively serving every use case, from customer experience to employee engagement, market research to payment and registration forms. With built-in research expertise and AI-powered technology, it’s like having a team of expert researchers at your fingertips.\n\nTrusted by millions—from startups to Fortune 500 companies—SurveyMonkey helps teams gather insights and information that inspire better decisions, create experiences people love, and drive business growth. Discover how at surveymonkey.com.\n\nWhat We’re Looking For\n\nSurveyMonkey’s mission is to power the curious so they can shape what’s next. For brave and ambitious teams, organizations, and communities, SurveyMonkey helps turn insights into action, empowering you to grow, innovate, and change what’s possi",
-  "job_analysis": {
-    "top_requirements": [
-      {
-        "requirement": "Experience in product management within AI and machine learning domains",
-        "importance": "This role requires a deep understanding of AI and machine learning to effectively manage and develop products that leverage these technologies, ensuring they meet market needs and drive business growth.",
-        "keywords": [
-          "AI",
-          "machine learning",
-          "product management"
-        ]
-      },
-      {
-        "requirement": "Ability to translate insights into actionable product strategies",
-        "importance": "SurveyMonkey's mission is to empower users to turn insights into action, making it crucial for the Product Manager to develop strategies that align with this goal and drive innovation.",
-        "keywords": [
-          "insights",
-          "actionable",
-          "product strategies"
-        ]
-      },
-      {
-        "requirement": "Strong collaboration skills with cross-functional teams",
-        "importance": "The role involves working with various teams to gather insights and develop products, making collaboration essential to ensure cohesive and successful product development.",
-        "keywords": [
-          "collaboration",
-          "cross-functional",
-          "teams"
-        ]
-      }
-    ],
-    "company_culture": "SurveyMonkey fosters a culture of curiosity and innovation, encouraging teams to be brave and ambitious in their pursuit of growth and change. The company values insights-driven decision-making and aims to empower its users to shape the future.",
-    "role_focus": "The primary focus of this role is to manage and develop AI and machine learning products that align with SurveyMonkey's mission to turn insights into action, driving innovation and business growth."
-  },
+  "job_posting": "Gestionnaire de programme IA\n\nFlare est une entreprise SaaS en forte croissance spécialisée en cybersécurité, dont la mission est de permettre aux organisations de prendre le contrôle de leurs données et de protéger leurs clients, employés et images de marque en identifiant les menaces externes. On permet aux équipes de cybersécurité de détecter de manière proactive les expositions à haut risque sur le \"dark web\" et sur internet, avant que les acteurs malveillants n'aient la chance de les exploiter. On unifie les capacités du renseignement sur les cyber menaces et de la gestion de la surface d'attaque externe dans une plateforme unique et intuitive.\n\nTL;DR : On est geeks qui aident à protéger les données de nos clients en localisant les cyber risques.\n\nEn tant que gestionnaire de programme IA chez Flare, tu seras membre fondateur de notre équipe IA centrale, dirigeant la transformation stratégique de notre façon de travailler grâce à l'adoption responsable de l'IA. Tu stimuleras l'efficacité opérationnelle à grande échelle en concevant des flux de travail et politiques IA centrés sur l'utilisateur qui permettent à nos équipes de se concentrer sur un travail à haute valeur ajoutée tout en automatisant les tâches répétitives. Ce rôle combine la réflexion produit, l'excellence opérationnelle et la gestion du changement pour assurer que l'IA génère un impact d'affaires mesurable dans notre organisation en croissance rapide.\n\nTes objectifs et ton impact:\n\nTa mission, si tu l'acceptes, sera de diriger le déploiement stratégique de l'IA chez Flare, stimulant l'efficacité opérationnelle et permettant une croissance évolutive. Tu devras notamment:\n\nDéfinir et implémenter des politiques IA et cadres de gouvernance axés sur l'expérience utilisateur et l'adoption\nDiriger le déploiement stratégique d'initiatives IA, concevant des flux de travail centrés sur l'utilisateur qui stimulent l'efficacité opérationnelle à grande échelle\nIdentifier, prioriser et développer des cas d'usag",
   "cv_analysis": {
     "cv_job_matches": [
       {
-        "requirement": "Experience in product management within AI and machine learning domains",
-        "matching_experience": "Samuel has extensive experience in product management within the AI domain, demonstrated through his role at agentic AI and his technical skills in AI technologies.",
+        "requirement": "Définir et implémenter des politiques IA et cadres de gouvernance axés sur l'expérience utilisateur et l'adoption",
+        "matching_experience": "At Anekdote App (Montréal, Canada, Septembre 2022 - Février 2024): As a Product Owner for a mobile and IoT application, you focused on the continuous improvement of Agile processes with a constant focus on user experience, maximizing the value delivered in each sprint. This involved strategic alignment with co-founders to design innovative and high-impact solutions, managing the product backlog via Jira, and prioritizing based on user feedback and alignment with the vision.",
         "keywords_addressed": [
-          "AI",
-          "machine learning",
-          "product management"
+          "politiques IA",
+          "cadres de gouvernance",
+          "expérience utilisateur",
+          "adoption"
         ],
         "strength_score": "high"
       },
       {
-        "requirement": "Ability to translate insights into actionable product strategies",
-        "matching_experience": "Samuel led the development of a mobile application at Anekdote, aligning product strategies with user insights and needs.",
+        "requirement": "Diriger le déploiement stratégique d'initiatives IA, concevant des flux de travail centrés sur l'utilisateur qui stimulent l'efficacité opérationnelle à grande échelle",
+        "matching_experience": "Walter Interactive Web Agency: As a Product Manager & Operations in Montréal, Canada, from February 2024 to March 2025, you transformed a digital agency into a high-performing Agile model. You were responsible for defining strategic client roadmaps, ensuring the quality of technological deliverables, and managing the agency's operations. This included handling projects over $100k and leading a team of more than 15 collaborators.",
         "keywords_addressed": [
-          "insights",
-          "actionable",
-          "product strategies"
+          "déploiement stratégique",
+          "initiatives IA",
+          "flux de travail",
+          "efficacité opérationnelle"
         ],
         "strength_score": "high"
       },
       {
-        "requirement": "Strong collaboration skills with cross-functional teams",
-        "matching_experience": "Samuel's roles at Glowtify and Walter Interactive highlight his strong collaboration skills with cross-functional teams, ensuring cohesive product development.",
+        "requirement": "Identifier, prioriser et développer des cas d'usage IA",
+        "matching_experience": "At Anekdote App (Montréal, Canada, September 2022 - February 2024): As a Product Owner, you were involved in the strategic alignment with co-founders (CEO & CTO) to design innovative and high-impact solutions. You managed the product backlog using Jira, defining Epics and User Stories, and prioritizing them based on user feedback and alignment with the vision.",
         "keywords_addressed": [
-          "collaboration",
-          "cross-functional",
-          "teams"
+          "identifier",
+          "prioriser",
+          "développer",
+          "cas d'usage IA"
         ],
         "strength_score": "high"
       }
     ],
     "compelling_talking_points": [
       {
-        "point": "AI Product Management Expertise",
-        "evidence": "Samuel's role at agentic AI and his technical skills in AI technologies demonstrate his expertise in product management within the AI domain.",
+        "point": "Leadership in AI Policy and Governance",
+        "evidence": "At Anekdote App, you focused on continuous improvement of Agile processes with a constant focus on user experience, aligning product strategies with user needs and organizational goals.",
         "keywords": [
-          "AI",
-          "product management",
-          "technical skills"
+          "politiques IA",
+          "cadres de gouvernance",
+          "expérience utilisateur"
         ]
       },
       {
-        "point": "Strategic Product Development",
-        "evidence": "At Anekdote, Samuel translated user insights into actionable product strategies, leading the development of a culturally enriching mobile application.",
+        "point": "Strategic Deployment of AI Initiatives",
+        "evidence": "At Walter Interactive Web Agency, you transformed a digital agency into a high-performing Agile model, leading strategic client roadmaps and managing operations to enhance operational efficiency.",
         "keywords": [
-          "insights",
-          "product strategies",
-          "user experience"
+          "déploiement stratégique",
+          "initiatives IA",
+          "efficacité opérationnelle"
         ]
       },
       {
-        "point": "Cross-Functional Collaboration",
-        "evidence": "Samuel's experience at Glowtify and Walter Interactive showcases his ability to collaborate with cross-functional teams, enhancing product development processes.",
+        "point": "Development of AI Use Cases",
+        "evidence": "At Anekdote App, you managed the product backlog, defined Epics and User Stories, and prioritized them based on user feedback, showcasing your ability to develop AI use cases.",
         "keywords": [
-          "collaboration",
-          "cross-functional",
-          "teamwork"
+          "identifier",
+          "prioriser",
+          "développer",
+          "cas d'usage IA"
         ]
       }
     ],
     "overall_fit_score": 0.8,
-    "recommendation": "Samuel is a strong candidate for roles requiring expertise in AI product management, strategic product development, and cross-functional collaboration. His high match strength across all requirements indicates a robust fit for positions in these domains."
+    "recommendation": "The candidate demonstrates a strong alignment with the job requirements, particularly in defining AI policies, leading strategic deployments, and developing AI use cases. Their experiences reflect a high level of competence and readiness for the role."
+  },
+  "job_analysis": {
+    "top_requirements": [
+      {
+        "requirement": "Définir et implémenter des politiques IA et cadres de gouvernance axés sur l'expérience utilisateur et l'adoption",
+        "importance": "This requirement is critical as it ensures that the AI initiatives are user-centric, which is essential for successful adoption and integration into the company's operations. It also ensures that the AI policies align with the company's strategic goals and governance standards.",
+        "keywords": [
+          "politiques IA",
+          "cadres de gouvernance",
+          "expérience utilisateur",
+          "adoption"
+        ]
+      },
+      {
+        "requirement": "Diriger le déploiement stratégique d'initiatives IA, concevant des flux de travail centrés sur l'utilisateur qui stimulent l'efficacité opérationnelle à grande échelle",
+        "importance": "This requirement is crucial because it involves leading the strategic implementation of AI initiatives that enhance operational efficiency, a key factor for the company's growth and competitive advantage.",
+        "keywords": [
+          "déploiement stratégique",
+          "initiatives IA",
+          "flux de travail",
+          "efficacité opérationnelle"
+        ]
+      },
+      {
+        "requirement": "Identifier, prioriser et développer des cas d'usage IA",
+        "importance": "This skill is vital as it involves recognizing and developing AI use cases that can provide significant business value, ensuring that the AI efforts are aligned with business objectives and deliver measurable impact.",
+        "keywords": [
+          "identifier",
+          "prioriser",
+          "développer",
+          "cas d'usage IA"
+        ]
+      }
+    ],
+    "company_culture": "Flare has a culture that values innovation, strategic thinking, and a proactive approach to cybersecurity. The company is described as a fast-growing SaaS firm with a focus on protecting client data and identifying external threats, indicating a dynamic and forward-thinking environment.",
+    "role_focus": "The primary focus of this role is to lead the strategic deployment and governance of AI initiatives to enhance operational efficiency and support scalable growth within the company."
   }
 }

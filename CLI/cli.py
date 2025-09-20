@@ -37,9 +37,11 @@ PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 VENV_PATH = PROJECT_ROOT / ".venv"
 AGENT_INBOX_PATH = PROJECT_ROOT / "agent-inbox"
 AGENT_CHAT_UI_PATH = PROJECT_ROOT / "agent-chat-ui"
+AGENT_CHAT_UI_2_PATH = PROJECT_ROOT / "agent-chat-ui-2"
 LANGGRAPH_API = "http://127.0.0.1:2024"
 AGENT_INBOX_UI = "http://localhost:3000"
 AGENT_CHAT_UI = "http://localhost:3001"
+AGENT_CHAT_UI_2 = "http://localhost:3002"
 LANGSMITH_STUDIO = "https://smith.langchain.com"
 
 
@@ -707,17 +709,18 @@ def start(
     langgraph_port: int = typer.Option(2024, "--langgraph-port", help="Port for LangGraph server"),
     inbox_port: int = typer.Option(3000, "--inbox-port", help="Port for Agent Inbox UI"),
     chat_port: int = typer.Option(3001, "--chat-port", help="Port for Agent Chat UI"),
+    chat_2_port: int = typer.Option(3002, "--chat-2-port", help="Port for Agent Chat UI 2 (original)"),
     studio: bool = typer.Option(True, "--studio/--no-studio", help="Open LangSmith Studio")
 ):
     """
     🚀 Start complete AI agent stack with all UIs
 
-    Launches LangGraph server, Agent Inbox, Agent Chat UI, and LangSmith Studio.
+    Launches LangGraph server, Agent Inbox, Agent Chat UI, Agent Chat UI 2 (original), and LangSmith Studio.
     This is the one-command solution to get everything running.
     """
     console.print(Panel.fit(
         "🚀 [bold green]Starting Complete AI Agent Stack[/bold green]",
-        subtitle="LangGraph + Agent Inbox + Agent Chat + LangSmith Studio"
+        subtitle="LangGraph + Agent Inbox + Agent Chat + Agent Chat 2 + LangSmith Studio"
     ))
 
     ensure_venv()
@@ -786,15 +789,39 @@ def start(
         chat_process = subprocess.Popen(["npm", "run", "dev"], env=chat_env)
 
         console.print(f"[green]✅ Agent Chat UI starting on port {chat_port}[/green]")
+
+        # Step 4: Start Agent Chat UI 2 (original)
+        console.print("[blue]📋 Step 4: Starting Agent Chat UI 2 (original)...[/blue]")
+
+        if not AGENT_CHAT_UI_2_PATH.exists():
+            console.print(f"[red]❌ Agent Chat UI 2 directory not found: {AGENT_CHAT_UI_2_PATH}[/red]")
+            langgraph_process.terminate()
+            inbox_process.terminate()
+            chat_process.terminate()
+            raise typer.Exit(1)
+
+        # Kill existing Agent Chat 2 processes
+        killed_chat_2 = kill_processes_on_port(chat_2_port, "Agent Chat UI 2")
+        if not killed_chat_2:
+            console.print(f"[green]✅ No existing Agent Chat UI 2 processes found on port {chat_2_port}[/green]")
+
+        # Start Agent Chat UI 2
+        os.chdir(AGENT_CHAT_UI_2_PATH)
+        chat_2_env = os.environ.copy()
+        chat_2_env['PORT'] = str(chat_2_port)
+        chat_2_process = subprocess.Popen(["npm", "run", "dev"], env=chat_2_env)
+
+        console.print(f"[green]✅ Agent Chat UI 2 starting on port {chat_2_port}[/green]")
         console.print("[blue]💭 Waiting for all UIs to initialize...[/blue]")
         time.sleep(8)  # Give all services time to start
 
-        # Step 4: Open all browser interfaces
-        console.print("[blue]📋 Step 4: Opening all browser interfaces...[/blue]")
+        # Step 5: Open all browser interfaces
+        console.print("[blue]📋 Step 5: Opening all browser interfaces...[/blue]")
 
         langgraph_url = f"http://127.0.0.1:{langgraph_port}"
         inbox_url = f"http://localhost:{inbox_port}"
         chat_url = f"http://localhost:{chat_port}"
+        chat_2_url = f"http://localhost:{chat_2_port}"
 
         # Open LangSmith Studio first
         if studio:
@@ -805,6 +832,11 @@ def start(
         # Open Agent Chat UI
         console.print(f"[green]💬 Opening Agent Chat UI at {chat_url}[/green]")
         webbrowser.open(chat_url)
+        time.sleep(1)
+
+        # Open Agent Chat UI 2 (original)
+        console.print(f"[green]💬 Opening Agent Chat UI 2 (original) at {chat_2_url}[/green]")
+        webbrowser.open(chat_2_url)
         time.sleep(1)
 
         # Open Agent Inbox UI
@@ -818,6 +850,7 @@ def start(
             f"🤖 LangGraph Server: [link]{langgraph_url}[/link]\n"
             f"📧 Agent Inbox UI: [link]{inbox_url}[/link]\n"
             f"💬 Agent Chat UI: [link]{chat_url}[/link]\n"
+            f"💬 Agent Chat UI 2 (original): [link]{chat_2_url}[/link]\n"
             f"🎨 LangSmith Studio: [link]{LANGSMITH_STUDIO}[/link]\n\n"
             f"[dim]Press Ctrl+C to stop all services[/dim]",
             title="✅ All Services Running",
@@ -837,6 +870,9 @@ def start(
                 if chat_process.poll() is not None:
                     console.print("[red]❌ Agent Chat UI stopped unexpectedly[/red]")
                     break
+                if chat_2_process.poll() is not None:
+                    console.print("[red]❌ Agent Chat UI 2 stopped unexpectedly[/red]")
+                    break
                 time.sleep(1)
         except KeyboardInterrupt:
             console.print("\n[yellow]📱 Stopping all services...[/yellow]")
@@ -845,17 +881,20 @@ def start(
             langgraph_process.terminate()
             inbox_process.terminate()
             chat_process.terminate()
+            chat_2_process.terminate()
 
             # Wait for them to stop
             try:
                 langgraph_process.wait(timeout=5)
                 inbox_process.wait(timeout=5)
                 chat_process.wait(timeout=5)
+                chat_2_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 console.print("[yellow]💀 Force killing remaining processes...[/yellow]")
                 langgraph_process.kill()
                 inbox_process.kill()
                 chat_process.kill()
+                chat_2_process.kill()
 
             console.print("[green]✅ All services stopped[/green]")
 

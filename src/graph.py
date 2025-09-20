@@ -21,6 +21,8 @@ from zoneinfo import ZoneInfo
 from typing import List, Optional
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
+from langchain_core.messages import HumanMessage
+
 
 # Import the global state from state.py
 from src.state import WorkflowState
@@ -108,33 +110,77 @@ async def create_calendar_agent():
         )
 
 async def create_email_agent():
-    """Create email agent for email operations"""
+    """Create email agent with MCP integration for email operations"""
     try:
-        email_model = ChatOpenAI(
-            model="gpt-4o",
+        from src.email_agent.email_mcp_orchestrator import create_email_agent_with_mcp
+
+        # Use proper async MCP email agent (same pattern as calendar agent)
+        email_agent_instance = await create_email_agent_with_mcp()
+
+        logger.info("Email agent with MCP integration initialized successfully")
+        return await email_agent_instance.get_agent()
+
+    except Exception as e:
+        logger.error(f"Failed to create email agent with MCP: {e}")
+        logger.info("Creating fallback email agent without MCP tools")
+
+        # Fallback: basic email agent without MCP tools
+        email_model = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
             temperature=0,
-            openai_api_key=os.getenv("OPENAI_API_KEY")
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+            streaming=False
         )
 
-        email_prompt = """You are an email management expert.
-        Help users with email composition, sending, reading, and organization.
-
-        Current capabilities:
-        - Email composition assistance
-        - Email etiquette and formatting guidance
-        - Email organization strategies
-
-        Note: Direct email sending is not yet configured."""
+        fallback_prompt = """You are Samuel's email assistant.
+        I apologize, but I cannot directly access your Gmail at the moment due to a technical issue.
+        I can provide email composition assistance and help you plan your communications, but cannot send, read, or manage actual emails.
+        Please let me know how I can assist you with email planning and composition."""
 
         return create_react_agent(
             model=email_model,
             tools=[],
-            name="email_agent",
-            prompt=email_prompt
+            name="email_agent_fallback",
+            prompt=fallback_prompt
         )
+
+async def create_drive_agent():
+    """Create Drive agent with MCP integration for Google Drive operations"""
+    try:
+        # Adjust import path to where you placed the Drive agent orchestrator
+        from src.knowledgebase_agent.drive_mcp_orchestrator import create_drive_agent_with_mcp
+
+        # Create the async Drive MCP agent (same pattern as your Gmail agent)
+        drive_agent_instance = await create_drive_agent_with_mcp()
+
+        logger.info("Drive agent with MCP integration initialized successfully")
+        return await drive_agent_instance.get_agent()
+
     except Exception as e:
-        logger.error(f"Failed to create email agent: {e}")
-        raise
+        logger.error(f"Failed to create Drive agent with MCP: {e}")
+        logger.info("Creating fallback Drive agent without MCP tools")
+
+        # Fallback: basic Drive assistant without MCP tools
+        drive_model = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
+            temperature=0,
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+            streaming=False
+        )
+
+        fallback_prompt = """You are Samuel's Google Drive assistant.
+I apologize, but I cannot directly access your Google Drive at the moment due to a technical issue.
+I can help you plan Drive operations, suggest folder/file organization, and compose file metadata changes,
+but I cannot list, move, delete, share, or modify actual files until Drive connectivity is restored.
+Please let me know how I can assist with Drive-related planning or drafting."""
+
+        return create_react_agent(
+            model=drive_model,
+            tools=[],
+            name="drive_agent_fallback",
+            prompt=fallback_prompt
+        )
+
 
 async def create_job_search_agent():
     """Create job search agent using the orchestrator"""
@@ -198,15 +244,18 @@ async def create_supervisor_graph():
         logger.info("Creating agents...")
         calendar_agent = await create_calendar_agent()
         email_agent = await create_email_agent()
+        drive_agent = await create_drive_agent()
         job_search_agent = await create_job_search_agent()
+
 
         logger.info("All agents created successfully")
 
         # Create supervisor model
-        supervisor_model = ChatOpenAI(
-            model="gpt-4o",
+        supervisor_model = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
             temperature=0,
-            openai_api_key=os.getenv("OPENAI_API_KEY")
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+            streaming=False
         )
 
         # Get dynamic context
@@ -225,6 +274,7 @@ AGENT CAPABILITIES:
 - calendar_agent: All calendar operations (create/view/modify events, check availability, scheduling)
 - email_agent: **PRIMARY EMAIL AGENT** - Complete email management, Gmail integration, triage, drafting, sending,
 - job_search_agent: CV upload, Job Offer, Job search, resume/cover letter advice, interview prep
+- drive_agent: File management, Google Drive integration, file sharing, document collaboration
 
 ROUTING STRATEGY:
 1. ANALYZE the user's request carefully
@@ -254,7 +304,7 @@ When an agent completes their task, analyze if additional routing is needed."""
 
         # Create supervisor workflow
         workflow = create_supervisor(
-            agents=[calendar_agent, email_agent, job_search_agent],
+            agents=[calendar_agent, email_agent, drive_agent, job_search_agent],
             model=supervisor_model,
             prompt=supervisor_prompt,
             supervisor_name="multi_agent_supervisor",

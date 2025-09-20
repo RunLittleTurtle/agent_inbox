@@ -18,7 +18,7 @@ load_dotenv()
 @dataclass
 class LLMConfig:
     """LLM configuration settings"""
-    model: str = "gpt-4o"
+    model: str = "claude-sonnet-4-20250514"
     temperature: float = 0.0
     max_tokens: int = 2000
     timeout: int = 60
@@ -26,12 +26,12 @@ class LLMConfig:
 
 
 LLM_CONFIG = {
-    "model": os.getenv("JOB_SEARCH_LLM_MODEL", "gpt-4o"),
+    "model": os.getenv("JOB_SEARCH_LLM_MODEL", "claude-sonnet-4-20250514"),
     "temperature": float(os.getenv("JOB_SEARCH_LLM_TEMPERATURE", "0.0")),
     "max_tokens": int(os.getenv("JOB_SEARCH_LLM_MAX_TOKENS", "2000")),
     "timeout": int(os.getenv("JOB_SEARCH_LLM_TIMEOUT", "60")),
     "max_retries": int(os.getenv("JOB_SEARCH_LLM_MAX_RETRIES", "3")),
-    "openai_api_key": os.getenv("OPENAI_API_KEY")
+    "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY")
 }
 
 
@@ -265,8 +265,8 @@ def validate_config() -> List[str]:
     issues = []
 
     # Check required API keys
-    if not INTEGRATION_CONFIG.get("openai_api_key"):
-        issues.append("Missing OPENAI_API_KEY environment variable")
+    if not INTEGRATION_CONFIG.get("ANTHROPIC_API_KEY"):
+        issues.append("Missing ANTHROPIC_API_KEY environment variable")
 
     # Check storage paths
     try:

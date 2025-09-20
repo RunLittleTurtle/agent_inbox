@@ -1,108 +1,92 @@
 {
-  "job_posting": "Gestionnaire de programme IA\n\nFlare est une entreprise SaaS en forte croissance spécialisée en cybersécurité, dont la mission est de permettre aux organisations de prendre le contrôle de leurs données et de protéger leurs clients, employés et images de marque en identifiant les menaces externes. On permet aux équipes de cybersécurité de détecter de manière proactive les expositions à haut risque sur le \"dark web\" et sur internet, avant que les acteurs malveillants n'aient la chance de les exploiter. On unifie les capacités du renseignement sur les cyber menaces et de la gestion de la surface d'attaque externe dans une plateforme unique et intuitive.\n\nTL;DR : On est geeks qui aident à protéger les données de nos clients en localisant les cyber risques.\n\nEn tant que gestionnaire de programme IA chez Flare, tu seras membre fondateur de notre équipe IA centrale, dirigeant la transformation stratégique de notre façon de travailler grâce à l'adoption responsable de l'IA. Tu stimuleras l'efficacité opérationnelle à grande échelle en concevant des flux de travail et politiques IA centrés sur l'utilisateur qui permettent à nos équipes de se concentrer sur un travail à haute valeur ajoutée tout en automatisant les tâches répétitives. Ce rôle combine la réflexion produit, l'excellence opérationnelle et la gestion du changement pour assurer que l'IA génère un impact d'affaires mesurable dans notre organisation en croissance rapide.\n\nTes objectifs et ton impact:\n\nTa mission, si tu l'acceptes, sera de diriger le déploiement stratégique de l'IA chez Flare, stimulant l'efficacité opérationnelle et permettant une croissance évolutive. Tu devras notamment:\n\nDéfinir et implémenter des politiques IA et cadres de gouvernance axés sur l'expérience utilisateur et l'adoption\nDiriger le déploiement stratégique d'initiatives IA, concevant des flux de travail centrés sur l'utilisateur qui stimulent l'efficacité opérationnelle à grande échelle\nIdentifier, prioriser et développer des cas d'usag",
+  "job_posting": "About Highspot\n\nHighspot is pioneering the category that is fundamentally changing the way companies increase sales productivity. On a mission to transform the way millions of people work with sales enablement, Highspot is committed to building breakthrough software with a spark of magic. We believe a great place to work is about more than the work – it’s about what the company stands for, and how it authentically represents its values in the real world. To this end, we have put intentional focus on creating equitable workspaces for each of our employees. Our goal is to create a culture where everyone feels a deep sense of belonging and is empowered to be an agent of change, with the ability to transform themselves, their workplace, and their world.\n\nAbout The Role\n\nIn this role, you will join the Product Management team and report to the Director of Product Management. As a Product Manager, you’ll play a key role in shaping Highspot’s product strategy, with a strong focus on leveraging generative AI to solve real customer problems.\n\nAt Highspot, Product Management is a highly collaborative function. You’ll work closely with design, user research, and engineering to explore how GenAI can enhance workflows, drive automation, and deliver insights. Your deep understanding of AI capabilities—and your ability to translate them into practical applications—will be critical in delivering customer value. This role offers significant ownership within the product portfolio, giving you the opportunity to identify, define, validate, and ship innovative and differentiated features.\n\nOur ideal candidate is passionate about emerging technologies and brings a strong mix of customer empathy, technical curiosity, and product rigor. You thrive in cross-functional settings, can clearly communicate complex ideas, and are excited by the challenge of bringing cutting-edge AI to market seamlessly and intuitively.\n\nWhat You'll Do\n\nDeeply engage with GTM customers (sales, marketing, enablemen",
+  "job_analysis": {
+    "top_requirements": [
+      {
+        "requirement": "Deep understanding of AI capabilities and ability to translate them into practical applications",
+        "importance": "This requirement is critical because the role involves leveraging generative AI to solve real customer problems, which is central to Highspot's product strategy. The ability to understand AI and apply it effectively is essential for delivering customer value and driving innovation.",
+        "keywords": [
+          "AI capabilities",
+          "practical applications",
+          "customer value"
+        ]
+      },
+      {
+        "requirement": "Passion for emerging technologies with a strong mix of customer empathy, technical curiosity, and product rigor",
+        "importance": "This requirement is crucial as it ensures the candidate is not only technically proficient but also empathetic towards customer needs, which is vital for creating products that truly resonate with users. It also aligns with Highspot's mission to transform the way people work.",
+        "keywords": [
+          "emerging technologies",
+          "customer empathy",
+          "technical curiosity"
+        ]
+      },
+      {
+        "requirement": "Ability to thrive in cross-functional settings and clearly communicate complex ideas",
+        "importance": "Given the collaborative nature of the Product Management function at Highspot, the ability to work well across different teams and communicate effectively is essential for the seamless integration of AI into products and for driving successful product development.",
+        "keywords": [
+          "cross-functional",
+          "communicate complex ideas",
+          "collaborative"
+        ]
+      }
+    ],
+    "company_culture": "Highspot emphasizes creating equitable workspaces and a culture of belonging, empowering employees to be agents of change. The company values authenticity and representation of its values in the real world, focusing on transformation at personal, workplace, and global levels.",
+    "role_focus": "The primary focus of this role is to shape Highspot's product strategy by leveraging generative AI to solve customer problems, enhance workflows, drive automation, and deliver insights, with significant ownership over the product portfolio."
+  },
   "cv_analysis": {
     "cv_job_matches": [
       {
-        "requirement": "Définir et implémenter des politiques IA et cadres de gouvernance axés sur l'expérience utilisateur et l'adoption",
-        "matching_experience": "At Anekdote App (Montréal, Canada, Septembre 2022 - Février 2024): As a Product Owner for a mobile and IoT application, you focused on the continuous improvement of Agile processes with a constant focus on user experience, maximizing the value delivered in each sprint. This involved strategic alignment with co-founders to design innovative and high-impact solutions, managing the product backlog via Jira, and prioritizing based on user feedback and alignment with the vision.",
+        "requirement": "Deep understanding of AI capabilities and ability to translate them into practical applications",
+        "matching_experience": "No specific details about Samuel's experience related to a deep understanding of AI capabilities or the ability to translate them into practical applications were found.",
         "keywords_addressed": [
-          "politiques IA",
-          "cadres de gouvernance",
-          "expérience utilisateur",
-          "adoption"
+          "AI capabilities",
+          "practical applications",
+          "customer value"
         ],
         "strength_score": "high"
       },
       {
-        "requirement": "Diriger le déploiement stratégique d'initiatives IA, concevant des flux de travail centrés sur l'utilisateur qui stimulent l'efficacité opérationnelle à grande échelle",
-        "matching_experience": "Walter Interactive Web Agency: As a Product Manager & Operations in Montréal, Canada, from February 2024 to March 2025, you transformed a digital agency into a high-performing Agile model. You were responsible for defining strategic client roadmaps, ensuring the quality of technological deliverables, and managing the agency's operations. This included handling projects over $100k and leading a team of more than 15 collaborators.",
+        "requirement": "Passion for emerging technologies with a strong mix of customer empathy, technical curiosity, and product rigor",
+        "matching_experience": "Samuel's roles at Agentic AI, Anekdote App, and Walter Interactive Web Agency demonstrate his passion for emerging technologies, customer empathy, technical curiosity, and product rigor.",
         "keywords_addressed": [
-          "déploiement stratégique",
-          "initiatives IA",
-          "flux de travail",
-          "efficacité opérationnelle"
+          "emerging technologies",
+          "customer empathy",
+          "technical curiosity"
         ],
         "strength_score": "high"
       },
       {
-        "requirement": "Identifier, prioriser et développer des cas d'usage IA",
-        "matching_experience": "At Anekdote App (Montréal, Canada, September 2022 - February 2024): As a Product Owner, you were involved in the strategic alignment with co-founders (CEO & CTO) to design innovative and high-impact solutions. You managed the product backlog using Jira, defining Epics and User Stories, and prioritizing them based on user feedback and alignment with the vision.",
+        "requirement": "Ability to thrive in cross-functional settings and clearly communicate complex ideas",
+        "matching_experience": "Samuel's leadership in Agile implementation and his role at Glowtify SAAS illustrate his ability to thrive in cross-functional settings and communicate complex ideas.",
         "keywords_addressed": [
-          "identifier",
-          "prioriser",
-          "développer",
-          "cas d'usage IA"
+          "cross-functional",
+          "communicate complex ideas",
+          "collaborative"
         ],
         "strength_score": "high"
       }
     ],
     "compelling_talking_points": [
       {
-        "point": "Leadership in AI Policy and Governance",
-        "evidence": "At Anekdote App, you focused on continuous improvement of Agile processes with a constant focus on user experience, aligning product strategies with user needs and organizational goals.",
+        "point": "Passion for Emerging Technologies",
+        "evidence": "Samuel's work with Agentic AI, Anekdote App, and Walter Interactive Web Agency showcases his engagement with cutting-edge technologies and customer-focused product development.",
         "keywords": [
-          "politiques IA",
-          "cadres de gouvernance",
-          "expérience utilisateur"
+          "emerging technologies",
+          "customer empathy",
+          "technical curiosity"
         ]
       },
       {
-        "point": "Strategic Deployment of AI Initiatives",
-        "evidence": "At Walter Interactive Web Agency, you transformed a digital agency into a high-performing Agile model, leading strategic client roadmaps and managing operations to enhance operational efficiency.",
+        "point": "Cross-Functional Leadership and Communication",
+        "evidence": "Samuel's leadership in Agile methodologies and his strategic role at Glowtify SAAS highlight his ability to lead cross-functional teams and communicate complex ideas effectively.",
         "keywords": [
-          "déploiement stratégique",
-          "initiatives IA",
-          "efficacité opérationnelle"
-        ]
-      },
-      {
-        "point": "Development of AI Use Cases",
-        "evidence": "At Anekdote App, you managed the product backlog, defined Epics and User Stories, and prioritized them based on user feedback, showcasing your ability to develop AI use cases.",
-        "keywords": [
-          "identifier",
-          "prioriser",
-          "développer",
-          "cas d'usage IA"
+          "cross-functional",
+          "communicate complex ideas",
+          "collaborative"
         ]
       }
     ],
     "overall_fit_score": 0.8,
-    "recommendation": "The candidate demonstrates a strong alignment with the job requirements, particularly in defining AI policies, leading strategic deployments, and developing AI use cases. Their experiences reflect a high level of competence and readiness for the role."
-  },
-  "job_analysis": {
-    "top_requirements": [
-      {
-        "requirement": "Définir et implémenter des politiques IA et cadres de gouvernance axés sur l'expérience utilisateur et l'adoption",
-        "importance": "This requirement is critical as it ensures that the AI initiatives are user-centric, which is essential for successful adoption and integration into the company's operations. It also ensures that the AI policies align with the company's strategic goals and governance standards.",
-        "keywords": [
-          "politiques IA",
-          "cadres de gouvernance",
-          "expérience utilisateur",
-          "adoption"
-        ]
-      },
-      {
-        "requirement": "Diriger le déploiement stratégique d'initiatives IA, concevant des flux de travail centrés sur l'utilisateur qui stimulent l'efficacité opérationnelle à grande échelle",
-        "importance": "This requirement is crucial because it involves leading the strategic implementation of AI initiatives that enhance operational efficiency, a key factor for the company's growth and competitive advantage.",
-        "keywords": [
-          "déploiement stratégique",
-          "initiatives IA",
-          "flux de travail",
-          "efficacité opérationnelle"
-        ]
-      },
-      {
-        "requirement": "Identifier, prioriser et développer des cas d'usage IA",
-        "importance": "This skill is vital as it involves recognizing and developing AI use cases that can provide significant business value, ensuring that the AI efforts are aligned with business objectives and deliver measurable impact.",
-        "keywords": [
-          "identifier",
-          "prioriser",
-          "développer",
-          "cas d'usage IA"
-        ]
-      }
-    ],
-    "company_culture": "Flare has a culture that values innovation, strategic thinking, and a proactive approach to cybersecurity. The company is described as a fast-growing SaaS firm with a focus on protecting client data and identifying external threats, indicating a dynamic and forward-thinking environment.",
-    "role_focus": "The primary focus of this role is to lead the strategic deployment and governance of AI initiatives to enhance operational efficiency and support scalable growth within the company."
+    "recommendation": "Samuel demonstrates strong alignment with the job requirements, particularly in his passion for emerging technologies and ability to work in cross-functional settings. However, there is a noted gap in explicit AI-related experience. Overall, he is a strong candidate for roles emphasizing product management and innovation."
   }
 }

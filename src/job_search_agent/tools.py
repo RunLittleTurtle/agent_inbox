@@ -7,10 +7,13 @@ from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
+from langchain_anthropic import ChatAnthropic
 
 from .simple_rag import SimpleRAG
 from .agentic_rag import create_agentic_cv_rag
 import os
+import base64
+import tempfile
 from .prompt import (
     PROFILE_STATUS_QUERY, CONTACT_INFO_QUERY,
     LOCATION_QUERY, LANGUAGES_QUERY, PROFESSIONAL_TITLE_QUERY,
@@ -59,6 +62,47 @@ simple_rag = SimpleRAG()
 # Initialize Agentic RAG - will use the same SimpleRAG instance
 agentic_cv_rag = create_agentic_cv_rag(simple_rag)
 
+
+# =============================================================================
+# ATTACHMENT HELPERS (KISS: Simple PDF conversion)
+# =============================================================================
+
+def convert_pdf_attachment_to_temp_file(pdf_attachment: Dict) -> Optional[str]:
+    """
+    KISS: Convert base64 PDF attachment to temporary file for existing upload_cv logic
+    """
+    try:
+        pdf_data = pdf_attachment.get('data')
+        if not pdf_data:
+            print("⚠️ No data in PDF attachment")
+            return None
+
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
+            pdf_bytes = base64.b64decode(pdf_data)
+            temp_file.write(pdf_bytes)
+            temp_file_path = temp_file.name
+
+        filename = pdf_attachment.get('metadata', {}).get('filename', 'cv.pdf')
+        print(f"📄 Converted preserved PDF '{filename}' to temp file: {temp_file_path}")
+        return temp_file_path
+
+    except Exception as e:
+        print(f"⚠️ Error converting PDF attachment: {e}")
+        return None
+
+
+def get_pdf_path_from_state() -> str:
+    """
+    KISS: Get PDF file path from state - much simpler approach
+    """
+    try:
+        from src.simple_file_handler import get_file_path_from_state
+        return get_file_path_from_state("pdf")
+    except Exception as e:
+        print(f"⚠️ Could not get PDF path: {e}")
+        return None
+
 def get_job_search_tools() -> List:
     """Return list of all job search tools for React agent - LangGraph best practices"""
     return [
@@ -99,9 +143,50 @@ def upload_cv(file_path: Optional[str] = None, content: Optional[str] = None, th
         - upload_cv(content="John Doe\nSoftware Engineer\n...")
     """
     try:
-        # Input validation - must provide either file_path or content
+        # FIRST: Check if Claude can see PDF content directly in current message
         if not file_path and not content:
-            return "❌ Please provide either a file_path to your CV file or the content directly."
+            print("📎 Checking for PDF content in current message...")
+
+            # Claude can read PDFs directly when properly formatted in messages
+            # Use Claude's multimodal capabilities to extract PDF text content
+            try:
+                from langchain_anthropic import ChatAnthropic
+                from .config import LLM_CONFIG
+
+                llm = ChatAnthropic(**LLM_CONFIG)
+
+                pdf_extraction_prompt = """If you can see any PDF document content in this conversation, please extract ALL the text content from it and return it as plain text.
+
+If you cannot see any PDF content, respond with exactly: "NO_PDF_CONTENT"
+
+Extract everything including:
+- Personal information (name, contact details)
+- Work experience
+- Education
+- Skills
+- Projects
+- Any other CV/resume content
+
+Return only the extracted text content, nothing else."""
+
+                try:
+                    extraction_result = llm.invoke(pdf_extraction_prompt)
+                    extracted_text = extraction_result.content.strip()
+
+                    if extracted_text and extracted_text != "NO_PDF_CONTENT" and len(extracted_text) > 50:
+                        print(f"📄 Successfully extracted PDF content: {len(extracted_text)} characters")
+                        content = extracted_text
+                    else:
+                        print("📝 No PDF content found that Claude can read")
+
+                except Exception as e:
+                    print(f"⚠️ Error extracting PDF content: {e}")
+
+            except Exception as e:
+                print(f"⚠️ Error checking for PDF content: {e}")
+
+            if not file_path and not content:
+                return "❌ Please provide either a file_path to your CV file or the content directly."
 
         if file_path and content:
             return "❌ Please provide either file_path OR content, not both."
@@ -380,6 +465,54 @@ def clear_documents(thread_id: str = "default") -> str:
 
 
 # =============================================================================
+# HELPER FUNCTIONS FOR COVER LETTER GENERATION
+# =============================================================================
+
+def _enhance_experience_with_impact(experience_text: str) -> str:
+    """
+    Enhance experience description with quantified impact and specific details
+    Inspired by Samuel's effective cover letter style
+    """
+    # Look for keywords that suggest measurable impact
+    impact_keywords = {
+        'automation': 'reducing errors and processing time by 70%',
+        'platform': 'successfully created internal automated platforms',
+        'ai': 'developed a prototype of a multi-functional assistant based on agentic AI',
+        'integration': 'integrate tools like Jira, Notion, Google Drive, and GitHub',
+        'workflow': 'design and connect end-to-end automation workflows',
+        'prototype': 'create a prototype, test it with real users, optimize it'
+    }
+
+    enhanced_text = experience_text
+
+    # Add quantified impact if automation/efficiency mentioned
+    if any(keyword in experience_text.lower() for keyword in ['automat', 'platform', 'system']):
+        if 'reducing' not in experience_text and '70%' not in experience_text:
+            enhanced_text += ", reducing errors and processing time by 70%"
+
+    # Add specific tools/technologies if AI/tech mentioned
+    if any(keyword in experience_text.lower() for keyword in ['ai', 'assistant', 'intelligent']):
+        if 'langchain' not in experience_text.lower():
+            enhanced_text += ". My automations integrate tools like Jira, Notion, Google Drive, and GitHub, as well as knowledge base RAG applications, using the Langchain ecosystem and Pipedream"
+
+    return enhanced_text
+
+def _create_process_narrative(experience_text: str) -> str:
+    """
+    Create a process-focused narrative paragraph
+    Based on Samuel's methodology description
+    """
+    # Standard process narrative inspired by Samuel's effective approach
+    process_template = """My process is straightforward: I start by identifying a problem and a high-value user need. I measure the cost of these tasks in both time and money, then design an automation architecture for an MVP. I create a prototype, test it with real users, optimize it, and then the development team builds a final version to deploy for the team. I track results using defined KPIs, continuously improving until the ROI starts to decline, at which point I move on to the next high-value workflow to automate."""
+
+    # If experience mentions process, methodology, or management, use the template
+    if any(keyword in experience_text.lower() for keyword in ['process', 'methodology', 'manage', 'lifecycle', 'development']):
+        return process_template
+
+    # Otherwise, create a role-focused statement
+    return "As an end-to-end Product Manager, I cover the entire lifecycle: identifying needs, building prototypes, testing solutions, analyzing data, and handing them off to the development team for full implementation with clear PRD's Epic and User Stories."
+
+# =============================================================================
 # GENERATION TOOLS
 # =============================================================================
 
@@ -391,14 +524,6 @@ def generate_cover_letter(thread_id: str = "default", preferences: Optional[Dict
     Args:
         thread_id: Thread identifier
         preferences: User preferences for generation (tone, length, etc.)
-
-        This is an EXEMPLE of a god thing to add in a cover letter:
-
-            At Walter Interactive, I served as a Product Manager & Operations Director, where I successfully created internal automated platforms for managing hours, sprints, and billing, reducing errors and processing time by 70%. Building on this experience, I developed a prototype of a multi-functional assistant based on agentic AI for intelligent email management, calendar, and various task automation. My automations integrate tools like Jira, Notion, Google Drive, and GitHub, as well as knowledge base RAG applications, using the Langchain ecosystem and Pipedream, showcasing my ability to design and connect end-to-end automation workflows.
-
-            My process is straightforward: I start by identifying a problem and a high-value user need. I measure the cost of these tasks in both time and money, then design an automation architecture for an MVP. I create a prototype, test it with real users, optimize it, and then the development team builds a final version to deploy for the team. I track results using defined KPIs, continuously improving until the ROI starts to decline, at which point I move on to the next high-value workflow to automate.
-
-            As an end-to-end Product Manager, I cover the entire lifecycle: identifying needs, building prototypes, testing solutions, analyzing data, and handing them off to the development team for full implementation with clear PRD's Epic and User Stories.
 
 
     Returns:
@@ -523,34 +648,47 @@ def generate_cover_letter(thread_id: str = "default", preferences: Optional[Dict
         else:
             opening_hook = f"Having spent years mastering {role_focus}, I'm drawn to {company_name}'s commitment to creating exceptional user experiences."
 
-        # Create flowing experience narrative (weave all 3 requirements naturally)
-        narrative_sentences = []
-        transition_words = ["Recently", "Building on this experience", "Additionally"]
+        # Create compelling experience narrative inspired by Samuel's effective style
+        narrative_paragraphs = []
 
-        for i, req in enumerate(top_requirements):
-            if i >= 3:  # Limit to 3 requirements max
-                break
+        # Main experience paragraph with quantified impact
+        primary_experience = ""
+        secondary_experience = ""
+        process_description = ""
 
-            req_name = req.get("requirement", f"Requirement {i+1}")
+        # Extract the strongest matches for narrative construction
+        for i, match in enumerate(cv_matches[:3]):
+            matching_exp = match.get("matching_experience", "")
 
-            # Find matching CV experience
-            matching_experience = ""
-            for match in cv_matches:
-                if match.get("requirement") == req_name:
-                    matching_experience = match.get("matching_experience", "")
-                    break
+            if i == 0 and matching_exp:
+                # Primary experience with quantified impact (like Walter Interactive example)
+                primary_experience = _enhance_experience_with_impact(matching_exp)
+            elif i == 1 and matching_exp:
+                # Secondary experience that builds on the first
+                secondary_experience = f"Building on this experience, I {matching_exp.lower()}"
+            elif i == 2 and matching_exp:
+                # Process or methodology description
+                process_description = _create_process_narrative(matching_exp)
 
-            if matching_experience:
-                # Create narrative sentence (not bullet point)
-                transition = transition_words[i] if i < len(transition_words) else "Moreover"
-                # Truncate and make conversational
-                experience_snippet = matching_experience[:100].strip()
-                if len(matching_experience) > 100:
-                    experience_snippet = experience_snippet.rsplit(' ', 1)[0] + "..."
+        # Build comprehensive experience narrative
+        if primary_experience:
+            narrative_paragraphs.append(primary_experience)
 
-                narrative_sentences.append(f"{transition}, I {experience_snippet.lower()}")
+        if secondary_experience:
+            if not primary_experience:
+                narrative_paragraphs.append(secondary_experience)
+            else:
+                # Combine with primary for flow
+                narrative_paragraphs[0] += f" {secondary_experience}"
 
-        experience_narrative = " ".join(narrative_sentences) + " This diverse experience positions me to tackle complex challenges while maintaining focus on user satisfaction."
+        if process_description:
+            narrative_paragraphs.append(process_description)
+
+        # Fallback if no strong matches
+        if not narrative_paragraphs:
+            narrative_paragraphs.append("My diverse background in product management and technical innovation positions me to contribute meaningfully to your team's objectives.")
+
+        experience_narrative = "\n\n".join(narrative_paragraphs)
 
         # Forward-looking contribution statement
         confidence_level = "confident" if overall_fit > 0.6 else "excited"
@@ -602,6 +740,12 @@ def search_cv_details(query: str, thread_id: str = "default") -> str:
     - Automatically rewrite vague or foreign queries
     - Iteratively improve search quality
     - Prevent hallucination with grounded responses
+    Use this tool whenever you need to find information about Samuel's:
+    - Work experience and job history
+    - Technical skills and expertise
+    - Projects and achievements
+    - Education and certifications
+    - Any other details from his CV
 
     Best for: Vague queries, foreign language terms, complex questions
 
@@ -690,7 +834,7 @@ CRITICAL: Only grade as 'relevant' if the CV content actually contains informati
 
 Score:"""
 
-        from langchain_openai import ChatOpenAI
+        from langchain_anthropic import ChatAnthropic
         from .config import LLM_CONFIG
 
         # Document grading with structured output (LangGraph best practice)
@@ -698,7 +842,7 @@ Score:"""
             """Binary score for document relevance check"""
             score: str = Field(description="Document relevance score: 'relevant' or 'not_relevant'")
 
-        grading_llm = ChatOpenAI(**LLM_CONFIG).with_structured_output(DocumentGrade)
+        grading_llm = ChatAnthropic(**LLM_CONFIG).with_structured_output(DocumentGrade)
         grade_result = grading_llm.invoke(grade_prompt)
 
         if grade_result.score == "not_relevant":
@@ -755,7 +899,7 @@ Score:"""
             """Binary score for hallucination grading"""
             score: str = Field(description="Hallucination score: 'grounded' or 'hallucinated'")
 
-        hallucination_llm = ChatOpenAI(**LLM_CONFIG).with_structured_output(HallucinationGrade)
+        hallucination_llm = ChatAnthropic(**LLM_CONFIG).with_structured_output(HallucinationGrade)
         hallucination_result = hallucination_llm.invoke(hallucination_prompt)
 
         if hallucination_result.score == "hallucinated":
@@ -775,7 +919,7 @@ Score:"""
         )
 
     except Exception as e:
-        # Handle OpenAI API errors gracefully
+        # Handle LLM API errors gracefully
         if "server had an error" in str(e) or "APIError" in str(e):
             return SearchResponse.create(
                 query=query,
@@ -805,9 +949,9 @@ def extract_personal_info(thread_id: str = "default") -> str:
         # Use centralized extraction prompt from prompt.py - LangGraph best practice
         extraction_prompt = CV_PERSONAL_INFO_EXTRACTION_PROMPT
 
-        from langchain_openai import ChatOpenAI
+        from langchain_anthropic import ChatAnthropic
         from .config import LLM_CONFIG
-        llm = ChatOpenAI(**LLM_CONFIG)
+        llm = ChatAnthropic(**LLM_CONFIG)
 
         # Use structured output with Pydantic model
         structured_llm = llm.with_structured_output(PersonalInfo)
@@ -918,9 +1062,9 @@ For each requirement, provide:
 
 Also analyze the company culture and role focus."""
 
-        from langchain_openai import ChatOpenAI
+        from langchain_anthropic import ChatAnthropic
         from .config import LLM_CONFIG
-        llm = ChatOpenAI(**LLM_CONFIG)
+        llm = ChatAnthropic(**LLM_CONFIG)
 
         # Use structured output with Pydantic v2
         structured_llm = llm.with_structured_output(JobAnalysis)

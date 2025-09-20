@@ -11,6 +11,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
+from langchain_anthropic import ChatAnthropic
 
 from .simple_rag import SimpleRAG
 from .config import LLM_CONFIG
@@ -42,7 +43,7 @@ class JobSearchOrchestrator:
     def __init__(self, llm_config: Dict[str, Any] = None):
         """Initialize orchestrator"""
         self.llm_config = llm_config or LLM_CONFIG
-        self.llm = ChatOpenAI(**self.llm_config)
+        self.llm = ChatAnthropic(**self.llm_config)
         self.checkpointer = MemorySaver()
 
         # Get tools (tools.py manages its own SimpleRAG instance)

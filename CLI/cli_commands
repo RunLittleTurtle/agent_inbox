@@ -40,3 +40,7 @@ source .venv/bin/activate
 git add .
 git commit -m "comment"
 git push origin main
+
+agent-inbox info :
+Mutli-Agent: id -> agent
+Executive-ai:id -> main

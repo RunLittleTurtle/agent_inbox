@@ -112,13 +112,13 @@ async def create_calendar_agent():
 async def create_email_agent():
     """Create email agent with MCP integration for email operations"""
     try:
-        from src.email_agent.email_mcp_orchestrator import create_email_agent_with_mcp
+        from src.email_agent.eaia.email_agent_orchestrator import create_email_agent as create_email_orchestrator
 
-        # Use proper async MCP email agent (same pattern as calendar agent)
-        email_agent_instance = await create_email_agent_with_mcp()
+        # Use proper email agent orchestrator (returns compiled workflow)
+        email_agent_workflow = create_email_orchestrator()
 
         logger.info("Email agent with MCP integration initialized successfully")
-        return await email_agent_instance.get_agent()
+        return email_agent_workflow
 
     except Exception as e:
         logger.error(f"Failed to create email agent with MCP: {e}")
@@ -272,7 +272,8 @@ IMPORTANT --> Always look at agent list before trying to answer!!
 
 AGENT CAPABILITIES:
 - calendar_agent: All calendar operations (create/view/modify events, check availability, scheduling)
-- email_agent: **PRIMARY EMAIL AGENT** - Complete email management, Gmail integration, triage, drafting, sending,
+- email_agent: **PRIMARY EMAIL AGENT** - Email composition/drafting/writing → email_agent / Email management (list, send drafts, search) → email_agent / Email reading/organization/ → email_agent
+- ALL EMAIL TASKS → email_agent (autonomous subgraph)
 - job_search_agent: CV upload, Job Offer, Job search, resume/cover letter advice, interview prep
 - drive_agent: File management, Google Drive integration, file sharing, document collaboration
 

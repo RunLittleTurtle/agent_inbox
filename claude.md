@@ -8,6 +8,10 @@ You have access to the LangGraph MCP server, ALWAYS use it : src/mcp.json
 
 Always follow the KISS principle, and work by iterations.
 
+When you code, do not add graceful fallback, ALWAYS insert clear error and log so we can debug easily and know when something is not working.
+
+If you have question about agent_inbox READ this : https://github.com/langchain-ai/agent-inbox
+
 ## Critical Structure Requirements
 
 ### MANDATORY FIRST STEP

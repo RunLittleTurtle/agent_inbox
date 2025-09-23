@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import List, Optional
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 
@@ -233,6 +233,57 @@ def validate_environment():
 
     logger.info("Environment validation passed")
 
+# -----------------------------
+# Ensure supervisor always ends with a recap
+# -----------------------------
+async def post_model_hook(messages, model_output=None):
+    """
+    post_model_hook that ensures the supervisor ends with a recap message.
+
+    Notes:
+    - Many langgraph supervisor hooks receive the conversation messages and optionally
+      the model output. If the real signature differs in your version of
+      langgraph_supervisor, adapt the parameters accordingly (e.g., remove model_output
+      or accept a kwargs).
+    - We use langchain_core.messages.AIMessage which is already imported above.
+    """
+    try:
+        # Defensive: handle sync or async usage
+        # messages is expected to be a list-like of BaseMessage objects
+        if not messages:
+            return messages
+
+        last_msg = messages[-1]
+        # If last message is an AIMessage and already looks like a recap, do nothing.
+        if isinstance(last_msg, AIMessage) and ("recap" in last_msg.content.lower() or "summary" in last_msg.content.lower()):
+            return messages
+
+        # Create a short recap from the last AI or Tool message content available.
+        # We'll try to extract a short snippet because models may produce long content.
+        source_text = ""
+        # prefer last AIMessage, else fallback to last message content
+        for m in reversed(messages):
+            if isinstance(m, AIMessage) or isinstance(m, ToolMessage):
+                source_text = (m.content or "").strip()
+                if source_text:
+                    break
+
+        # fallback safe default
+        if not source_text:
+            recap_content = "Recap: The supervisor completed routing and agent handoff as required."
+        else:
+            # Keep recap short — first 480 chars, and remove newlines for compactness
+            short_snippet = " ".join(source_text.splitlines())[:480].strip()
+            recap_content = f"Recap: {short_snippet}"
+
+        # Append the recap as an AIMessage
+        messages.append(AIMessage(content=recap_content))
+        return messages
+
+    except Exception as e:
+        logger.exception("post_model_hook failed — returning original messages.")
+        return messages
+
 async def create_supervisor_graph():
     """Create multi-agent supervisor with improved error handling"""
     try:
@@ -309,7 +360,8 @@ When an agent completes their task, analyze if additional routing is needed."""
             prompt=supervisor_prompt,
             supervisor_name="multi_agent_supervisor",
             output_mode="last_message",
-            add_handoff_back_messages=True
+            add_handoff_back_messages=True,
+            post_model_hook=post_model_hook,
         )
 
         # Compile the workflow

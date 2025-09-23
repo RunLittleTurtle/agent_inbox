@@ -79,7 +79,7 @@ Here is the email thread. Note that this is the full email thread. Pay special a
 {email}"""
 
 
-async def draft_response(state: State, config: RunnableConfig, store: BaseStore):
+async def draft_response(state: State, config: RunnableConfig):
     """Write an email to a customer."""
     model = config["configurable"].get("model", "gpt-4o")
     llm = ChatOpenAI(
@@ -99,29 +99,45 @@ async def draft_response(state: State, config: RunnableConfig, store: BaseStore)
     if len(messages) > 0:
         tools.append(Ignore)
     prompt_config = await get_config(config)
-    namespace = (config["configurable"].get("assistant_id", "default"),)
-    key = "schedule_preferences"
-    result = await store.aget(namespace, key)
-    if result and "data" in result.value:
-        schedule_preferences = result.value["data"]
+
+    # Access store through config - LangGraph provides store automatically
+    # Make store optional for direct invocation (fallback) scenarios
+    store = config.get("store")
+
+    # Use store if available, otherwise fall back to config values
+    if store is not None:
+        namespace = (config["configurable"].get("assistant_id", "default"),)
+
+        key = "schedule_preferences"
+        result = await store.aget(namespace, key)
+        if result and "data" in result.value:
+            schedule_preferences = result.value["data"]
+        else:
+            await store.aput(namespace, key, {"data": prompt_config["schedule_preferences"]})
+            schedule_preferences = prompt_config["schedule_preferences"]
+
+        key = "random_preferences"
+        result = await store.aget(namespace, key)
+        if result and "data" in result.value:
+            random_preferences = result.value["data"]
+        else:
+            await store.aput(
+                namespace, key, {"data": prompt_config["background_preferences"]}
+            )
+            random_preferences = prompt_config["background_preferences"]
+
+        key = "response_preferences"
+        result = await store.aget(namespace, key)
+        if result and "data" in result.value:
+            response_preferences = result.value["data"]
+        else:
+            await store.aput(namespace, key, {"data": prompt_config["response_preferences"]})
+            response_preferences = prompt_config["response_preferences"]
     else:
-        await store.aput(namespace, key, {"data": prompt_config["schedule_preferences"]})
+        # Fallback: Use config values directly when store is not available
+        # This happens when the graph is invoked directly rather than through the server
         schedule_preferences = prompt_config["schedule_preferences"]
-    key = "random_preferences"
-    result = await store.aget(namespace, key)
-    if result and "data" in result.value:
-        random_preferences = result.value["data"]
-    else:
-        await store.aput(
-            namespace, key, {"data": prompt_config["background_preferences"]}
-        )
         random_preferences = prompt_config["background_preferences"]
-    key = "response_preferences"
-    result = await store.aget(namespace, key)
-    if result and "data" in result.value:
-        response_preferences = result.value["data"]
-    else:
-        await store.aput(namespace, key, {"data": prompt_config["response_preferences"]})
         response_preferences = prompt_config["response_preferences"]
     _prompt = EMAIL_WRITING_INSTRUCTIONS.format(
         schedule_preferences=schedule_preferences,

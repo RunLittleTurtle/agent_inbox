@@ -42,5 +42,5 @@ git commit -m "comment"
 git push origin main
 
 agent-inbox info :
-Mutli-Agent: id -> agent
-Executive-ai:id -> main
+Mutli-Agent: id -> agent / url -> http://localhost:2024
+Executive-ai:id -> executive_main / url -> http://localhost:2024

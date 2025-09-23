@@ -2,6 +2,8 @@
 
 ALWAYS use LangGraph, follow these principles and patterns.
 
+ALWAYS activate virtual environment  : source .venv/bin/activate
+
 For more extensive information check : src/CLAUDE-large.md
 
 You have access to the LangGraph MCP server, ALWAYS use it : src/mcp.json

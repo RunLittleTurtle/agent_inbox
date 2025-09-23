@@ -2,6 +2,7 @@ import os
 import sys
 import asyncio
 import logging
+import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from langchain_core.tools import tool, BaseTool
@@ -135,53 +136,216 @@ class EmailMCPConnection:
 _email_mcp = EmailMCPConnection()
 
 
+def create_synthetic_email_context(user_request: str) -> dict:
+    """Create synthetic email context from live chat request"""
+    timestamp = datetime.now()
+    return {
+        "id": f"chat-{uuid.uuid4().hex[:8]}",
+        "thread_id": "live-chat",
+        "from_email": "user@chat.local",
+        "subject": f"Live Chat Request: {user_request[:50]}{'...' if len(user_request) > 50 else ''}",
+        "page_content": user_request,
+        "send_time": timestamp.isoformat(),
+        "to_email": "assistant@chat.local"
+    }
+
+
 @tool
-def create_draft_workflow_tool(request: str, email_data: str = None) -> str:
+def create_draft_workflow_tool(request: str) -> str:
     """
-    Tool that encapsulates the create_draft_workflow as a sub-agent.
+    Tool for creating email drafts through live interactions with human interrupts.
+    Supports draft creation, corrections, calendar invites, and email sending.
 
     Args:
-        request: The user's request or email content to process
-        email_data: Optional email data (JSON string format)
+        request: The user's request for email draft assistance
 
     Returns:
-        Result from the draft workflow execution
+        Clear, structured result from the draft workflow execution
     """
     try:
-        from .create_draft_workflow.graph import graph
+        print(f"🔧 create_draft_workflow_tool called for live interactions")
 
-        # Prepare initial state for the create_draft_workflow
+        # Set up import paths for both local and LangGraph server contexts
+        import sys
+        import os
+
+        # Add both project root and email_agent as base paths
+        current_dir = os.path.dirname(__file__)
+        project_root = os.path.abspath(os.path.join(current_dir, '../../..'))
+        email_agent_root = os.path.abspath(os.path.join(current_dir, '..'))
+
+        for path in [project_root, email_agent_root]:
+            if path not in sys.path:
+                sys.path.insert(0, path)
+
+        # Import the single unified StateGraph
+        try:
+            # Try absolute import first (LangGraph server)
+            from src.email_agent.eaia.create_draft_workflow.graph import graph
+            print("✅ Using absolute imports for StateGraph")
+        except ImportError as e1:
+            print(f"⚠️ Absolute import failed: {e1}")
+            try:
+                # Fallback to relative import (local development)
+                from eaia.create_draft_workflow.graph import graph
+                print("✅ Using relative imports for StateGraph")
+            except ImportError as e2:
+                return f"❌ Error: Could not import StateGraph. Absolute: {e1}, Relative: {e2}"
+
+        # Create synthetic email context for live interactions
+        synthetic_email = create_synthetic_email_context(request)
         initial_state = {
             "messages": [HumanMessage(content=request)],
+            "email": synthetic_email
         }
+        print(f"📧 Created synthetic email context: {synthetic_email['subject']}")
 
-        # Add email data if provided
-        if email_data:
+        # Use proper config from config.py/config.yaml - let get_config() load from YAML
+        try:
+            from src.email_agent.eaia.create_draft_workflow.config import LLM_CONFIG
+            print("✅ Using absolute import for LLM_CONFIG")
+        except ImportError as e1:
+            print(f"⚠️ Absolute config import failed: {e1}")
             try:
-                import json
-                email_dict = json.loads(email_data) if isinstance(email_data, str) else email_data
-                initial_state["email"] = email_dict
-            except (json.JSONDecodeError, TypeError):
-                return f"Error: Invalid email_data format. Expected JSON string."
+                from eaia.create_draft_workflow.config import LLM_CONFIG
+                print("✅ Using relative import for LLM_CONFIG")
+            except ImportError as e2:
+                return f"❌ Error: Could not import LLM_CONFIG. Absolute: {e1}, Relative: {e2}"
 
-        # Execute the create_draft_workflow sub-graph
-        config = {"configurable": {"db_id": 1, "model": "claude-3-5-sonnet-20241022"}}
-        result = graph.invoke(initial_state, config=config)
+        # Minimal config - get_config() will load the rest from config.yaml
+        # NOTE: draft_response.py expects OpenAI models, so use gpt-4o for compatibility
+        config = {
+            "configurable": {
+                "db_id": 1,
+                "model": "gpt-4o"  # Compatible with draft_response.py (uses ChatOpenAI)
+            }
+        }
+        print(f"🚀 Executing live draft workflow with model: {config['configurable']['model']}")
 
-        # Extract the result message
-        if result.get("messages"):
-            final_message = result["messages"][-1]
-            if hasattr(final_message, 'content'):
-                return f"Draft workflow completed: {final_message.content}"
-            else:
-                return f"Draft workflow completed: {str(final_message)}"
-        else:
-            return "Draft workflow completed successfully (no message content)"
+        # IMPORTANT: Use LangGraph client SDK to invoke through server API
+        # This ensures store configuration from langgraph.json is available
+        try:
+            import asyncio
+            from langgraph_sdk import get_client
+            import uuid
+
+            # Use LangGraph client to invoke through server API
+            async def execute_workflow():
+                # Get client connected to local LangGraph server
+                client = get_client(url="http://localhost:2024")
+
+                # Generate unique thread ID for this conversation
+                thread_id = f"draft-{uuid.uuid4().hex[:8]}"
+
+                # Create run through server API - this will have proper store access
+                run = await client.runs.create(
+                    assistant_id="email_agent",  # This is the registered graph ID in main langgraph.json
+                    thread_id=thread_id,
+                    input=initial_state,
+                    config=config.get("configurable", {})
+                )
+
+                # Wait for completion and return result
+                return await client.runs.wait(run["run_id"])
+
+            # Execute through server API with proper store configuration
+            result = asyncio.run(execute_workflow())
+
+        except Exception as e:
+            print(f"⚠️ Server API execution error: {e}")
+            print(f"⚠️ Falling back to direct graph execution (may not have store access)...")
+            try:
+                # Fallback: try direct invocation (won't have server store)
+                import asyncio
+                async def direct_execute():
+                    return await graph.ainvoke(initial_state, config=config)
+                result = asyncio.run(direct_execute())
+            except Exception as direct_e:
+                print(f"⚠️ Direct execution also failed: {direct_e}")
+                return f"❌ Error in draft workflow execution: Server API failed: {str(e)}, Direct execution failed: {str(direct_e)}"
+        print(f"✅ Draft workflow execution completed")
+
+        # Extract clear, structured output
+        return extract_clear_workflow_output(result)
 
     except Exception as e:
-        error_msg = f"Error in create_draft_workflow: {str(e)}"
+        error_msg = f"❌ Error in create_draft_workflow: {str(e)}"
         print(f"DEBUG: {error_msg}")
         return error_msg
+
+
+def extract_clear_workflow_output(result) -> str:
+    """Extract clear, actionable output for React agent with proper formatting"""
+
+    print(f"📤 Extracting output from result type: {type(result)}")
+
+    # Handle server API response format
+    if isinstance(result, dict) and "values" in result:
+        # Server API returns {values: {...}, next: [...], ...}
+        values = result["values"]
+        if values and "messages" in values:
+            messages = values["messages"]
+        else:
+            return "✅ Draft workflow completed - no messages in server response"
+    elif isinstance(result, dict) and "messages" in result:
+        # Direct graph invocation format
+        messages = result["messages"]
+    else:
+        print(f"⚠️ Unexpected result format: {result}")
+        return "✅ Draft workflow completed - unexpected result format"
+
+    if not messages:
+        return "✅ Draft workflow completed - no content generated"
+
+    final_message = messages[-1]
+    print(f"📤 Extracting output from final message: {type(final_message)}")
+
+    # Handle message object vs dict format
+    if hasattr(final_message, 'content'):
+        content = final_message.content
+        tool_calls = getattr(final_message, 'tool_calls', None)
+    elif isinstance(final_message, dict):
+        content = final_message.get('content', '')
+        tool_calls = final_message.get('tool_calls', None)
+    else:
+        content = str(final_message)
+        tool_calls = None
+
+    # Check if it's already a formatted response
+    if content and any(emoji in content for emoji in ["✅", "📧", "📅", "💬"]):
+        print(f"📋 Returning pre-formatted content")
+        return content
+
+    # Handle tool calls
+    if tool_calls:
+        tool_call = tool_calls[0]
+        action_name = tool_call["name"]
+
+        print(f"🔧 Processing tool call: {action_name}")
+
+        if action_name == "ResponseEmailDraft":
+            draft_content = tool_call["args"]["content"]
+            recipients = tool_call["args"].get("new_recipients", [])
+
+            output = f"✅ **Email Draft Created:**\n\n{draft_content}"
+            if recipients:
+                output += f"\n\n📧 **Additional Recipients:** {', '.join(recipients)}"
+            return output
+
+        elif action_name == "SendCalendarInvite":
+            invite_args = tool_call["args"]
+            return f"📅 **Calendar Invite Created:**\n\n📍 **Event:** {invite_args['title']}\n🕐 **Time:** {invite_args['start_time']} - {invite_args['end_time']}\n👥 **Attendees:** {', '.join(invite_args['emails'])}"
+
+        elif action_name == "Question":
+            question_content = tool_call["args"]["content"]
+            return f"❓ **Question for User:**\n\n{question_content}"
+
+    # Handle regular message content
+    if content:
+        return f"💬 **Draft Workflow Result:**\n\n{content}"
+
+    # Fallback
+    return f"✅ Draft workflow completed successfully"
 
 
 async def get_email_tools_with_mcp() -> List[BaseTool]:

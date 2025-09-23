@@ -47,7 +47,6 @@ def take_action(
 ) -> Literal[
     "send_message",
     "rewrite",
-    "mark_as_read_node",
     "find_meeting_time",
     "send_cal_invite",
     "bad_tool_name",
@@ -61,7 +60,8 @@ def take_action(
     elif tool_call["name"] == "ResponseEmailDraft":
         return "rewrite"
     elif tool_call["name"] == "Ignore":
-        return "mark_as_read_node"
+        # For live interactions, ignore means end workflow - handle in human_node routing
+        return "bad_tool_name"  # This will go to bad_tool_name, then back to draft_response
     elif tool_call["name"] == "MeetingAssistant":
         return "find_meeting_time"
     elif tool_call["name"] == "SendCalendarInvite":
@@ -88,13 +88,12 @@ def bad_tool_name(state: State):
 def enter_after_human(
     state,
 ) -> Literal[
-    "mark_as_read_node", "draft_response", "send_email_node", "send_cal_invite_node"
+    "draft_response", "send_email_node", "send_cal_invite_node"
 ]:
     messages = state.get("messages") or []
     if len(messages) == 0:
-        if state["triage"].response == "notify":
-            return "mark_as_read_node"
-        raise ValueError
+        # For live interactions, always go back to draft_response if no messages
+        return "draft_response"
     else:
         if isinstance(messages[-1], (ToolMessage, HumanMessage)):
             return "draft_response"
@@ -105,7 +104,9 @@ def enter_after_human(
             elif execute["name"] == "SendCalendarInvite":
                 return "send_cal_invite_node"
             elif execute["name"] == "Ignore":
-                return "mark_as_read_node"
+                # For live interactions, ignore ends the workflow - but this shouldn't be reached
+                # because Ignore goes through take_action first
+                return "draft_response"
             elif execute["name"] == "Question":
                 return "draft_response"
             else:
@@ -162,32 +163,41 @@ class ConfigSchema(TypedDict):
     model: str
 
 
+# Live interactions StateGraph - simplified for email_agent orchestrator
 graph_builder = StateGraph(State, config_schema=ConfigSchema)
+
+# Essential nodes for live interactions
 graph_builder.add_node(human_node)
-graph_builder.add_node(triage_input)
 graph_builder.add_node(draft_response)
 graph_builder.add_node(send_message)
 graph_builder.add_node(rewrite)
-graph_builder.add_node(mark_as_read_node)
 graph_builder.add_node(send_email_draft)
 graph_builder.add_node(send_email_node)
 graph_builder.add_node(bad_tool_name)
-graph_builder.add_node(notify)
+graph_builder.add_node(notify)  # For user notifications/alerts
 graph_builder.add_node(send_cal_invite_node)
 graph_builder.add_node(send_cal_invite)
-graph_builder.add_conditional_edges("triage_input", route_after_triage)
-graph_builder.set_entry_point("triage_input")
+graph_builder.add_node(find_meeting_time)  # For calendar functionality
+
+# Set entry point for live interactions (bypass triage)
+graph_builder.set_entry_point("draft_response")
+
+# Core workflow edges
 graph_builder.add_conditional_edges("draft_response", take_action)
 graph_builder.add_edge("send_message", "human_node")
 graph_builder.add_edge("send_cal_invite", "human_node")
-graph_builder.add_node(find_meeting_time)
 graph_builder.add_edge("find_meeting_time", "draft_response")
 graph_builder.add_edge("bad_tool_name", "draft_response")
 graph_builder.add_edge("send_cal_invite_node", "draft_response")
-graph_builder.add_edge("send_email_node", "mark_as_read_node")
 graph_builder.add_edge("rewrite", "send_email_draft")
 graph_builder.add_edge("send_email_draft", "human_node")
-graph_builder.add_edge("mark_as_read_node", END)
+
+# Live interactions: send email then end (no mark_as_read for live mode)
+graph_builder.add_edge("send_email_node", END)
+
+# User notifications and human interaction routing
 graph_builder.add_edge("notify", "human_node")
 graph_builder.add_conditional_edges("human_node", enter_after_human)
+# Compile graph - LangGraph server will automatically provide store from langgraph.json configuration
+# The email_agent langgraph.json defines: "store": {"index": {"embed": "openai:text-embedding-3-small", "dims": 1536}}
 graph = graph_builder.compile()

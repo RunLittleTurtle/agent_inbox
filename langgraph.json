@@ -2,10 +2,7 @@
   "dependencies": ["."],
   "graphs": {
     "agent": "./src/graph.py:graph",
-    "executive_main": "./src/executive-ai-assistant/eaia/main/graph.py:graph",
-    "executive_cron": "./src/executive-ai-assistant/eaia/cron_graph.py:graph",
-    "general_reflection_graph": "./src/executive-ai-assistant/eaia/reflection_graphs.py:general_reflection_graph",
-    "multi_reflection_graph": "./src/executive-ai-assistant/eaia/reflection_graphs.py:multi_reflection_graph"
+    "email_agent": "./src/email_agent/eaia/create_draft_workflow/graph.py:graph"
   },
   "env": ".env"
 }

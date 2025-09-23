@@ -144,23 +144,23 @@ async def create_email_agent():
             prompt=fallback_prompt
         )
 
+
 async def create_drive_agent():
-    """Create Drive agent with MCP integration for Google Drive operations"""
+    """Create Google Drive agent with MCP integration for file management and Google Drive operations"""
     try:
-        # Adjust import path to where you placed the Drive agent orchestrator
-        from src.knowledgebase_agent.drive_mcp_orchestrator import create_drive_agent_with_mcp
+        from src.drive_react_agent.x_agent_orchestrator import create_drive_agent as create_drive_orchestrator
 
-        # Create the async Drive MCP agent (same pattern as your Gmail agent)
-        drive_agent_instance = await create_drive_agent_with_mcp()
+        # Use proper drive agent orchestrator (returns compiled workflow)
+        drive_agent_workflow = create_drive_orchestrator()
 
-        logger.info("Drive agent with MCP integration initialized successfully")
-        return await drive_agent_instance.get_agent()
+        logger.info("Google Drive agent with MCP integration initialized successfully")
+        return drive_agent_workflow
 
     except Exception as e:
-        logger.error(f"Failed to create Drive agent with MCP: {e}")
-        logger.info("Creating fallback Drive agent without MCP tools")
+        logger.error(f"Failed to create drive agent with MCP: {e}")
+        logger.info("Creating fallback drive agent without MCP tools")
 
-        # Fallback: basic Drive assistant without MCP tools
+        # Fallback: basic drive agent without MCP tools
         drive_model = ChatAnthropic(
             model="claude-sonnet-4-20250514",
             temperature=0,
@@ -168,11 +168,10 @@ async def create_drive_agent():
             streaming=False
         )
 
-        fallback_prompt = """You are Samuel's Google Drive assistant.
-I apologize, but I cannot directly access your Google Drive at the moment due to a technical issue.
-I can help you plan Drive operations, suggest folder/file organization, and compose file metadata changes,
-but I cannot list, move, delete, share, or modify actual files until Drive connectivity is restored.
-Please let me know how I can assist with Drive-related planning or drafting."""
+        fallback_prompt = """You are a Google Drive assistant.
+        I apologize, but I cannot directly access Google Drive at the moment due to a technical issue.
+        I can provide general file management assistance and planning, but cannot perform actual operations.
+        Please let me know how I can assist you with file management planning."""
 
         return create_react_agent(
             model=drive_model,

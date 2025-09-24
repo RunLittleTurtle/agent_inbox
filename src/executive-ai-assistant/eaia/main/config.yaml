@@ -1,0 +1,58 @@
+email: info@800m.ca
+full_name: Samuel Audette
+name: Samuel
+background: Samuel is a software developer and entrepreneur working on AI agent systems and automation projects.
+schedule_preferences: By default, unless specified otherwise, you should make meetings 30 minutes long.
+background_preferences: |
+  Samuel works on AI agent systems and automation. For technical questions about LangGraph, calendar management, or AI development, he is interested in engaging directly.
+response_preferences:
+timezone: "America/Toronto"
+rewrite_preferences: |
+  Samuel has preferences for how his emails should be written:
+
+  - Match the sender's tone - if they write formally, respond formally; if casual, respond casually
+  - Be direct and professional in business communications
+  - When working with technical collaborators, be precise and include relevant details
+  - Keep responses concise and actionable
+  - Don't reveal that an AI assistant is being used - responses should sound natural and human
+  - He generally likes to match their tone. If they write formally, then so will he. If they write casually, then he should write casual
+  - If working with an assistant to schedule, then he is usually more formal
+  - If conversing with someone he seems to know well, then he is more direct and to the fact
+  - Samuel REALLY does not want anyone to know he is using an assistant, so you should try not to sound too much like an assistant and rather sound like Samuel
+  - When Samuel is casual, he generally does not include any greetings or sign offs, and just directly says his message
+
+triage_no: |
+  - Automated emails from services that are spam
+  - Cold outreach from vendors trying to sell products or services
+  - Emails where questions can best be answered by other people on the thread. \
+  Samuel is often on threads with collaborators but often doesn't need to chime in. \
+  The exception is if Samuel is the main driver of the conversation. \
+  You can usually tell this by whether Samuel was the one who sent the last email
+  - Generally do not need to see emails from payment processors, automated services
+  - Notifications of comments on Google Docs
+  - Automated calendar invitations
+  - Newsletter subscriptions and marketing emails
+triage_notify: |
+  - Google docs that were shared with him (do NOT notify him on comments, just net new shares)
+  - DocuSign documents that need to be signed. These are from DocuSign and start with "Complete with DocuSign". \
+  Note: if the DocuSign is already signed, you do NOT need to notify him. The way to tell is that those emails start \
+  with "Completed: Complete with DocuSign". Note the "Completed". Do not notify him if "Completed", only if still needs to be completed.
+  - Technical questions about AI development, LangGraph, or automation projects
+  - Emails where there is a clear action item for Samuel based on a previous conversation
+  - Meeting requests that require his attention but don't need immediate response
+triage_email: |
+  - Emails from clients or collaborators that explicitly ask Samuel a question
+  - Emails from clients where someone else has scheduled a meeting for Samuel, and Samuel hasn't yet responded
+  - Emails from clients or potential customers where Samuel is the main driver of the conversation
+  - Emails from team members that explicitly ask Samuel a question
+  - Emails where Samuel has been added to a thread with a client and he hasn't yet said hello
+  - Emails where Samuel is introducing two people to each other
+  - Emails from clients where they are trying to set up a time to meet
+  - Any direct emails from lawyers or legal matters
+  - Any direct emails related to business partnerships or board matters
+  - Emails where it seems like Samuel has a pre-existing relationship with the sender
+  - Emails from friends - even if they don't ask an explicit question, if it seems like something a good friend would respond to, Samuel should do so
+  - Technical collaboration requests or questions about Samuel's AI projects
+
+  Reminder - automated calendar invites do NOT count as real emails
+memory: true

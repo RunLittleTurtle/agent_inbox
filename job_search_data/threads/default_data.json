@@ -1,92 +1,42 @@
 {
-  "job_posting": "About Highspot\n\nHighspot is pioneering the category that is fundamentally changing the way companies increase sales productivity. On a mission to transform the way millions of people work with sales enablement, Highspot is committed to building breakthrough software with a spark of magic. We believe a great place to work is about more than the work – it’s about what the company stands for, and how it authentically represents its values in the real world. To this end, we have put intentional focus on creating equitable workspaces for each of our employees. Our goal is to create a culture where everyone feels a deep sense of belonging and is empowered to be an agent of change, with the ability to transform themselves, their workplace, and their world.\n\nAbout The Role\n\nIn this role, you will join the Product Management team and report to the Director of Product Management. As a Product Manager, you’ll play a key role in shaping Highspot’s product strategy, with a strong focus on leveraging generative AI to solve real customer problems.\n\nAt Highspot, Product Management is a highly collaborative function. You’ll work closely with design, user research, and engineering to explore how GenAI can enhance workflows, drive automation, and deliver insights. Your deep understanding of AI capabilities—and your ability to translate them into practical applications—will be critical in delivering customer value. This role offers significant ownership within the product portfolio, giving you the opportunity to identify, define, validate, and ship innovative and differentiated features.\n\nOur ideal candidate is passionate about emerging technologies and brings a strong mix of customer empathy, technical curiosity, and product rigor. You thrive in cross-functional settings, can clearly communicate complex ideas, and are excited by the challenge of bringing cutting-edge AI to market seamlessly and intuitively.\n\nWhat You'll Do\n\nDeeply engage with GTM customers (sales, marketing, enablemen",
+  "job_posting": "Company Overview\n\nLawlabs Inc. is a dynamic team based in London, Ontario, comprised of law and tech professionals dedicated to revolutionizing the property closing experience. Our mission is to create a seamless and optimized conveyancing process that meets the evolving needs of lawyers and clerks, all while upholding our core values of trust and integrity.\n\nPosition Overview:\n\nThe Project Manager is responsible for tracking and facilitating Agile project delivery across software development teams. The role combines the responsibilities of Agile cross-team coordination, interdisciplinary facilitation, and project oversight to ensure the timely and effective delivery of high-quality software products. The role requires close collaboration with product owners, development teams, and business stakeholders.\n\nKey Responsibilities:\n\nFacilitation Duties\n\nRecommend and implement tools and techniques that enhance productivity and transparency.\n\nFacilitate all Agile touchpoints, including daily stand-ups, sprint planning, sprint reviews, and retrospectives.\nAct as a servant leader to support and guide the development team in following Agile principles and practices.\nRemove impediments and resolve conflicts that hinder team progress or productivity.\nCoach team members and stakeholders on Agile/Scrum practices to foster continuous improvement and team autonomy.\nProject Management Duties\n\nDevelop, manage, and monitor project plans, schedules and resource allocation.\nCoordinate with cross-functional teams to ensure deliverables meet defined requirements, quality standards, and deadlines.\nIdentify project risks and issues, develop mitigation strategies, and communicate project status to stakeholders.\nManage stakeholder expectations through clear communication and regular status updates.\nEnsure proper documentation and compliance with internal standards and client requirements.\nTeam and Stakeholder Coordination\n\nServe as a key point of contact between the development team and exte",
   "job_analysis": {
     "top_requirements": [
       {
-        "requirement": "Deep understanding of AI capabilities and ability to translate them into practical applications",
-        "importance": "This requirement is critical because the role involves leveraging generative AI to solve real customer problems, which is central to Highspot's product strategy. The ability to understand AI and apply it effectively is essential for delivering customer value and driving innovation.",
+        "requirement": "Agile/Scrum facilitation and coaching experience",
+        "importance": "This is the core of the role - the PM must facilitate all Agile touchpoints (daily stand-ups, sprint planning, reviews, retrospectives) and coach team members on Agile practices. Without this expertise, they cannot fulfill the primary servant leader responsibilities.",
         "keywords": [
-          "AI capabilities",
-          "practical applications",
-          "customer value"
+          "Agile",
+          "Scrum",
+          "facilitation",
+          "servant leader",
+          "coaching"
         ]
       },
       {
-        "requirement": "Passion for emerging technologies with a strong mix of customer empathy, technical curiosity, and product rigor",
-        "importance": "This requirement is crucial as it ensures the candidate is not only technically proficient but also empathetic towards customer needs, which is vital for creating products that truly resonate with users. It also aligns with Highspot's mission to transform the way people work.",
-        "keywords": [
-          "emerging technologies",
-          "customer empathy",
-          "technical curiosity"
-        ]
-      },
-      {
-        "requirement": "Ability to thrive in cross-functional settings and clearly communicate complex ideas",
-        "importance": "Given the collaborative nature of the Product Management function at Highspot, the ability to work well across different teams and communicate effectively is essential for the seamless integration of AI into products and for driving successful product development.",
+        "requirement": "Cross-functional team coordination and stakeholder management",
+        "importance": "The role explicitly requires serving as a key point of contact between development teams and external stakeholders, coordinating with cross-functional teams, and managing stakeholder expectations. This coordination ability is essential for project success.",
         "keywords": [
           "cross-functional",
-          "communicate complex ideas",
-          "collaborative"
+          "stakeholder",
+          "coordination",
+          "communication",
+          "collaboration"
+        ]
+      },
+      {
+        "requirement": "Project management with risk identification and mitigation",
+        "importance": "The PM must develop and monitor project plans, identify risks and issues, develop mitigation strategies, and ensure timely delivery of high-quality software products. This systematic project oversight is critical for meeting deadlines and quality standards.",
+        "keywords": [
+          "project plans",
+          "risk identification",
+          "mitigation",
+          "deliverables",
+          "quality standards"
         ]
       }
     ],
-    "company_culture": "Highspot emphasizes creating equitable workspaces and a culture of belonging, empowering employees to be agents of change. The company values authenticity and representation of its values in the real world, focusing on transformation at personal, workplace, and global levels.",
-    "role_focus": "The primary focus of this role is to shape Highspot's product strategy by leveraging generative AI to solve customer problems, enhance workflows, drive automation, and deliver insights, with significant ownership over the product portfolio."
-  },
-  "cv_analysis": {
-    "cv_job_matches": [
-      {
-        "requirement": "Deep understanding of AI capabilities and ability to translate them into practical applications",
-        "matching_experience": "No specific details about Samuel's experience related to a deep understanding of AI capabilities or the ability to translate them into practical applications were found.",
-        "keywords_addressed": [
-          "AI capabilities",
-          "practical applications",
-          "customer value"
-        ],
-        "strength_score": "high"
-      },
-      {
-        "requirement": "Passion for emerging technologies with a strong mix of customer empathy, technical curiosity, and product rigor",
-        "matching_experience": "Samuel's roles at Agentic AI, Anekdote App, and Walter Interactive Web Agency demonstrate his passion for emerging technologies, customer empathy, technical curiosity, and product rigor.",
-        "keywords_addressed": [
-          "emerging technologies",
-          "customer empathy",
-          "technical curiosity"
-        ],
-        "strength_score": "high"
-      },
-      {
-        "requirement": "Ability to thrive in cross-functional settings and clearly communicate complex ideas",
-        "matching_experience": "Samuel's leadership in Agile implementation and his role at Glowtify SAAS illustrate his ability to thrive in cross-functional settings and communicate complex ideas.",
-        "keywords_addressed": [
-          "cross-functional",
-          "communicate complex ideas",
-          "collaborative"
-        ],
-        "strength_score": "high"
-      }
-    ],
-    "compelling_talking_points": [
-      {
-        "point": "Passion for Emerging Technologies",
-        "evidence": "Samuel's work with Agentic AI, Anekdote App, and Walter Interactive Web Agency showcases his engagement with cutting-edge technologies and customer-focused product development.",
-        "keywords": [
-          "emerging technologies",
-          "customer empathy",
-          "technical curiosity"
-        ]
-      },
-      {
-        "point": "Cross-Functional Leadership and Communication",
-        "evidence": "Samuel's leadership in Agile methodologies and his strategic role at Glowtify SAAS highlight his ability to lead cross-functional teams and communicate complex ideas effectively.",
-        "keywords": [
-          "cross-functional",
-          "communicate complex ideas",
-          "collaborative"
-        ]
-      }
-    ],
-    "overall_fit_score": 0.8,
-    "recommendation": "Samuel demonstrates strong alignment with the job requirements, particularly in his passion for emerging technologies and ability to work in cross-functional settings. However, there is a noted gap in explicit AI-related experience. Overall, he is a strong candidate for roles emphasizing product management and innovation."
+    "company_culture": "Dynamic law and tech professionals focused on revolutionizing property closing experience with core values of trust and integrity, emphasizing seamless optimization and meeting evolving client needs",
+    "role_focus": "Agile project delivery facilitation across software development teams, combining servant leadership, cross-team coordination, and project oversight to ensure timely delivery of high-quality software products"
   }
 }

@@ -3,10 +3,11 @@
 .env.*
 *.env
 
-# OAuth tokens and credentials  
+# OAuth tokens and credentials
 credentials.json
 fresh_token.pickle
 token.pickle
+token.json
 
 # LangGraph checkpoints and data
 .langgraph_api/

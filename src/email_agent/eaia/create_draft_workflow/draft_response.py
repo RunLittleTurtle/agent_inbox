@@ -1,3 +1,5 @@
+from eaia.schemas import ReWriteEmail
+from eaia.create_draft_workflow import rewrite
 """Core agent responsible for drafting email."""
 
 from langchain_core.runnables import RunnableConfig
@@ -6,7 +8,7 @@ from langgraph.store.base import BaseStore
 
 from eaia.schemas import (
     State,
-    NewEmailDraft,
+    ReWriteEmail,
     ResponseEmailDraft,
     Question,
     MeetingAssistant,
@@ -28,7 +30,7 @@ Your job is to help {name} respond. You can do this in a few ways.
 
 First, get all required information to respond. You can use the Question tool to ask {name} for information if you do not know it.
 
-When drafting emails (either to response on thread or , if you do not have all the information needed to respond in the most appropriate way, call the `Question` tool until you have that information. Do not put placeholders for names or emails or information - get that directly from {name}!
+When drafting emails (either for a new email or to response on thread or , if you do not have all the information needed to respond in the most appropriate way, call the `Question` tool until you have that information. Do not put placeholders for names or emails or information - get that directly from {name}!
 You can get this information by calling `Question`. Again - do not, under any circumstances, draft an email with placeholders or you will get fired.
 
 If people ask {name} if he can attend some event or meet with them, do not agree to do so unless he has explicitly okayed it!
@@ -54,9 +56,9 @@ If you are sure that {name} would want to schedule a meeting, and you know that 
 
 {schedule_preferences}
 
-# Using the `NewEmailDraft` tool
+# Using the `ReWriteEmail` tool
 
-Sometimes you will need to start a new email thread. If you have all the necessary information for this, use the `NewEmailDraft` tool for this.
+Sometimes you will need to start a new email thread. If you have all the necessary information for this, use the `ReWriteEmail` tool for this.
 
 If {name} asks someone if it's okay to introduce them, and they respond yes, you should draft a new email with that introduction.
 
@@ -89,7 +91,7 @@ async def draft_response(state: State, config: RunnableConfig):
         tool_choice="required",
     )
     tools = [
-        NewEmailDraft,
+        ReWriteEmail,
         ResponseEmailDraft,
         Question,
         MeetingAssistant,

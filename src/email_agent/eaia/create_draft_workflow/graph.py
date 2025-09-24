@@ -60,8 +60,8 @@ def take_action(
     elif tool_call["name"] == "ResponseEmailDraft":
         return "rewrite"
     elif tool_call["name"] == "Ignore":
-        # For live interactions, ignore means end workflow - handle in human_node routing
-        return "bad_tool_name"  # This will go to bad_tool_name, then back to draft_response
+        # For live interactions, send to human_node which will end the workflow
+        return "send_message"  # Route to human_node to allow graceful exit
     elif tool_call["name"] == "MeetingAssistant":
         return "find_meeting_time"
     elif tool_call["name"] == "SendCalendarInvite":
@@ -72,7 +72,28 @@ def take_action(
 
 def bad_tool_name(state: State):
     tool_call = state["messages"][-1].tool_calls[0]
-    message = f"Could not find tool with name `{tool_call['name']}`. Make sure you are calling one of the allowed tools!"
+
+    # Count how many consecutive bad_tool_name errors we've had
+    error_count = 0
+    for msg in reversed(state.get("messages", [])):
+        if hasattr(msg, 'content') and isinstance(msg.content, str):
+            if "Could not find tool with name" in msg.content:
+                error_count += 1
+            elif hasattr(msg, 'tool_calls') and msg.tool_calls:
+                # If we hit a successful tool call, reset the count
+                break
+
+    # After 3 consecutive errors, suggest the Ignore tool to end gracefully
+    if error_count >= 2:
+        # Force the LLM to use Ignore tool to exit
+        message = (
+            f"You've tried invalid tools multiple times. "
+            f"Please use one of: Question, ResponseEmailDraft, MeetingAssistant, SendCalendarInvite. "
+            f"Or use the Ignore tool to end this conversation if no action is needed."
+        )
+    else:
+        message = f"Could not find tool with name `{tool_call['name']}`. Make sure you are calling one of the allowed tools: Question, ResponseEmailDraft, MeetingAssistant, SendCalendarInvite, or Ignore!"
+
     last_message = state["messages"][-1]
     last_message.tool_calls[0]["name"] = last_message.tool_calls[0]["name"].replace(
         ":", ""

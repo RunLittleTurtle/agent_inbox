@@ -30,22 +30,30 @@ Subject: {subject}
 {email_thread}"""
 
 
-async def rewrite(state: State, config, store):
+async def rewrite(state: State, config):
     model = config["configurable"].get("model", "gpt-4o")
     llm = ChatOpenAI(model=model, temperature=0)
     prev_message = state["messages"][-1]
     draft = prev_message.tool_calls[0]["args"]["content"]
-    namespace = (config["configurable"].get("assistant_id", "default"),)
-    result = await store.aget(namespace, "rewrite_instructions")
+
+    # Access store through config - make it optional for fallback scenarios
+    store = config.get("store")
     prompt_config = await get_config(config)
-    if result and "data" in result.value:
-        _prompt = result.value["data"]
+
+    if store is not None:
+        namespace = (config["configurable"].get("assistant_id", "default"),)
+        result = await store.aget(namespace, "rewrite_instructions")
+        if result and "data" in result.value:
+            _prompt = result.value["data"]
+        else:
+            await store.aput(
+                namespace,
+                "rewrite_instructions",
+                {"data": prompt_config["rewrite_preferences"]},
+            )
+            _prompt = prompt_config["rewrite_preferences"]
     else:
-        await store.aput(
-            namespace,
-            "rewrite_instructions",
-            {"data": prompt_config["rewrite_preferences"]},
-        )
+        # Fallback when store is not available
         _prompt = prompt_config["rewrite_preferences"]
     input_message = rewrite_prompt.format(
         email_thread=state["email"]["page_content"],

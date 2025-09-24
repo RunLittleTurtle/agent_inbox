@@ -31,11 +31,6 @@ class ResponseEmailDraft(BaseModel):
     new_recipients: List[str]
 
 
-class NewEmailDraft(BaseModel):
-    """Draft of a new email to send."""
-
-    content: str
-    recipients: List[str]
 
 
 class ReWriteEmail(BaseModel):

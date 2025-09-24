@@ -58,7 +58,12 @@ def _generate_email_markdown(state: State):
     )
 
 
-async def save_email(state: State, config, store: BaseStore, status: str):
+async def save_email(state: State, config, status: str):
+    # Access store through config
+    store = config.get("store")
+    if store is None:
+        # If no store available, skip saving
+        return
     namespace = (
         config["configurable"].get("assistant_id", "default"),
         "triage_examples",
@@ -71,7 +76,9 @@ async def save_email(state: State, config, store: BaseStore, status: str):
 
 
 @traceable
-async def send_message(state: State, config, store):
+async def send_message(state: State, config):
+    # Access store through config
+    store = config.get("store")
     prompt_config = await get_config(config)
     memory = prompt_config["memory"]
     user = prompt_config['name']
@@ -101,7 +108,7 @@ async def send_message(state: State, config, store):
             "tool_call_id": tool_call["id"],
         }
         if memory:
-            await save_email(state, config, store, "email")
+            await save_email(state, config, "email")
             rewrite_state = {
                 "messages": [
                     {
@@ -129,7 +136,7 @@ async def send_message(state: State, config, store):
             ],
         }
         if memory:
-            await save_email(state, config, store, "no")
+            await save_email(state, config, "no")
     else:
         raise ValueError(f"Unexpected response: {response}")
 
@@ -137,7 +144,9 @@ async def send_message(state: State, config, store):
 
 
 @traceable
-async def send_email_draft(state: State, config, store):
+async def send_email_draft(state: State, config):
+    # Access store through config
+    store = config.get("store")
     prompt_config = await get_config(config)
     memory = prompt_config["memory"]
     user = prompt_config['name']
@@ -167,7 +176,7 @@ async def send_email_draft(state: State, config, store):
             "tool_call_id": tool_call["id"],
         }
         if memory:
-            await save_email(state, config, store, "email")
+            await save_email(state, config, "email")
             rewrite_state = {
                 "messages": [
                     {
@@ -195,7 +204,7 @@ async def send_email_draft(state: State, config, store):
             ],
         }
         if memory:
-            await save_email(state, config, store, "no")
+            await save_email(state, config, "no")
     elif response["type"] == "edit":
         msg = {
             "role": "assistant",
@@ -211,7 +220,7 @@ async def send_email_draft(state: State, config, store):
         }
         if memory:
             corrected = response["args"]["args"]["content"]
-            await save_email(state, config, store, "email")
+            await save_email(state, config, "email")
             rewrite_state = {
                 "messages": [
                     {
@@ -230,7 +239,7 @@ async def send_email_draft(state: State, config, store):
             await LGC.runs.create(None, "multi_reflection_graph", input=rewrite_state)
     elif response["type"] == "accept":
         if memory:
-            await save_email(state, config, store, "email")
+            await save_email(state, config, "email")
         return None
     else:
         raise ValueError(f"Unexpected response: {response}")
@@ -238,7 +247,9 @@ async def send_email_draft(state: State, config, store):
 
 
 @traceable
-async def notify(state: State, config, store):
+async def notify(state: State, config):
+    # Access store through config
+    store = config.get("store")
     prompt_config = await get_config(config)
     memory = prompt_config["memory"]
     user = prompt_config['name']
@@ -262,7 +273,7 @@ async def notify(state: State, config, store):
     if response["type"] == "response":
         msg = {"type": "user", "content": response["args"]}
         if memory:
-            await save_email(state, config, store, "email")
+            await save_email(state, config, "email")
             rewrite_state = {
                 "messages": [
                     {
@@ -290,7 +301,7 @@ async def notify(state: State, config, store):
             ],
         }
         if memory:
-            await save_email(state, config, store, "no")
+            await save_email(state, config, "no")
     else:
         raise ValueError(f"Unexpected response: {response}")
 
@@ -298,7 +309,9 @@ async def notify(state: State, config, store):
 
 
 @traceable
-async def send_cal_invite(state: State, config, store):
+async def send_cal_invite(state: State, config):
+    # Access store through config
+    store = config.get("store")
     prompt_config = await get_config(config)
     memory = prompt_config["memory"]
     user = prompt_config['name']
@@ -328,7 +341,7 @@ async def send_cal_invite(state: State, config, store):
             "tool_call_id": tool_call["id"],
         }
         if memory:
-            await save_email(state, config, store, "email")
+            await save_email(state, config, "email")
             rewrite_state = {
                 "messages": [
                     {
@@ -356,7 +369,7 @@ async def send_cal_invite(state: State, config, store):
             ],
         }
         if memory:
-            await save_email(state, config, store, "no")
+            await save_email(state, config, "no")
     elif response["type"] == "edit":
         msg = {
             "role": "assistant",
@@ -371,7 +384,7 @@ async def send_cal_invite(state: State, config, store):
             ],
         }
         if memory:
-            await save_email(state, config, store, "email")
+            await save_email(state, config, "email")
             rewrite_state = {
                 "messages": [
                     {
@@ -387,7 +400,7 @@ async def send_cal_invite(state: State, config, store):
             await LGC.runs.create(None, "multi_reflection_graph", input=rewrite_state)
     elif response["type"] == "accept":
         if memory:
-            await save_email(state, config, store, "email")
+            await save_email(state, config, "email")
         return None
     else:
         raise ValueError(f"Unexpected response: {response}")

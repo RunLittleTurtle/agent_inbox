@@ -7,3 +7,12 @@
 [submodule "src/executive-ai-assistant"]
 	path = src/executive-ai-assistant
 	url = https://github.com/langchain-ai/executive-ai-assistant.git
+[submodule "library/langchain-mcp-adapters"]
+	path = library/langchain-mcp-adapters
+	url = https://github.com/langchain-ai/langchain-mcp-adapters.git
+[submodule "library/langgraph"]
+	path = library/langgraph
+	url = https://github.com/langchain-ai/langgraph.git
+[submodule "library/langgraph_supervisor-py"]
+	path = library/langgraph_supervisor-py
+	url = https://github.com/langchain-ai/langgraph-supervisor.git

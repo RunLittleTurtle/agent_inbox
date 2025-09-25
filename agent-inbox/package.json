@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:config": "next dev -p 3004",
     "build": "next build",
     "start": "next start",
+    "start:config": "next start -p 3004",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "format": "prettier --config .prettierrc --write \"src\"",
@@ -52,6 +54,7 @@
     "@radix-ui/react-separator": "^1.1.0",
     "@radix-ui/react-slider": "^1.2.1",
     "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-toast": "^1.2.1",
     "@radix-ui/react-tooltip": "^1.1.4",
     "@replit/codemirror-lang-csharp": "^6.2.0",

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from langchain.agents.react.agent import create_react_agent
+from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
@@ -67,7 +67,7 @@ async def find_meeting_time(state: State, config: RunnableConfig):
     """Write an email to a customer."""
     model = config["configurable"].get("model", "gpt-4o")
     llm = ChatOpenAI(model=model, temperature=0)
-    agent = create_react_agent(llm, [get_events_for_days])
+    agent = create_react_agent(llm, [get_events_for_days], name="meeting_time_finder")
     current_date = datetime.now()
     prompt_config = await get_config(config)
     input_message = meeting_prompts.format(

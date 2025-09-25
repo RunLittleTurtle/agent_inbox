@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from langchain_core.tools import tool, BaseTool
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
+from langsmith import traceable
 
 # Load environment variables
 load_dotenv()
@@ -151,13 +152,18 @@ def create_synthetic_email_context(user_request: str) -> dict:
 
 
 @tool
-def create_draft_workflow_tool(request: str) -> str:
+@traceable(name="create_draft_workflow_subagent", run_type="chain")
+async def create_draft_workflow_tool(request: str) -> str:
     """
     Tool for creating email drafts through live interactions with human interrupts.
     Supports draft creation, corrections, calendar invites, and email sending.
 
+    CRITICAL: This tool MUST receive config from parent to maintain thread context.
+    Without proper thread_id inheritance, interrupts won't reach agent-inbox UI.
+
     Args:
         request: The user's request for email draft assistance
+        config: Runtime config with thread_id for interrupt propagation
 
     Returns:
         Clear, structured result from the draft workflow execution
@@ -212,57 +218,55 @@ def create_draft_workflow_tool(request: str) -> str:
             except ImportError as e2:
                 return f"❌ Error: Could not import LLM_CONFIG. Absolute: {e1}, Relative: {e2}"
 
-        # Minimal config - get_config() will load the rest from config.yaml
-        # NOTE: draft_response.py expects OpenAI models, so use gpt-4o for compatibility
+        # CRITICAL: Inherit parent thread context for interrupt propagation
+        # This ensures interrupts reach the agent-inbox UI monitoring the parent thread
+        import uuid
+        import contextvars
+        from langchain_core.runnables.config import var_child_runnable_config
+
+        # Try to get the runtime config from LangChain's context
+        parent_thread_id = None
+        parent_config = {}
+
+        try:
+            # Access the runtime config from context variables
+            runtime_config = var_child_runnable_config.get()
+            if runtime_config:
+                parent_config = runtime_config
+                parent_thread_id = runtime_config.get("configurable", {}).get("thread_id")
+                print(f"📍 Found parent thread_id from runtime context: {parent_thread_id}")
+        except Exception as e:
+            print(f"⚠️ Could not get runtime config: {e}")
+
+        # Use parent thread_id to maintain interrupt context continuity
         config = {
             "configurable": {
-                "db_id": 1,
-                "model": "gpt-4o"  # Compatible with draft_response.py (uses ChatOpenAI)
+                "db_id": parent_config.get("configurable", {}).get("db_id", 1),
+                "model": "gpt-4o",  # Compatible with draft_response.py (uses ChatOpenAI)
+                # CRITICAL: Use parent thread_id for interrupt visibility
+                "thread_id": parent_thread_id or ("draft-" + uuid.uuid4().hex[:8]),
+                # Pass through any assistant_id for proper routing
+                "assistant_id": parent_config.get("configurable", {}).get("assistant_id", "email_agent"),
+                # Preserve any other parent config values
+                **{k: v for k, v in parent_config.get("configurable", {}).items()
+                   if k not in ["db_id", "model", "thread_id", "assistant_id"]}
             }
         }
-        print(f"🚀 Executing live draft workflow with model: {config['configurable']['model']}")
 
-        # IMPORTANT: Use LangGraph client SDK to invoke through server API
-        # This ensures store configuration from langgraph.json is available
+        print(f"🔐 Using thread_id for interrupt propagation: {config['configurable']['thread_id']}")
+        print(f"🚀 Executing subagent with interrupt propagation enabled")
+
+        # Direct graph execution with proper async context for LangSmith tracing
         try:
-            import asyncio
-            from langgraph_sdk import get_client
-            import uuid
-
-            # Use LangGraph client to invoke through server API
-            async def execute_workflow():
-                # Get client connected to local LangGraph server
-                client = get_client(url="http://localhost:2024")
-
-                # Generate unique thread ID for this conversation
-                thread_id = f"draft-{uuid.uuid4().hex[:8]}"
-
-                # Create run through server API - this will have proper store access
-                run = await client.runs.create(
-                    assistant_id="email_agent",  # This is the registered graph ID in main langgraph.json
-                    thread_id=thread_id,
-                    input=initial_state,
-                    config=config.get("configurable", {})
-                )
-
-                # Wait for completion and return result
-                return await client.runs.wait(run["run_id"])
-
-            # Execute through server API with proper store configuration
-            result = asyncio.run(execute_workflow())
+            # Use await directly to preserve tracing context
+            # This ensures the subagent appears in LangSmith traces
+            print(f"📊 Executing subagent with LangSmith tracing enabled")
+            result = await graph.ainvoke(initial_state, config=config)
+            print(f"✅ Subagent execution completed with tracing")
 
         except Exception as e:
-            print(f"⚠️ Server API execution error: {e}")
-            print(f"⚠️ Falling back to direct graph execution (may not have store access)...")
-            try:
-                # Fallback: try direct invocation (won't have server store)
-                import asyncio
-                async def direct_execute():
-                    return await graph.ainvoke(initial_state, config=config)
-                result = asyncio.run(direct_execute())
-            except Exception as direct_e:
-                print(f"⚠️ Direct execution also failed: {direct_e}")
-                return f"❌ Error in draft workflow execution: Server API failed: {str(e)}, Direct execution failed: {str(direct_e)}"
+            print(f"❌ Direct graph execution error: {e}")
+            return f"❌ Error in draft workflow execution: {str(e)}"
         print(f"✅ Draft workflow execution completed")
 
         # Extract clear, structured output
@@ -379,6 +383,7 @@ def get_email_simple_tools() -> List[BaseTool]:
     """
     Synchronous wrapper for getting email tools
     For compatibility with existing orchestrator
+    Note: create_draft_workflow_tool is now async for proper tracing
     """
     try:
         # Try to get tools with MCP
@@ -397,5 +402,5 @@ def get_email_simple_tools() -> List[BaseTool]:
         print(f"⚠️ MCP connection failed: {e}")
         print("📧 Falling back to local tool only")
 
-        # Fallback to just the local tool
+        # Fallback to just the local tool (now async)
         return [create_draft_workflow_tool]

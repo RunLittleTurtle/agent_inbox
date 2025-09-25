@@ -1,6 +1,6 @@
 # LangGraph Development Principles
 
-ALWAYS use LangGraph, follow these principles and patterns.
+ALWAYS use LangGraph v.1, follow these principles and patterns.
 
 ALWAYS activate virtual environment  : source .venv/bin/activate
 

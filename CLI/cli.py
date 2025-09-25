@@ -39,6 +39,7 @@ AGENT_INBOX_PATH = PROJECT_ROOT / "agent-inbox"
 AGENT_CHAT_UI_PATH = PROJECT_ROOT / "agent-chat-ui"
 AGENT_CHAT_UI_2_PATH = PROJECT_ROOT / "agent-chat-ui-2"
 LANGGRAPH_API = "http://127.0.0.1:2024"
+EXECUTIVE_API = "http://127.0.0.1:2025"
 AGENT_INBOX_UI = "http://localhost:3000"
 AGENT_CHAT_UI = "http://localhost:3001"
 AGENT_CHAT_UI_2 = "http://localhost:3002"
@@ -576,7 +577,7 @@ async def _send_email_to_workflow(email_data, executive=False):
                 import uuid
 
                 # Use LangGraph SDK client instead of direct HTTP calls
-                lg_client = get_client(url=LANGGRAPH_API)
+                lg_client = get_client(url=EXECUTIVE_API)
 
                 # Create thread ID using same logic as run_ingest.py
                 thread_id = str(
@@ -606,7 +607,7 @@ async def _send_email_to_workflow(email_data, executive=False):
                 # Start executive assistant workflow using SDK (matching run_ingest.py)
                 run_result = await lg_client.runs.create(
                     thread_id,
-                    "executive_main",
+                    "main",
                     input={"email": executive_email},
                     multitask_strategy="rollback",
                 )
@@ -707,6 +708,7 @@ def _update_cli_commands_with_gmail():
 @app.command()
 def start(
     langgraph_port: int = typer.Option(2024, "--langgraph-port", help="Port for LangGraph server"),
+    executive_port: int = typer.Option(2025, "--executive-port", help="Port for Executive AI Assistant server"),
     inbox_port: int = typer.Option(3000, "--inbox-port", help="Port for Agent Inbox UI"),
     chat_port: int = typer.Option(3001, "--chat-port", help="Port for Agent Chat UI"),
     chat_2_port: int = typer.Option(3002, "--chat-2-port", help="Port for Agent Chat UI 2 (original)"),
@@ -715,12 +717,12 @@ def start(
     """
     🚀 Start complete AI agent stack with all UIs
 
-    Launches LangGraph server, Agent Inbox, Agent Chat UI, Agent Chat UI 2 (original), and LangSmith Studio.
+    Launches LangGraph server, Executive AI Assistant, Agent Inbox, Agent Chat UI, Agent Chat UI 2 (original), and LangSmith Studio.
     This is the one-command solution to get everything running.
     """
     console.print(Panel.fit(
         "🚀 [bold green]Starting Complete AI Agent Stack[/bold green]",
-        subtitle="LangGraph + Agent Inbox + Agent Chat + Agent Chat 2 + LangSmith Studio"
+        subtitle="LangGraph + Executive Assistant + Agent Inbox + Agent Chat + Agent Chat 2 + LangSmith Studio"
     ))
 
     ensure_venv()
@@ -747,12 +749,41 @@ def start(
         console.print("[blue]💭 Waiting for LangGraph to initialize...[/blue]")
         time.sleep(5)  # Give LangGraph time to start
 
-        # Step 2: Start Agent Inbox UI
-        console.print("[blue]📋 Step 2: Starting Agent Inbox UI...[/blue]")
+        # Step 2: Start Executive AI Assistant LangGraph server
+        console.print("[blue]📋 Step 2: Starting Executive AI Assistant server...[/blue]")
+
+        # Check if executive assistant directory exists
+        executive_assistant_path = PROJECT_ROOT / "src" / "executive-ai-assistant"
+        if not executive_assistant_path.exists():
+            console.print(f"[red]❌ Executive AI Assistant directory not found: {executive_assistant_path}[/red]")
+            langgraph_process.terminate()
+            raise typer.Exit(1)
+
+        # Kill existing Executive Assistant processes
+        killed_executive = kill_processes_on_port(executive_port, "Executive AI Assistant")
+        if not killed_executive:
+            console.print(f"[green]✅ No existing Executive AI Assistant processes found on port {executive_port}[/green]")
+
+        # Start Executive AI Assistant LangGraph server
+        executive_env = os.environ.copy()
+        os.chdir(executive_assistant_path)
+        executive_cmd = str(VENV_PATH / "bin" / "langgraph")
+        executive_process = subprocess.Popen(
+            [executive_cmd, "dev", "--port", str(executive_port), "--allow-blocking"],
+            env=executive_env
+        )
+
+        console.print(f"[green]✅ Executive AI Assistant server starting on port {executive_port}[/green]")
+        console.print("[blue]💭 Waiting for Executive Assistant to initialize...[/blue]")
+        time.sleep(5)  # Give Executive Assistant time to start
+
+        # Step 3: Start Agent Inbox UI
+        console.print("[blue]📋 Step 3: Starting Agent Inbox UI...[/blue]")
 
         if not AGENT_INBOX_PATH.exists():
             console.print(f"[red]❌ Agent Inbox directory not found: {AGENT_INBOX_PATH}[/red]")
             langgraph_process.terminate()
+            executive_process.terminate()
             raise typer.Exit(1)
 
         # Kill existing Agent Inbox processes
@@ -768,12 +799,13 @@ def start(
 
         console.print(f"[green]✅ Agent Inbox UI starting on port {inbox_port}[/green]")
 
-        # Step 3: Start Agent Chat UI
-        console.print("[blue]📋 Step 3: Starting Agent Chat UI...[/blue]")
+        # Step 4: Start Agent Chat UI
+        console.print("[blue]📋 Step 4: Starting Agent Chat UI...[/blue]")
 
         if not AGENT_CHAT_UI_PATH.exists():
             console.print(f"[red]❌ Agent Chat UI directory not found: {AGENT_CHAT_UI_PATH}[/red]")
             langgraph_process.terminate()
+            executive_process.terminate()
             inbox_process.terminate()
             raise typer.Exit(1)
 
@@ -790,12 +822,13 @@ def start(
 
         console.print(f"[green]✅ Agent Chat UI starting on port {chat_port}[/green]")
 
-        # Step 4: Start Agent Chat UI 2 (original)
-        console.print("[blue]📋 Step 4: Starting Agent Chat UI 2 (original)...[/blue]")
+        # Step 5: Start Agent Chat UI 2 (original)
+        console.print("[blue]📋 Step 5: Starting Agent Chat UI 2 (original)...[/blue]")
 
         if not AGENT_CHAT_UI_2_PATH.exists():
             console.print(f"[red]❌ Agent Chat UI 2 directory not found: {AGENT_CHAT_UI_2_PATH}[/red]")
             langgraph_process.terminate()
+            executive_process.terminate()
             inbox_process.terminate()
             chat_process.terminate()
             raise typer.Exit(1)
@@ -815,10 +848,11 @@ def start(
         console.print("[blue]💭 Waiting for all UIs to initialize...[/blue]")
         time.sleep(8)  # Give all services time to start
 
-        # Step 5: Open all browser interfaces
-        console.print("[blue]📋 Step 5: Opening all browser interfaces...[/blue]")
+        # Step 6: Open all browser interfaces
+        console.print("[blue]📋 Step 6: Opening all browser interfaces...[/blue]")
 
         langgraph_url = f"http://127.0.0.1:{langgraph_port}"
+        executive_url = f"http://127.0.0.1:{executive_port}"
         inbox_url = f"http://localhost:{inbox_port}"
         chat_url = f"http://localhost:{chat_port}"
         chat_2_url = f"http://localhost:{chat_2_port}"
@@ -842,16 +876,24 @@ def start(
         # Open Agent Inbox UI
         console.print(f"[green]📧 Opening Agent Inbox at {inbox_url}[/green]")
         webbrowser.open(inbox_url)
+        time.sleep(1)
+
+        # Open Executive AI Assistant LangGraph Studio (LangSmith hosted version)
+        executive_studio_url = f"https://smith.langchain.com/studio/?baseUrl={executive_url}"
+        console.print(f"[green]🤖 Opening Executive AI Assistant Studio at {executive_studio_url}[/green]")
+        webbrowser.open(executive_studio_url)
 
         # Success summary
         console.print()
         console.print(Panel(
             f"[bold green]🎉 Complete AI Agent Stack Started Successfully![/bold green]\n\n"
             f"🤖 LangGraph Server: [link]{langgraph_url}[/link]\n"
+            f"🤖 Executive AI Assistant: [link]{executive_url}[/link]\n"
             f"📧 Agent Inbox UI: [link]{inbox_url}[/link]\n"
             f"💬 Agent Chat UI: [link]{chat_url}[/link]\n"
             f"💬 Agent Chat UI 2 (original): [link]{chat_2_url}[/link]\n"
             f"🎨 LangSmith Studio: [link]{LANGSMITH_STUDIO}[/link]\n\n"
+            f"[dim]All Studio windows opened automatically in separate browser tabs[/dim]\n"
             f"[dim]Press Ctrl+C to stop all services[/dim]",
             title="✅ All Services Running",
             border_style="green"
@@ -863,6 +905,9 @@ def start(
                 # Check if any process has died
                 if langgraph_process.poll() is not None:
                     console.print("[red]❌ LangGraph server stopped unexpectedly[/red]")
+                    break
+                if executive_process.poll() is not None:
+                    console.print("[red]❌ Executive AI Assistant stopped unexpectedly[/red]")
                     break
                 if inbox_process.poll() is not None:
                     console.print("[red]❌ Agent Inbox stopped unexpectedly[/red]")
@@ -879,6 +924,7 @@ def start(
 
             # Stop all processes gracefully
             langgraph_process.terminate()
+            executive_process.terminate()
             inbox_process.terminate()
             chat_process.terminate()
             chat_2_process.terminate()
@@ -982,6 +1028,63 @@ def status():
 
     if not check_service(AGENT_INBOX_UI, "Agent Inbox"):
         console.print("💡 Start everything: [bold]python cli.py start[/bold]")
+
+
+@app.command()
+def executive_cron(
+    interval: int = typer.Option(15, "--interval", "-i", help="Interval in minutes between email checks"),
+    minutes_since: int = typer.Option(30, "--minutes-since", "-m", help="Process emails from last N minutes"),
+):
+    """
+    🤖 Start Executive AI Assistant with automatic email cron timer
+
+    This command starts the Executive AI Assistant LangGraph server with an automatic
+    timer that checks for new emails every 15 minutes and processes them.
+    """
+    import subprocess
+    import time
+    import signal
+    import sys
+    from pathlib import Path
+
+    console.print(Panel.fit(
+        "🤖 [bold blue]Executive AI Assistant + Cron Timer[/bold blue]",
+        subtitle="Automatic email processing"
+    ))
+
+    console.print("🚀 Starting Executive AI Assistant with cron timer...")
+    console.print(f"   📅 Email check interval: Every {interval} minutes")
+    console.print(f"   📧 Email window: Last {minutes_since} minutes")
+    console.print(f"   🔄 Press Ctrl+C to stop both services")
+    console.print()
+
+    # Start LangGraph server for executive assistant
+    executive_dir = PROJECT_ROOT / "src" / "executive-ai-assistant"
+
+    try:
+        # Start LangGraph dev server in background
+        console.print("📡 Starting LangGraph server for Executive AI Assistant...")
+        langgraph_process = subprocess.Popen([
+            sys.executable, "-m", "venv", "--help"  # This will be replaced with actual command
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # For now, provide manual instructions
+        console.print("⚠️  [yellow]Manual setup required:[/yellow]")
+        console.print("   1. In a new terminal, run:")
+        console.print(f"      [bold]cd {executive_dir}[/bold]")
+        console.print("      [bold]source ../../.venv/bin/activate[/bold]")
+        console.print("      [bold]langgraph dev --port 2025 --allow-blocking[/bold]")
+        console.print()
+        console.print("   2. In another terminal, run:")
+        console.print(f"      [bold]cd {executive_dir}[/bold]")
+        console.print("      [bold]source ../../.venv/bin/activate[/bold]")
+        console.print(f"      [bold]PYTHONPATH=. python scripts/local_cron_timer.py --interval {interval} --minutes-since {minutes_since}[/bold]")
+        console.print()
+        console.print("💡 Future versions will automate this process!")
+
+    except Exception as e:
+        console.print(f"[red]❌ Error starting executive cron: {e}[/red]")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

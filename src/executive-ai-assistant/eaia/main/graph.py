@@ -191,3 +191,6 @@ graph_builder.add_edge("mark_as_read_node", END)
 graph_builder.add_edge("notify", "human_node")
 graph_builder.add_conditional_edges("human_node", enter_after_human)
 graph = graph_builder.compile()
+
+# Export as 'app' for LangGraph Studio recognition
+app = graph

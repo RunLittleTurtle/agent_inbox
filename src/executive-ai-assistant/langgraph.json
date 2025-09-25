@@ -4,7 +4,7 @@
     "."
   ],
   "graphs": {
-    "main": "./eaia/main/graph.py:graph",
+    "main": "./eaia/main/graph.py:app",
     "cron": "./eaia/cron_graph.py:graph",
     "general_reflection_graph": "./eaia/reflection_graphs.py:general_reflection_graph",
     "multi_reflection_graph": "./eaia/reflection_graphs.py:multi_reflection_graph"
@@ -14,5 +14,6 @@
       "embed": "openai:text-embedding-3-small",
       "dims": 1536
     }
-  }
+  },
+  "env": "../../.env"
 }

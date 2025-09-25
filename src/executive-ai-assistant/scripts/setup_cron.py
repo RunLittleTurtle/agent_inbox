@@ -10,7 +10,7 @@ async def main(
     minutes_since: int = 60,
 ):
     if url is None:
-        client = get_client(url="http://127.0.0.1:2024")
+        client = get_client(url="http://127.0.0.1:2025")
     else:
         client = get_client(
             url=url

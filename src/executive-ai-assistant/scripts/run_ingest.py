@@ -38,7 +38,7 @@ async def main(
     else:
         email_address = email
     if url is None:
-        client = get_client(url="http://127.0.0.1:2024")
+        client = get_client(url="http://127.0.0.1:2025")
     else:
         client = get_client(
             url=url
@@ -82,10 +82,10 @@ async def main(
                     continue
         await client.threads.update(thread_id, metadata={"email_id": email["id"]})
 
-        print(f"🚀 Creating workflow run for thread {thread_id} with graph executive_main")
+        print(f"🚀 Creating workflow run for thread {thread_id} with graph main")
         run_result = await client.runs.create(
             thread_id,
-            "executive_main",
+            "main",
             input={"email": email},
             multitask_strategy="rollback",
         )

@@ -2,7 +2,6 @@
 
 This module implements a clean multi-agent architecture with:
 - Calendar agent for Google Calendar operations via MCP
-- Email agent for email management tasks
 - Job search agent for job search tasks
 - Supervisor using official langgraph_supervisor patterns
 - Automatic agent handoff and state management
@@ -109,40 +108,6 @@ async def create_calendar_agent():
             prompt=fallback_prompt
         )
 
-async def create_email_agent():
-    """Create email agent with MCP integration for email operations"""
-    try:
-        from src.email_agent.eaia.email_agent_orchestrator import create_email_agent as create_email_orchestrator
-
-        # Use proper email agent orchestrator (returns compiled workflow)
-        email_agent_workflow = create_email_orchestrator()
-
-        logger.info("Email agent with MCP integration initialized successfully")
-        return email_agent_workflow
-
-    except Exception as e:
-        logger.error(f"Failed to create email agent with MCP: {e}")
-        logger.info("Creating fallback email agent without MCP tools")
-
-        # Fallback: basic email agent without MCP tools
-        email_model = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
-            temperature=0,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            streaming=False
-        )
-
-        fallback_prompt = """You are Samuel's email assistant.
-        I apologize, but I cannot directly access your Gmail at the moment due to a technical issue.
-        I can provide email composition assistance and help you plan your communications, but cannot send, read, or manage actual emails.
-        Please let me know how I can assist you with email planning and composition."""
-
-        return create_react_agent(
-            model=email_model,
-            tools=[],
-            name="email_agent_fallback",
-            prompt=fallback_prompt
-        )
 
 
 async def create_drive_agent():

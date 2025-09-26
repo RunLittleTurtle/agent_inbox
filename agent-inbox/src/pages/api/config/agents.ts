@@ -95,10 +95,16 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       config: AgentConfigData;
     }> = [];
 
-    const projectRoot = process.cwd().split('/agent-inbox')[0];
+    // Get the project root - go up from agent-inbox directory to main project
+    const projectRoot = path.join(process.cwd(), '..');
+
+    console.log('Current working directory:', process.cwd());
+    console.log('Project root resolved to:', projectRoot);
 
     for (const configPath of AGENT_CONFIG_PATHS) {
       const fullPath = path.join(projectRoot, configPath);
+
+      console.log(`Checking path: ${fullPath}, exists: ${fs.existsSync(fullPath)}`);
 
       if (fs.existsSync(fullPath)) {
         const config = parseConfigFile(fullPath);

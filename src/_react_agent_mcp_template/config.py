@@ -1,6 +1,14 @@
 """
 Agent configuration - centralized settings
-TODO: Configure AGENT_NAME and MCP_SERVICE for your agent
+
+🔥 CRITICAL: Replace ALL placeholder values below for configuration UI to work:
+- {AGENT_NAME} → actual agent name (e.g., "gmail", "sheets", "drive")
+- {AGENT_DISPLAY_NAME} → display name (e.g., "Gmail", "Google Sheets")
+- {AGENT_DESCRIPTION} → description (e.g., "email management", "spreadsheet operations")
+- {MCP_SERVICE} → MCP service name (e.g., "google_gmail", "google_sheets")
+
+Also update agent-inbox/src/pages/api/config/ endpoints when duplicating.
+See ../../MCP_AGENT_CONFIGURATION_GUIDE.md for complete instructions.
 """
 
 import os
@@ -25,7 +33,7 @@ USER_TIMEZONE = os.getenv("USER_TIMEZONE", "America/Toronto")
 
 LLM_CONFIG = {
     "model": "claude-sonnet-4-20250514",
-    "temperature": 0.2,
+    "temperature": 0.3,
     "streaming": False,  # Disable streaming for LangGraph compatibility
     "api_key": os.getenv("ANTHROPIC_API_KEY")
 }

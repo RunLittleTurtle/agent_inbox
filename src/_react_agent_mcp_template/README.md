@@ -44,7 +44,26 @@ def create_gmail_agent():  # Replace {agent} with your agent name
     return create_default_orchestrator()
 ```
 
-### 4. Add to Supervisor
+### 4. Add Configuration UI Support
+
+**IMPORTANT**: For the configuration UI to work, you must:
+
+1. **Update API endpoints** in `agent-inbox/src/pages/api/config/`:
+   - Add your agent path to `AGENT_CONFIG_PATHS` in `agents.ts`
+   - Add reading logic to `values.ts`
+   - Add writing logic to `update.ts`
+
+2. **Replace ALL placeholder values** in `config.py`:
+   - `{AGENT_NAME}` → actual agent name
+   - `{AGENT_DISPLAY_NAME}` → display name
+   - `{AGENT_DESCRIPTION}` → description
+   - `{MCP_SERVICE}` → MCP service name
+
+3. **Only include implemented fields** in `ui_config.py`
+
+See `../../MCP_AGENT_CONFIGURATION_GUIDE.md` for complete instructions.
+
+### 5. Add to Supervisor
 
 Copy the code from `supervisor_snippet_connection.md` and add it to `src/graph.py`.
 

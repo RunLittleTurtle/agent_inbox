@@ -54,28 +54,64 @@ export default function ConfigPage() {
 
   const { toast } = useToast();
 
-  // Load agents and config data
+  // Simple retry helper following Next.js best practices
+  const fetchWithRetry = async (url: string, retries = 2): Promise<Response> => {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) return response;
+
+        // Don't retry on 4xx errors (client errors)
+        if (response.status >= 400 && response.status < 500) {
+          throw new Error(`Client error: ${response.status}`);
+        }
+
+        // Retry on 5xx errors (server errors)
+        if (i < retries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // exponential backoff
+          continue;
+        }
+
+        throw new Error(`Server error: ${response.status}`);
+      } catch (err) {
+        if (i === retries) throw err;
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+    throw new Error('Max retries exceeded');
+  };
+
+  // Load config values for specific agent
+  const loadAgentValues = React.useCallback(async (agentId: string | null) => {
+    try {
+      const url = agentId
+        ? `/api/config/values?agentId=${agentId}`
+        : '/api/config/values';
+
+      const response = await fetchWithRetry(url);
+      const data = await response.json();
+
+      setConfigValues(data.values);
+    } catch (error) {
+      console.error('Error loading agent values:', error);
+    }
+  }, []);
+
+  // Load agents and initial config data
   React.useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Load agents
-        const agentsResponse = await fetch('/api/config/agents');
-        if (!agentsResponse.ok) {
-          throw new Error('Failed to load agents');
-        }
+        // Load agents first
+        const agentsResponse = await fetchWithRetry('/api/config/agents');
         const agentsData = await agentsResponse.json();
         setAgents(agentsData.agents);
 
-        // Load current config values
-        const valuesResponse = await fetch('/api/config/values');
-        if (!valuesResponse.ok) {
-          throw new Error('Failed to load configuration values');
-        }
-        const valuesData = await valuesResponse.json();
-        setConfigValues(valuesData.values);
+        // Load values for the current selection
+        const agentId = showMainMenu ? null : selectedAgent;
+        await loadAgentValues(agentId);
 
       } catch (err) {
         console.error('Error loading configuration:', err);
@@ -88,6 +124,14 @@ export default function ConfigPage() {
     loadData();
   }, []);
 
+  // Reload values when agent selection changes
+  React.useEffect(() => {
+    if (!loading) {
+      const agentId = showMainMenu ? null : selectedAgent;
+      loadAgentValues(agentId);
+    }
+  }, [selectedAgent, showMainMenu, loadAgentValues]);
+
   const handleValueChange = async (sectionKey: string, fieldKey: string, value: any, envVar?: string) => {
     const changeKey = `${sectionKey}.${fieldKey}`;
 
@@ -97,10 +141,19 @@ export default function ConfigPage() {
       [changeKey]: { sectionKey, fieldKey, value, envVar }
     }));
 
+    // Update both envVar and nested structure for immediate UI feedback
     if (envVar) {
       setConfigValues(prev => ({
         ...prev,
         [envVar]: value
+      }));
+    } else {
+      setConfigValues(prev => ({
+        ...prev,
+        [sectionKey]: {
+          ...(prev[sectionKey] || {}),
+          [fieldKey]: value
+        }
       }));
     }
 
@@ -137,6 +190,10 @@ export default function ConfigPage() {
         description: `${fieldKey} has been updated successfully.`,
       });
 
+      // Refresh values from server to ensure UI shows saved state
+      const agentId = showMainMenu ? null : selectedAgent;
+      await loadAgentValues(agentId);
+
     } catch (error) {
       console.error('Error updating configuration:', error);
 
@@ -146,13 +203,16 @@ export default function ConfigPage() {
         description: `Failed to update ${fieldKey}. Please try again.`,
       });
 
-      // Revert local change on error
-      if (envVar) {
-        setConfigValues(prev => ({
-          ...prev,
-          [envVar]: prev[envVar] // Revert to previous value
-        }));
-      }
+      // Revert local change on error - reload from server is more reliable
+      const agentId = showMainMenu ? null : selectedAgent;
+      await loadAgentValues(agentId);
+
+      // Remove from pending changes
+      setPendingChanges(prev => {
+        const updated = { ...prev };
+        delete updated[changeKey];
+        return updated;
+      });
     }
   };
 

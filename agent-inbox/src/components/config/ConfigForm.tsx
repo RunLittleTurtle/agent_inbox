@@ -49,24 +49,51 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
     }));
   };
 
-  const getCurrentValue = (field: ConfigField) => {
-    if (field.envVar) {
-      return values[field.envVar] || field.default || '';
+  const getCurrentValue = (section: ConfigSection, field: ConfigField) => {
+    // Handle environment variable fields (flat structure from API)
+    if (field.envVar && values[field.envVar] !== undefined) {
+      return values[field.envVar];
     }
+
+    // Handle nested structure fields (for non-envVar fields)
+    if (values[section.key]?.[field.key] !== undefined) {
+      return values[section.key][field.key];
+    }
+
+    // Fall back to default value
     return field.default || '';
   };
 
   const handleFieldChange = (section: ConfigSection, field: ConfigField, value: any) => {
-    // TODO(human) - Implement the field change handler logic
-    // This function should handle different field types and call onValueChange appropriately
-    // Consider these field types: text, password, boolean, select, number, textarea
-    // Handle validation and type conversion before calling onValueChange
+    // Handle type-specific conversions
+    let processedValue = value;
 
-    onValueChange(section.key, field.key, value, field.envVar);
+    switch (field.type) {
+      case 'number':
+        // Ensure numbers are properly parsed
+        processedValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
+        break;
+      case 'boolean':
+        // Ensure booleans are actual boolean types
+        processedValue = typeof value === 'string' ? value === 'true' : value;
+        break;
+      case 'select':
+      case 'text':
+      case 'password':
+      case 'textarea':
+        // Ensure strings are strings
+        processedValue = String(value);
+        break;
+      default:
+        processedValue = value;
+    }
+
+    // Call the parent's value change handler with processed value
+    onValueChange(section.key, field.key, processedValue, field.envVar);
   };
 
   const renderField = (section: ConfigSection, field: ConfigField) => {
-    const currentValue = getCurrentValue(field);
+    const currentValue = getCurrentValue(section, field);
     const fieldId = `${section.key}-${field.key}`;
 
     switch (field.type) {

@@ -57,6 +57,43 @@ function getPythonConfigValues(agentId: string | string[] | undefined) {
         };
       }
     }
+
+    if (agentId === 'email_agent') {
+      // Read values from the email agent's config.py
+      const projectRoot = path.join(process.cwd(), '..');
+      const configPath = path.join(projectRoot, 'src/email_agent/config.py');
+
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, 'utf8');
+
+        // Extract LLM_CONFIG values
+        const modelMatch = content.match(/"model":\s*"([^"]+)"/);
+        const tempMatch = content.match(/"temperature":\s*([\d.]+)/);
+        const maxTokensMatch = content.match(/"max_tokens":\s*([\d]+)/);
+        const streamingMatch = content.match(/"streaming":\s*(True|False)/);
+
+        // Extract agent identity values
+        const agentNameMatch = content.match(/AGENT_NAME\s*=\s*"([^"]+)"/);
+        const displayNameMatch = content.match(/AGENT_DISPLAY_NAME\s*=\s*"([^"]+)"/);
+        const descriptionMatch = content.match(/AGENT_DESCRIPTION\s*=\s*"([^"]+)"/);
+        const mcpServiceMatch = content.match(/MCP_SERVICE\s*=\s*"([^"]+)"/);
+
+        return {
+          llm: {
+            model: modelMatch?.[1] || 'claude-sonnet-4-20250514',
+            temperature: tempMatch ? parseFloat(tempMatch[1]) : 0.3,
+            max_tokens: maxTokensMatch ? parseInt(maxTokensMatch[1]) : 2000,
+            streaming: streamingMatch?.[1] === 'True'
+          },
+          agent_identity: {
+            agent_name: agentNameMatch?.[1] || 'email',
+            agent_display_name: displayNameMatch?.[1] || 'Email',
+            agent_description: descriptionMatch?.[1] || 'email management and Gmail operations',
+            mcp_service: mcpServiceMatch?.[1] || 'google_gmail'
+          }
+        };
+      }
+    }
   } catch (error) {
     console.error('Error reading Python config values:', error);
   }

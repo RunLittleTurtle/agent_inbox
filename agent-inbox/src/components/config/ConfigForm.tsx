@@ -20,6 +20,7 @@ interface ConfigField {
   description?: string;
   placeholder?: string;
   required?: boolean;
+  readonly?: boolean;
   options?: string[];
   validation?: any;
   note?: string;
@@ -109,9 +110,10 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
                 id={fieldId}
                 type={showPasswords[fieldId] ? "text" : "password"}
                 value={currentValue}
-                onChange={(e) => handleFieldChange(section, field, e.target.value)}
+                onChange={(e) => !field.readonly && handleFieldChange(section, field, e.target.value)}
                 placeholder={field.placeholder}
-                className="pr-10"
+                className={`pr-10 ${field.readonly ? 'bg-gray-50 text-gray-600' : ''}`}
+                readOnly={field.readonly}
               />
               <Button
                 type="button"
@@ -140,9 +142,11 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
             <Textarea
               id={fieldId}
               value={currentValue}
-              onChange={(e) => handleFieldChange(section, field, e.target.value)}
+              onChange={(e) => !field.readonly && handleFieldChange(section, field, e.target.value)}
               placeholder={field.placeholder}
               rows={3}
+              className={field.readonly ? 'bg-gray-50 text-gray-600' : ''}
+              readOnly={field.readonly}
             />
           </div>
         );
@@ -153,7 +157,8 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
             <Switch
               id={fieldId}
               checked={currentValue === true || currentValue === 'true'}
-              onCheckedChange={(checked) => handleFieldChange(section, field, checked)}
+              onCheckedChange={(checked) => !field.readonly && handleFieldChange(section, field, checked)}
+              disabled={field.readonly}
             />
             <Label htmlFor={fieldId} className="flex items-center gap-2">
               {field.label}
@@ -171,7 +176,8 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
             </Label>
             <Select
               value={currentValue}
-              onValueChange={(value) => handleFieldChange(section, field, value)}
+              onValueChange={(value) => !field.readonly && handleFieldChange(section, field, value)}
+              disabled={field.readonly}
             >
               <SelectTrigger>
                 <SelectValue placeholder={field.placeholder} />
@@ -198,11 +204,13 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
               id={fieldId}
               type="number"
               value={currentValue}
-              onChange={(e) => handleFieldChange(section, field, parseFloat(e.target.value) || 0)}
+              onChange={(e) => !field.readonly && handleFieldChange(section, field, parseFloat(e.target.value) || 0)}
               placeholder={field.placeholder}
               min={field.validation?.min}
               max={field.validation?.max}
               step={field.validation?.step}
+              className={field.readonly ? 'bg-gray-50 text-gray-600' : ''}
+              readOnly={field.readonly}
             />
           </div>
         );
@@ -218,8 +226,10 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
               id={fieldId}
               type="text"
               value={currentValue}
-              onChange={(e) => handleFieldChange(section, field, e.target.value)}
+              onChange={(e) => !field.readonly && handleFieldChange(section, field, e.target.value)}
               placeholder={field.placeholder}
+              className={field.readonly ? 'bg-gray-50 text-gray-600' : ''}
+              readOnly={field.readonly}
             />
           </div>
         );

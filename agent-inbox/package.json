@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:config": "next dev -p 3004",
+    "dev:config:clean": "sh scripts/clear-cache.sh && next dev -p 3004",
+    "clear-cache": "sh scripts/clear-cache.sh",
     "build": "next build",
     "start": "next start",
     "start:config": "next start -p 3004",

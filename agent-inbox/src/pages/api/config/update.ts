@@ -129,6 +129,71 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
       return true;
     }
 
+    // Special handling for email_agent
+    if (configPath.includes('email_agent')) {
+      // For the email agent, update the config.py file instead of ui_config.py
+      const configPyPath = fullPath.replace('ui_config.py', 'config.py');
+
+      if (!fs.existsSync(configPyPath)) {
+        console.error(`Email agent config.py not found: ${configPyPath}`);
+        return false;
+      }
+
+      let configContent = fs.readFileSync(configPyPath, 'utf8');
+
+      // Update LLM_CONFIG fields
+      if (sectionKey === 'llm') {
+        if (fieldKey === 'model') {
+          configContent = configContent.replace(
+            /("model":\s*")([^"]+)(")/,
+            `$1${value}$3`
+          );
+        } else if (fieldKey === 'temperature') {
+          configContent = configContent.replace(
+            /("temperature":\s*)([\d.]+)/,
+            `$1${value}`
+          );
+        } else if (fieldKey === 'max_tokens') {
+          if (configContent.includes('"max_tokens"')) {
+            configContent = configContent.replace(
+              /("max_tokens":\s*)([\d]+)/,
+              `$1${value}`
+            );
+          } else {
+            configContent = configContent.replace(
+              /("streaming":\s*False)(,?)(\s*\n\s*})/,
+              `$1,\n    "max_tokens": ${value}$3`
+            );
+          }
+        } else if (fieldKey === 'streaming') {
+          configContent = configContent.replace(
+            /("streaming":\s*)(True|False)/,
+            `$1${value ? 'True' : 'False'}`
+          );
+        }
+      }
+      // Update agent identity fields
+      else if (sectionKey === 'agent_identity') {
+        const mappings: Record<string, string> = {
+          'agent_name': 'AGENT_NAME',
+          'agent_display_name': 'AGENT_DISPLAY_NAME',
+          'agent_description': 'AGENT_DESCRIPTION',
+          'mcp_service': 'MCP_SERVICE'
+        };
+
+        const varName = mappings[fieldKey];
+        if (varName) {
+          const regex = new RegExp(`(${varName}\\s*=\\s*")([^"]+)(")`, 'g');
+          configContent = configContent.replace(regex, `$1${value}$3`);
+        }
+      }
+
+      // Write the updated content back
+      fs.writeFileSync(configPyPath, configContent, 'utf8');
+      console.log(`Successfully updated ${fieldKey} in ${configPyPath}`);
+      return true;
+    }
+
     // For other Python config files, implement similar logic as needed
     console.warn(`Config file updates not implemented for: ${configPath}`);
     return false;

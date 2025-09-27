@@ -41,6 +41,7 @@ const AGENT_CONFIG_PATHS = [
   'src/drive_react_agent/ui_config.py',
   'src/executive-ai-assistant/ui_config_wrapper.py',
   'src/job_search_agent/ui_config.py',
+  'src/email_agent/ui_config.py',
 ];
 
 function parseConfigFile(filePath: string): AgentConfigData | null {

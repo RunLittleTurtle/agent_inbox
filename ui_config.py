@@ -47,7 +47,7 @@ CONFIG_SECTIONS = [
                 'envVar': 'AGENT_INBOX_GRAPH_ID',
                 'default': 'agent',
                 'description': 'Main graph identifier for agent system',
-                'required': True
+                'readonly': True
             },
             {
                 'key': 'langgraph_deployment_url',
@@ -56,7 +56,7 @@ CONFIG_SECTIONS = [
                 'envVar': 'LANGGRAPH_DEPLOYMENT_URL',
                 'default': 'http://localhost:2024',
                 'description': 'LangGraph server deployment endpoint',
-                'required': True
+                'readonly': True
             },
             {
                 'key': 'langsmith_api_key',
@@ -67,20 +67,13 @@ CONFIG_SECTIONS = [
                 'placeholder': 'lsv2_pt_...'
             },
             {
-                'key': 'langchain_tracing_v2',
-                'label': 'Enable LangChain Tracing',
-                'type': 'boolean',
-                'envVar': 'LANGCHAIN_TRACING_V2',
-                'default': True,
-                'description': 'Enable detailed tracing for debugging'
-            },
-            {
                 'key': 'langchain_project',
                 'label': 'LangChain Project Name',
                 'type': 'text',
                 'envVar': 'LANGCHAIN_PROJECT',
                 'default': 'ambient-email-agent',
-                'description': 'Project name for LangSmith organization'
+                'description': 'Project name for LangSmith organization',
+                'readonly': True
             }
         ]
     },
@@ -95,7 +88,8 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'envVar': 'GOOGLE_OAUTH_CREDENTIALS',
                 'description': 'Path to Google OAuth JSON credentials file',
-                'placeholder': '/path/to/client_secret_xxx.json'
+                'placeholder': '/path/to/client_secret_xxx.json',
+                'readonly': True
             },
             {
                 'key': 'google_client_id',
@@ -203,7 +197,8 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'envVar': 'MCP_SERVER_GOOGLE_WORKSPACE',
                 'default': 'http://localhost:3000/mcp',
-                'description': 'Local Google Workspace MCP server URL'
+                'description': 'Local Google Workspace MCP server URL',
+                'readonly': True
             }
         ]
     },
@@ -220,7 +215,7 @@ CONFIG_SECTIONS = [
                 'default': 'development',
                 'description': 'Current environment mode',
                 'options': ['development', 'staging', 'production'],
-                'required': True
+                'readonly': True
             },
             {
                 'key': 'log_level',
@@ -229,7 +224,8 @@ CONFIG_SECTIONS = [
                 'envVar': 'LOG_LEVEL',
                 'default': 'INFO',
                 'description': 'System logging level',
-                'options': ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+                'options': ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                'readonly': True
             },
             {
                 'key': 'force_langgraph_api',
@@ -237,7 +233,8 @@ CONFIG_SECTIONS = [
                 'type': 'boolean',
                 'envVar': 'FORCE_LANGGRAPH_API',
                 'default': True,
-                'description': 'Force use of LangGraph API mode'
+                'description': 'Force use of LangGraph API mode',
+                'readonly': True
             },
             {
                 'key': 'use_enhanced_calendar_agent',
@@ -245,7 +242,8 @@ CONFIG_SECTIONS = [
                 'type': 'boolean',
                 'envVar': 'USE_ENHANCED_CALENDAR_AGENT',
                 'default': True,
-                'description': 'Enable the enhanced calendar agent features'
+                'description': 'Enable the enhanced calendar agent features',
+                'readonly': True
             }
         ]
     },

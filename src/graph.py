@@ -188,6 +188,42 @@ async def create_job_search_agent():
             prompt=job_prompt
         )
 
+
+async def create_email_agent():
+    """Create Email agent with MCP integration for email management and Gmail operations"""
+    try:
+        from src.email_agent.x_agent_orchestrator import create_email_agent as create_email_orchestrator
+
+        # Use proper email agent orchestrator (returns compiled workflow)
+        email_agent_workflow = create_email_orchestrator()
+
+        logger.info("Email agent with MCP integration initialized successfully")
+        return email_agent_workflow
+
+    except Exception as e:
+        logger.error(f"Failed to create email agent with MCP: {e}")
+        logger.info("Creating fallback email agent without MCP tools")
+
+        # Fallback: basic email agent without MCP tools
+        email_model = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
+            temperature=0,
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+            streaming=False
+        )
+
+        fallback_prompt = """You are a Email assistant.
+        I apologize, but I cannot directly access Gmail at the moment due to a technical issue.
+        I can provide general email management and Gmail operations assistance and planning, but cannot perform actual operations.
+        Please let me know how I can assist you with email management and Gmail operations planning."""
+
+        return create_react_agent(
+            model=email_model,
+            tools=[],
+            name="email_agent_fallback",
+            prompt=fallback_prompt
+        )
+
 def validate_environment():
     """Validate required environment variables"""
     required_vars = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
@@ -287,7 +323,7 @@ IMPORTANT --> Always look at agent list before trying to answer!!
 
 AGENT CAPABILITIES:
 - calendar_agent: All calendar operations (create/view/modify events, check availability, scheduling)
-- email_agent: **PRIMARY EMAIL AGENT** - Email composition/drafting/writing → email_agent / Email management (list, send drafts, search) → email_agent / Email reading/organization/ → email_agent
+- email_agent: **PRIMARY EMAIL AGENT** - Email composition/drafting/writing → email_agent / Email management (list, send drafts, search) → email_agent / Email reading/organization/ → email_agent IMPORTANT : If the agent writes a DRAFTor a NEW email you MUST show it to the user
 - ALL EMAIL TASKS → email_agent (autonomous subgraph)
 - job_search_agent: CV upload, Job Offer, Job search, resume/cover letter advice, interview prep
 - drive_agent: File management, Google Drive integration, file sharing, document collaboration

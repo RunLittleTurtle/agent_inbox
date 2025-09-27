@@ -82,7 +82,7 @@ def find_processes_on_port(port: int) -> List[psutil.Process]:
     for proc in psutil.process_iter(['pid', 'name']):
         try:
             # Get connections separately to avoid attr access issues
-            connections = proc.connections()
+            connections = proc.net_connections()
             for conn in connections:
                 if hasattr(conn, 'laddr') and conn.laddr.port == port:
                     processes.append(proc)
@@ -712,17 +712,18 @@ def start(
     inbox_port: int = typer.Option(3000, "--inbox-port", help="Port for Agent Inbox UI"),
     chat_port: int = typer.Option(3001, "--chat-port", help="Port for Agent Chat UI"),
     chat_2_port: int = typer.Option(3002, "--chat-2-port", help="Port for Agent Chat UI 2 (original)"),
+    config_port: int = typer.Option(3004, "--config-port", help="Port for Configuration UI"),
     studio: bool = typer.Option(True, "--studio/--no-studio", help="Open LangSmith Studio")
 ):
     """
     🚀 Start complete AI agent stack with all UIs
 
-    Launches LangGraph server, Executive AI Assistant, Agent Inbox, Agent Chat UI, Agent Chat UI 2 (original), and LangSmith Studio.
+    Launches LangGraph server, Executive AI Assistant, Agent Inbox, Agent Chat UI, Agent Chat UI 2 (original), Configuration UI, and LangSmith Studio.
     This is the one-command solution to get everything running.
     """
     console.print(Panel.fit(
         "🚀 [bold green]Starting Complete AI Agent Stack[/bold green]",
-        subtitle="LangGraph + Executive Assistant + Agent Inbox + Agent Chat + Agent Chat 2 + LangSmith Studio"
+        subtitle="LangGraph + Executive Assistant + Agent Inbox + Agent Chat + Agent Chat 2 + Config UI + LangSmith Studio"
     ))
 
     ensure_venv()
@@ -845,17 +846,34 @@ def start(
         chat_2_process = subprocess.Popen(["npm", "run", "dev"], env=chat_2_env)
 
         console.print(f"[green]✅ Agent Chat UI 2 starting on port {chat_2_port}[/green]")
+
+        # Step 6: Start Configuration UI
+        console.print("[blue]📋 Step 6: Starting Configuration UI...[/blue]")
+
+        # Kill existing Config UI processes
+        killed_config = kill_processes_on_port(config_port, "Configuration UI")
+        if not killed_config:
+            console.print(f"[green]✅ No existing Configuration UI processes found on port {config_port}[/green]")
+
+        # Start Configuration UI
+        os.chdir(AGENT_INBOX_PATH)
+        config_env = os.environ.copy()
+        config_env['PORT'] = str(config_port)
+        config_process = subprocess.Popen(["npm", "run", "dev:config"], env=config_env)
+
+        console.print(f"[green]✅ Configuration UI starting on port {config_port}[/green]")
         console.print("[blue]💭 Waiting for all UIs to initialize...[/blue]")
         time.sleep(8)  # Give all services time to start
 
-        # Step 6: Open all browser interfaces
-        console.print("[blue]📋 Step 6: Opening all browser interfaces...[/blue]")
+        # Step 7: Open all browser interfaces
+        console.print("[blue]📋 Step 7: Opening all browser interfaces...[/blue]")
 
         langgraph_url = f"http://127.0.0.1:{langgraph_port}"
         executive_url = f"http://127.0.0.1:{executive_port}"
         inbox_url = f"http://localhost:{inbox_port}"
         chat_url = f"http://localhost:{chat_port}"
         chat_2_url = f"http://localhost:{chat_2_port}"
+        config_url = f"http://localhost:{config_port}/config"
 
         # Open LangSmith Studio first
         if studio:
@@ -882,6 +900,11 @@ def start(
         executive_studio_url = f"https://smith.langchain.com/studio/?baseUrl={executive_url}"
         console.print(f"[green]🤖 Opening Executive AI Assistant Studio at {executive_studio_url}[/green]")
         webbrowser.open(executive_studio_url)
+        time.sleep(1)
+
+        # Open Configuration UI
+        console.print(f"[green]⚙️  Opening Configuration UI at {config_url}[/green]")
+        webbrowser.open(config_url)
 
         # Success summary
         console.print()
@@ -892,6 +915,7 @@ def start(
             f"📧 Agent Inbox UI: [link]{inbox_url}[/link]\n"
             f"💬 Agent Chat UI: [link]{chat_url}[/link]\n"
             f"💬 Agent Chat UI 2 (original): [link]{chat_2_url}[/link]\n"
+            f"⚙️  Configuration UI: [link]{config_url}[/link]\n"
             f"🎨 LangSmith Studio: [link]{LANGSMITH_STUDIO}[/link]\n\n"
             f"[dim]All Studio windows opened automatically in separate browser tabs[/dim]\n"
             f"[dim]Press Ctrl+C to stop all services[/dim]",
@@ -918,6 +942,9 @@ def start(
                 if chat_2_process.poll() is not None:
                     console.print("[red]❌ Agent Chat UI 2 stopped unexpectedly[/red]")
                     break
+                if config_process.poll() is not None:
+                    console.print("[red]❌ Configuration UI stopped unexpectedly[/red]")
+                    break
                 time.sleep(1)
         except KeyboardInterrupt:
             console.print("\n[yellow]📱 Stopping all services...[/yellow]")
@@ -928,19 +955,24 @@ def start(
             inbox_process.terminate()
             chat_process.terminate()
             chat_2_process.terminate()
+            config_process.terminate()
 
             # Wait for them to stop
             try:
                 langgraph_process.wait(timeout=5)
+                executive_process.wait(timeout=5)
                 inbox_process.wait(timeout=5)
                 chat_process.wait(timeout=5)
                 chat_2_process.wait(timeout=5)
+                config_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 console.print("[yellow]💀 Force killing remaining processes...[/yellow]")
                 langgraph_process.kill()
+                executive_process.kill()
                 inbox_process.kill()
                 chat_process.kill()
                 chat_2_process.kill()
+                config_process.kill()
 
             console.print("[green]✅ All services stopped[/green]")
 
@@ -993,6 +1025,126 @@ def setup_oauth():
     except Exception as e:
         console.print(f"[red]❌ Error during OAuth setup: {e}[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def config(
+    port: int = typer.Option(3004, "--port", "-p", help="Port to run Config UI on"),
+    clean: bool = typer.Option(False, "--clean", help="Clear cache before starting"),
+    restart: bool = typer.Option(True, "--restart/--no-restart", help="Kill existing processes and restart")
+):
+    """
+    ⚙️ Launch the Configuration UI
+
+    Opens the configuration interface for managing agents and system settings.
+    Use --clean to clear Next.js cache if you encounter runtime errors.
+    """
+    console.print(Panel.fit(
+        "⚙️ [bold cyan]Configuration UI Launcher[/bold cyan]",
+        subtitle="Agent Configuration Management"
+    ))
+
+    ensure_venv()
+
+    if not AGENT_INBOX_PATH.exists():
+        console.print(f"[red]❌ Agent Inbox directory not found: {AGENT_INBOX_PATH}[/red]")
+        raise typer.Exit(1)
+
+    # Kill existing processes on the port if restart is enabled
+    if restart:
+        if kill_processes_on_port(port, "Config UI"):
+            console.print("[green]✅ Cleaned up existing processes[/green]")
+
+    # Clear cache if requested
+    if clean:
+        console.print("[yellow]🧹 Clearing Next.js cache...[/yellow]")
+        try:
+            os.chdir(AGENT_INBOX_PATH)
+            subprocess.run(["rm", "-rf", ".next"], capture_output=True)
+            subprocess.run(["rm", "-rf", "node_modules/.cache"], capture_output=True)
+            subprocess.run(["npm", "cache", "clean", "--force"], capture_output=True)
+            console.print("[green]✅ Cache cleared successfully![/green]")
+        except Exception as e:
+            console.print(f"[yellow]⚠️  Error clearing cache: {e}[/yellow]")
+
+    # Start the config UI
+    console.print(f"[green]🚀 Starting Config UI on port {port}...[/green]")
+    os.chdir(AGENT_INBOX_PATH)
+
+    cmd = ["npm", "run", "dev:config"]
+
+    try:
+        process = subprocess.Popen(cmd)
+        time.sleep(3)  # Give it time to start
+
+        config_url = f"http://localhost:{port}/config"
+        console.print(f"[green]✅ Config UI started successfully![/green]")
+        console.print(f"[blue]🌐 Opening {config_url}[/blue]")
+
+        webbrowser.open(config_url)
+
+        console.print("[yellow]Press Ctrl+C to stop the server[/yellow]")
+        process.wait()
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⚠️  Shutting down Config UI...[/yellow]")
+        process.terminate()
+        process.wait()
+        console.print("[green]✅ Config UI stopped[/green]")
+    except Exception as e:
+        console.print(f"[red]❌ Error starting Config UI: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def clear_cache():
+    """
+    🧹 Clear Next.js cache for config UI
+
+    Clears all Next.js cache files to fix runtime errors.
+    Use this if you encounter ENOENT errors when running the config UI.
+    """
+    console.print(Panel.fit(
+        "🧹 [bold yellow]Cache Cleaner[/bold yellow]",
+        subtitle="Clear Next.js cache files"
+    ))
+
+    ensure_venv()
+
+    if not AGENT_INBOX_PATH.exists():
+        console.print(f"[red]❌ Agent Inbox directory not found: {AGENT_INBOX_PATH}[/red]")
+        raise typer.Exit(1)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Clearing cache...", total=4)
+
+        # Kill processes on port 3004
+        progress.update(task, description="Killing processes on port 3004...")
+        kill_processes_on_port(3004, "Config UI")
+        progress.advance(task)
+
+        # Clear .next directory
+        progress.update(task, description="Clearing .next directory...")
+        subprocess.run(["rm", "-rf", str(AGENT_INBOX_PATH / ".next")], capture_output=True)
+        progress.advance(task)
+
+        # Clear node_modules cache
+        progress.update(task, description="Clearing node_modules cache...")
+        subprocess.run(["rm", "-rf", str(AGENT_INBOX_PATH / "node_modules" / ".cache")], capture_output=True)
+        progress.advance(task)
+
+        # Clear npm cache
+        progress.update(task, description="Clearing npm cache...")
+        os.chdir(AGENT_INBOX_PATH)
+        subprocess.run(["npm", "cache", "clean", "--force"], capture_output=True)
+        progress.advance(task)
+
+    console.print("[green]✅ Cache cleared successfully![/green]")
+    console.print("[blue]💡 You can now run: python cli.py config[/blue]")
 
 
 @app.command()

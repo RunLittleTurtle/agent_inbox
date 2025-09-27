@@ -45,10 +45,11 @@ class BookingNode:
     """Dedicated node for booking operations with human approval"""
 
     def __init__(self, booking_tools: List, model: Optional[ChatAnthropic] = None):
+        from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
         self.booking_tools = booking_tools
         self.model = model or ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
-            temperature=0,
+            model=LLM_CONFIG.get("model", "claude-3-5-sonnet-20241022"),
+            temperature=LLM_CONFIG.get("temperature", 0.1),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY")
         )
         # Initialize the MCP executor
@@ -232,9 +233,9 @@ class BookingNode:
     ) -> Optional[Dict[str, Any]]:
         """Enhanced booking detail extraction with full conversation context"""
 
-        # Get timezone context from .env using async pattern
+        # Get timezone context from config using async pattern
 
-        timezone_name = os.getenv("USER_TIMEZONE", "America/Toronto")
+        timezone_name = USER_TIMEZONE
         # Use asyncio.to_thread to avoid blocking I/O in async context
         current_time = await asyncio.to_thread(lambda: datetime.now(ZoneInfo(timezone_name)))
 
@@ -269,6 +270,8 @@ CURRENT TIME CONTEXT:
 - Timezone: {timezone_name}
 - Today's date: {current_time.strftime('%Y-%m-%d')}
 - Current day: {current_time.strftime('%A')}
+- Work hours: {WORK_HOURS_START} - {WORK_HOURS_END}
+- Default meeting duration: {DEFAULT_MEETING_DURATION} minutes
 
 EXTRACTION RULES:
 1. Use the FULL conversation context to understand the booking intent

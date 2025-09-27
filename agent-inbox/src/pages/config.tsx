@@ -190,6 +190,9 @@ export default function ConfigPage() {
         description: `${fieldKey} has been updated successfully.`,
       });
 
+      // Small delay to ensure file write is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Refresh values from server to ensure UI shows saved state
       const agentId = showMainMenu ? null : selectedAgent;
       await loadAgentValues(agentId);

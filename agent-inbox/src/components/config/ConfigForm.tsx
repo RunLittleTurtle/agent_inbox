@@ -226,10 +226,25 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
               id={fieldId}
               type="text"
               value={currentValue}
-              onChange={(e) => !field.readonly && handleFieldChange(section, field, e.target.value)}
+              onChange={(e) => {
+                console.log(`Field ${field.key} onChange:`, {
+                  fieldKey: field.key,
+                  readonly: field.readonly,
+                  value: e.target.value,
+                  currentValue,
+                  envVar: field.envVar,
+                  sectionKey: section.key
+                });
+                if (!field.readonly) {
+                  handleFieldChange(section, field, e.target.value);
+                }
+              }}
+              onFocus={() => console.log(`Field ${field.key} focused, readonly: ${field.readonly}`)}
+              onClick={() => console.log(`Field ${field.key} clicked, readonly: ${field.readonly}`)}
               placeholder={field.placeholder}
               className={field.readonly ? 'bg-gray-50 text-gray-600' : ''}
               readOnly={field.readonly}
+              disabled={field.readonly}
             />
           </div>
         );

@@ -1,6 +1,6 @@
 """
 Calendar Agent UI Configuration Schema
-Streamlined config interface focused on essential user settings
+Optimized configuration for calendar agent settings
 """
 
 CONFIG_INFO = {
@@ -14,7 +14,7 @@ CONFIG_SECTIONS = [
     {
         'key': 'agent_identity',
         'label': 'Agent Information',
-        'description': 'Calendar agent identification',
+        'description': 'Calendar agent identification and status',
         'fields': [
             {
                 'key': 'agent_name',
@@ -27,10 +27,10 @@ CONFIG_SECTIONS = [
             {
                 'key': 'agent_status',
                 'label': 'Status',
-                'type': 'text',
-                'default': 'Active',
-                'description': 'Agent operational status',
-                'readonly': True
+                'type': 'select',
+                'default': 'active',
+                'description': 'Enable or disable this agent',
+                'options': ['active', 'disabled']
             }
         ]
     },
@@ -87,10 +87,11 @@ CONFIG_SECTIONS = [
                 'key': 'timezone',
                 'label': 'Timezone',
                 'type': 'select',
-                'envVar': 'USER_TIMEZONE',
-                'default': 'America/Toronto',
-                'description': 'Your timezone for scheduling',
+                'default': 'global',
+                'description': 'Your timezone - select Use Global for system default',
+                'placeholder': 'Select timezone',
                 'options': [
+                    'global',
                     'America/Toronto',
                     'America/Montreal',
                     'America/New_York',
@@ -98,7 +99,10 @@ CONFIG_SECTIONS = [
                     'America/Chicago',
                     'Europe/London',
                     'Europe/Paris',
-                    'Asia/Tokyo'
+                    'Europe/Berlin',
+                    'Asia/Tokyo',
+                    'Asia/Shanghai',
+                    'Australia/Sydney'
                 ]
             },
             {
@@ -107,7 +111,7 @@ CONFIG_SECTIONS = [
                 'type': 'select',
                 'default': '09:00',
                 'description': 'Start of your work day',
-                'options': ['07:00', '08:00', '09:00', '10:00']
+                'options': ['07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00']
             },
             {
                 'key': 'work_hours_end',
@@ -115,15 +119,15 @@ CONFIG_SECTIONS = [
                 'type': 'select',
                 'default': '17:00',
                 'description': 'End of your work day',
-                'options': ['16:00', '17:00', '18:00', '19:00', '20:00']
+                'options': ['16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00']
             },
             {
                 'key': 'default_meeting_duration',
                 'label': 'Default Meeting Duration',
                 'type': 'select',
                 'default': '30',
-                'description': 'Default duration for new meetings',
-                'options': ['15', '30', '45', '60', '90']
+                'description': 'Default duration for new meetings (minutes)',
+                'options': ['15', '30', '45', '60', '90', '120']
             }
         ]
     }

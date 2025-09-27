@@ -20,20 +20,38 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # TODO: Configure for your agent
-AGENT_NAME = "{AGENT_NAME}"  # e.g., "gmail", "sheets", "drive"
+AGENT_NAME = "{AGENT_NAME}"  # e.g., "gmail", "sheets", "drive" - DO NOT CHANGE (internal identifier)
 AGENT_DISPLAY_NAME = "{AGENT_DISPLAY_NAME}"  # e.g., "Gmail", "Google Sheets", "Google Drive"
 AGENT_DESCRIPTION = "{AGENT_DESCRIPTION}"  # e.g., "email management", "spreadsheet operations"
 MCP_SERVICE = "{MCP_SERVICE}"  # e.g., "google_gmail", "google_sheets", "google_drive"
+AGENT_STATUS = "disabled"  # active or disabled
+
+# Agent Prompt Configuration
+AGENT_PROMPT = """You are a helpful AI assistant specialized in {AGENT_DESCRIPTION}.
+Use the available tools to help users efficiently."""
 
 # MCP Environment Variable
 MCP_ENV_VAR = f"PIPEDREAM_MCP_SERVER_{MCP_SERVICE}"
 
-# Timezone configuration from environment
-USER_TIMEZONE = os.getenv("USER_TIMEZONE", "America/Toronto")
+# MCP Server URL - centralized configuration
+# This gets the URL from the environment variable dynamically
+MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '')
+
+# Timezone Configuration
+# 'global' means use the system-wide USER_TIMEZONE from main .env
+TEMPLATE_TIMEZONE = 'global'  # This will be updated by config UI
+
+# Effective timezone: Use agent-specific if set, otherwise fall back to global
+if TEMPLATE_TIMEZONE == 'global' or not TEMPLATE_TIMEZONE:
+    # Use the global timezone from main .env
+    USER_TIMEZONE = os.getenv('USER_TIMEZONE', 'America/Toronto')
+else:
+    # Use the agent-specific timezone
+    USER_TIMEZONE = TEMPLATE_TIMEZONE
 
 LLM_CONFIG = {
     "model": "claude-sonnet-4-20250514",
-    "temperature": 0.3,
+    "temperature": 0.2,
     "streaming": False,  # Disable streaming for LangGraph compatibility
     "api_key": os.getenv("ANTHROPIC_API_KEY")
 }
@@ -68,3 +86,7 @@ def get_current_context() -> Dict[str, str]:
             "tomorrow": f"{current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})",
             "time_str": current_time.strftime('%I:%M %p UTC')
         }
+
+def is_agent_enabled():
+    """Check if the agent is enabled"""
+    return AGENT_STATUS == "active"

@@ -21,7 +21,7 @@ except ImportError:
     import sys
     import os
     sys.path.append(os.path.dirname(__file__))
-    from config import AGENT_NAME, MCP_SERVICE
+    from config import AGENT_NAME, MCP_SERVICE, MCP_SERVER_URL
 
 # Load environment variables
 load_dotenv()
@@ -80,8 +80,8 @@ class AgentMCPConnection:
         self._mcp_tools: List[BaseTool] = []
         self._tools_cache_time: Optional[datetime] = None
 
-        # Get Pipedream service URL from environment
-        self.mcp_url = os.getenv(MCP_ENV_VAR)
+        # Get Pipedream service URL from config
+        self.mcp_url = MCP_SERVER_URL
 
         if self.mcp_url:
             self.mcp_servers = {

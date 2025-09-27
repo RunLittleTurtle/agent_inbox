@@ -48,14 +48,15 @@ class CalendarAgentWithMCP:
         model: Optional[ChatAnthropic] = None,
         mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None
     ):
+        from .config import LLM_CONFIG, MCP_SERVER_URL, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
         self.model = model or ChatAnthropic(
-            model="claude-sonnet-4-20250514",
-            temperature=0,
+            model=LLM_CONFIG.get("model", "claude-3-5-sonnet-20241022"),
+            temperature=LLM_CONFIG.get("temperature", 0.1),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY")
         )
 
         # MCP server configuration - connect to configured Pipedream Google Calendar MCP server
-        pipedream_url = os.getenv("PIPEDREAM_MCP_SERVER")
+        pipedream_url = MCP_SERVER_URL
         if pipedream_url:
             self.mcp_servers = mcp_servers or {
                 "pipedream_calendar": {
@@ -180,11 +181,11 @@ When users request calendar operations:
 
 NEVER claim to have successfully completed calendar operations when you have no tools."""
         else:
-            # Get timezone context from .env USER_TIMEZONE
+            # Get timezone context from config
             import os
             from zoneinfo import ZoneInfo
             from datetime import timedelta
-            timezone_name = os.getenv("USER_TIMEZONE", "America/Toronto")
+            timezone_name = USER_TIMEZONE
             current_time = datetime.now(ZoneInfo(timezone_name))
 
             prompt = f"""You are a helpful Calendar Agent with READ-ONLY access to Google Calendar via MCP tools.

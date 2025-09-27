@@ -46,8 +46,7 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'envVar': 'AGENT_INBOX_GRAPH_ID',
                 'default': 'agent',
-                'description': 'Main graph identifier for agent system',
-                'readonly': True
+                'description': 'Main graph identifier for agent system'
             },
             {
                 'key': 'langgraph_deployment_url',
@@ -55,8 +54,7 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'envVar': 'LANGGRAPH_DEPLOYMENT_URL',
                 'default': 'http://localhost:2024',
-                'description': 'LangGraph server deployment endpoint',
-                'readonly': True
+                'description': 'LangGraph server deployment endpoint'
             },
             {
                 'key': 'langsmith_api_key',
@@ -72,8 +70,7 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'envVar': 'LANGCHAIN_PROJECT',
                 'default': 'ambient-email-agent',
-                'description': 'Project name for LangSmith organization',
-                'readonly': True
+                'description': 'Project name for LangSmith organization'
             }
         ]
     },
@@ -88,8 +85,7 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'envVar': 'GOOGLE_OAUTH_CREDENTIALS',
                 'description': 'Path to Google OAuth JSON credentials file',
-                'placeholder': '/path/to/client_secret_xxx.json',
-                'readonly': True
+                'placeholder': '/path/to/client_secret_xxx.json'
             },
             {
                 'key': 'google_client_id',
@@ -242,8 +238,7 @@ CONFIG_SECTIONS = [
                 'type': 'boolean',
                 'envVar': 'USE_ENHANCED_CALENDAR_AGENT',
                 'default': True,
-                'description': 'Enable the enhanced calendar agent features',
-                'readonly': True
+                'description': 'Enable the enhanced calendar agent features'
             }
         ]
     },

@@ -9,8 +9,28 @@ function getCurrentEnvValues() {
     const projectRoot = path.join(process.cwd(), '..');
     const envPath = path.join(projectRoot, '.env');
 
-    // Load environment variables from .env file
-    config({ path: envPath });
+    // IMPORTANT: Force reload from disk, don't use cached process.env
+    // This ensures we get fresh values after updates
+    const envConfig = config({ path: envPath, override: true });
+
+    // Also read the file directly for env vars that might not be in process.env
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const envVars: Record<string, string> = {};
+
+      envContent.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          const [key, ...valueParts] = trimmed.split('=');
+          if (key) {
+            envVars[key.trim()] = valueParts.join('=').trim();
+          }
+        }
+      });
+
+      // Merge with process.env, preferring fresh file values
+      return { ...process.env, ...envVars };
+    }
 
     return process.env;
   } catch (error) {
@@ -90,6 +110,83 @@ function getPythonConfigValues(agentId: string | string[] | undefined) {
             agent_display_name: displayNameMatch?.[1] || 'Email',
             agent_description: descriptionMatch?.[1] || 'email management and Gmail operations',
             mcp_service: mcpServiceMatch?.[1] || 'google_gmail'
+          }
+        };
+      }
+    }
+
+    if (agentId === 'calendar_agent') {
+      const projectRoot = path.join(process.cwd(), '..');
+      const configPath = path.join(projectRoot, 'src/calendar_agent/config.py');
+
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, 'utf8');
+
+        // LLM Config
+        const modelMatch = content.match(/"model":\s*"([^"]+)"/);
+        const tempMatch = content.match(/"temperature":\s*([\d.]+)/);
+
+        // Agent Identity
+        const statusMatch = content.match(/AGENT_STATUS\s*=\s*"([^"]+)"/);
+
+        // User Preferences
+        const timezoneMatch = content.match(/CALENDAR_TIMEZONE\s*=\s*'([^']+)'/);
+        const workStartMatch = content.match(/WORK_HOURS_START\s*=\s*'([^']+)'/);
+        const workEndMatch = content.match(/WORK_HOURS_END\s*=\s*'([^']+)'/);
+        const meetingDurationMatch = content.match(/DEFAULT_MEETING_DURATION\s*=\s*'([^']+)'/);
+
+        return {
+          agent_identity: {
+            agent_name: 'calendar',  // This is readonly
+            agent_status: statusMatch?.[1] || 'active'
+          },
+          llm: {
+            model: modelMatch?.[1] || 'claude-3-5-sonnet-20241022',
+            temperature: tempMatch ? parseFloat(tempMatch[1]) : 0.1
+          },
+          user_preferences: {
+            timezone: timezoneMatch?.[1] || 'global',
+            work_hours_start: workStartMatch?.[1] || '09:00',
+            work_hours_end: workEndMatch?.[1] || '17:00',
+            default_meeting_duration: meetingDurationMatch?.[1] || '30'
+          }
+        };
+      }
+    }
+
+    if (agentId === 'drive_react_agent') {
+      const projectRoot = path.join(process.cwd(), '..');
+      const configPath = path.join(projectRoot, 'src/drive_react_agent/config.py');
+
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, 'utf8');
+
+        const modelMatch = content.match(/"model":\s*"([^"]+)"/);
+        const tempMatch = content.match(/"temperature":\s*([\d.]+)/);
+
+        return {
+          llm: {
+            model: modelMatch?.[1] || 'claude-sonnet-4-20250514',
+            temperature: tempMatch ? parseFloat(tempMatch[1]) : 0.2
+          }
+        };
+      }
+    }
+
+    if (agentId === 'job_search_agent') {
+      const projectRoot = path.join(process.cwd(), '..');
+      const configPath = path.join(projectRoot, 'src/job_search_agent/config.py');
+
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, 'utf8');
+
+        const modelMatch = content.match(/"model":\s*"([^"]+)"/);
+        const tempMatch = content.match(/"temperature":\s*([\d.]+)/);
+
+        return {
+          llm: {
+            model: modelMatch?.[1] || 'claude-sonnet-4-20250514',
+            temperature: tempMatch ? parseFloat(tempMatch[1]) : 0
           }
         };
       }

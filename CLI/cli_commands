@@ -46,10 +46,20 @@ Mutli-Agent: id -> agent / url -> http://localhost:2024
 Executive-ai:id -> main / url -> http://localhost:2025
 
 
-# config page for agent-inbox cache problem debug
+# Configuration UI Management
+python cli.py config                    # Launch Configuration UI on port 3004
+python cli.py config --clean            # Clear cache and launch Configuration UI
+python cli.py config --port 3005       # Launch Configuration UI on custom port
+python cli.py clear-cache              # Clear Next.js cache (fixes styling issues)
+
+# Manual cache clearing for debug (run in agent-inbox directory)
 When you get cache errors:
   npm run clear-cache
   npm run dev:config
 
   Or one command:
   npm run dev:config:clean
+
+  Or use the CLI:
+  python cli.py clear-cache
+  python cli.py config --clean

@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 try:
     from tools import discover_mcp_tools_sync, _agent_mcp
-    from config import AGENT_NAME, MCP_SERVICE, MCP_ENV_VAR
+    from config import AGENT_NAME, MCP_SERVICE, MCP_ENV_VAR, MCP_SERVER_URL
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you're running this script from the agent directory")
@@ -46,7 +46,7 @@ def print_header():
     print(f"Agent: {AGENT_NAME}")
     print(f"Service: {MCP_SERVICE}")
     print(f"Environment Variable: {MCP_ENV_VAR}")
-    print(f"MCP URL: {os.getenv(MCP_ENV_VAR, 'NOT SET')}")
+    print(f"MCP URL: {MCP_SERVER_URL or 'NOT SET'}")
     print("-"*70)
 
 
@@ -165,7 +165,7 @@ def main():
         sys.exit(1)
 
     # Validate environment
-    mcp_url = os.getenv(MCP_ENV_VAR)
+    mcp_url = MCP_SERVER_URL
     if not mcp_url:
         print(f"❌ Environment variable {MCP_ENV_VAR} is not set")
         print(f"Please add it to your .env file:")

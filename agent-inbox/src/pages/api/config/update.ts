@@ -26,10 +26,13 @@ function updateEnvVariable(envVar: string, value: any) {
     const envVarRegex = new RegExp(`^${envVar}=`);
     let updated = false;
 
+    // Special handling for 'global' value - store as empty string in .env
+    const envValue = value === 'global' ? '' : value;
+
     // Find and update existing variable
     for (let i = 0; i < lines.length; i++) {
       if (envVarRegex.test(lines[i])) {
-        lines[i] = `${envVar}=${value}`;
+        lines[i] = `${envVar}=${envValue}`;
         updated = true;
         break;
       }
@@ -37,7 +40,7 @@ function updateEnvVariable(envVar: string, value: any) {
 
     // Add new variable if not found
     if (!updated) {
-      lines.push(`${envVar}=${value}`);
+      lines.push(`${envVar}=${envValue}`);
     }
 
     // Write back to .env file
@@ -71,6 +74,22 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
       }
 
       let configContent = fs.readFileSync(configPyPath, 'utf8');
+
+      // Handle MCP integration fields specially for dynamic env vars
+      if (sectionKey === 'mcp_integration' && fieldKey === 'mcp_server_url') {
+        // For MCP server URL, we need to get the current MCP_SERVICE value
+        // and update the correct environment variable
+        const mcpServiceMatch = configContent.match(/MCP_SERVICE\s*=\s*"([^"]+)"/);
+        if (mcpServiceMatch) {
+          const mcpService = mcpServiceMatch[1];
+          // Skip if it's still a placeholder
+          if (!mcpService.includes('{')) {
+            const dynamicEnvVar = `PIPEDREAM_MCP_SERVER_${mcpService}`;
+            // Update the environment variable in .env
+            return updateEnvVariable(dynamicEnvVar, value);
+          }
+        }
+      }
 
       // Update LLM_CONFIG fields
       if (sectionKey === 'llm') {
@@ -113,13 +132,32 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
           'agent_name': 'AGENT_NAME',
           'agent_display_name': 'AGENT_DISPLAY_NAME',
           'agent_description': 'AGENT_DESCRIPTION',
-          'mcp_service': 'MCP_SERVICE'
+          'mcp_service': 'MCP_SERVICE',
+          'agent_status': 'AGENT_STATUS'
         };
 
         const varName = mappings[fieldKey];
         if (varName) {
           const regex = new RegExp(`(${varName}\\s*=\\s*")([^"]+)(")`, 'g');
           configContent = configContent.replace(regex, `$1${value}$3`);
+        }
+      }
+      // Update agent configuration fields
+      else if (sectionKey === 'agent_configuration') {
+        if (fieldKey === 'agent_prompt') {
+          // Update the AGENT_PROMPT multi-line string
+          const promptRegex = /AGENT_PROMPT\s*=\s*"""[\s\S]*?"""/;
+          configContent = configContent.replace(promptRegex, `AGENT_PROMPT = """${value}"""`);
+        }
+      }
+      // Update user preferences fields
+      else if (sectionKey === 'user_preferences') {
+        if (fieldKey === 'timezone') {
+          // Update TEMPLATE_TIMEZONE variable
+          configContent = configContent.replace(
+            /(TEMPLATE_TIMEZONE\s*=\s*')([^']+)(')/,
+            `$1${value}$3`
+          );
         }
       }
 
@@ -178,7 +216,8 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
           'agent_name': 'AGENT_NAME',
           'agent_display_name': 'AGENT_DISPLAY_NAME',
           'agent_description': 'AGENT_DESCRIPTION',
-          'mcp_service': 'MCP_SERVICE'
+          'mcp_service': 'MCP_SERVICE',
+          'agent_status': 'AGENT_STATUS'
         };
 
         const varName = mappings[fieldKey];
@@ -189,6 +228,133 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
       }
 
       // Write the updated content back
+      fs.writeFileSync(configPyPath, configContent, 'utf8');
+      console.log(`Successfully updated ${fieldKey} in ${configPyPath}`);
+      return true;
+    }
+
+    // Handler for calendar_agent
+    if (configPath.includes('calendar_agent')) {
+      const configPyPath = fullPath.replace('ui_config.py', 'config.py');
+
+      if (!fs.existsSync(configPyPath)) {
+        console.error(`Calendar agent config.py not found: ${configPyPath}`);
+        return false;
+      }
+
+      let configContent = fs.readFileSync(configPyPath, 'utf8');
+
+      // Update LLM_CONFIG fields
+      if (sectionKey === 'llm') {
+        if (fieldKey === 'model') {
+          configContent = configContent.replace(
+            /("model":\s*")([^"]+)(")/,
+            `$1${value}$3`
+          );
+        } else if (fieldKey === 'temperature') {
+          configContent = configContent.replace(
+            /("temperature":\s*)([\d.]+)/,
+            `$1${value}`
+          );
+        }
+      }
+      // Update agent identity fields
+      else if (sectionKey === 'agent_identity') {
+        if (fieldKey === 'agent_status') {
+          configContent = configContent.replace(
+            /(AGENT_STATUS\s*=\s*")([^"]+)(")/,
+            `$1${value}$3`
+          );
+        }
+      }
+      // Update user preferences fields
+      else if (sectionKey === 'user_preferences') {
+        if (fieldKey === 'timezone') {
+          // Update CALENDAR_TIMEZONE variable
+          configContent = configContent.replace(
+            /(CALENDAR_TIMEZONE\s*=\s*')([^']+)(')/,
+            `$1${value}$3`
+          );
+        } else if (fieldKey === 'work_hours_start') {
+          configContent = configContent.replace(
+            /(WORK_HOURS_START\s*=\s*')([^']+)(')/,
+            `$1${value}$3`
+          );
+        } else if (fieldKey === 'work_hours_end') {
+          configContent = configContent.replace(
+            /(WORK_HOURS_END\s*=\s*')([^']+)(')/,
+            `$1${value}$3`
+          );
+        } else if (fieldKey === 'default_meeting_duration') {
+          configContent = configContent.replace(
+            /(DEFAULT_MEETING_DURATION\s*=\s*')([^']+)(')/,
+            `$1${value}$3`
+          );
+        }
+      }
+
+      fs.writeFileSync(configPyPath, configContent, 'utf8');
+      console.log(`Successfully updated ${fieldKey} in ${configPyPath}`);
+      return true;
+    }
+
+    // Handler for drive_react_agent
+    if (configPath.includes('drive_react_agent')) {
+      const configPyPath = fullPath.replace('ui_config.py', 'config.py');
+
+      if (!fs.existsSync(configPyPath)) {
+        console.error(`Drive agent config.py not found: ${configPyPath}`);
+        return false;
+      }
+
+      let configContent = fs.readFileSync(configPyPath, 'utf8');
+
+      // Update LLM_CONFIG fields
+      if (sectionKey === 'llm') {
+        if (fieldKey === 'model') {
+          configContent = configContent.replace(
+            /("model":\s*")([^"]+)(")/,
+            `$1${value}$3`
+          );
+        } else if (fieldKey === 'temperature') {
+          configContent = configContent.replace(
+            /("temperature":\s*)([\d.]+)/,
+            `$1${value}`
+          );
+        }
+      }
+
+      fs.writeFileSync(configPyPath, configContent, 'utf8');
+      console.log(`Successfully updated ${fieldKey} in ${configPyPath}`);
+      return true;
+    }
+
+    // Handler for job_search_agent
+    if (configPath.includes('job_search_agent')) {
+      const configPyPath = fullPath.replace('ui_config.py', 'config.py');
+
+      if (!fs.existsSync(configPyPath)) {
+        console.error(`Job search agent config.py not found: ${configPyPath}`);
+        return false;
+      }
+
+      let configContent = fs.readFileSync(configPyPath, 'utf8');
+
+      // Update LLM_CONFIG fields
+      if (sectionKey === 'llm') {
+        if (fieldKey === 'model') {
+          configContent = configContent.replace(
+            /("model":\s*")([^"]+)(")/,
+            `$1${value}$3`
+          );
+        } else if (fieldKey === 'temperature') {
+          configContent = configContent.replace(
+            /("temperature":\s*)([\d.]+)/,
+            `$1${value}`
+          );
+        }
+      }
+
       fs.writeFileSync(configPyPath, configContent, 'utf8');
       console.log(`Successfully updated ${fieldKey} in ${configPyPath}`);
       return true;
@@ -208,14 +374,18 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     const { agentId, configPath, sectionKey, fieldKey, value, envVar } = req.body as UpdateConfigRequest;
 
+    console.log('Update request:', { agentId, sectionKey, fieldKey, value, envVar });
+
     try {
       let success = true;
 
       // If this field has an environment variable, update .env
       if (envVar) {
+        console.log(`Updating env var: ${envVar} = ${value}`);
         success = updateEnvVariable(envVar, value);
       } else {
         // Otherwise, update the config file directly
+        console.log(`Updating config file: ${configPath}, ${sectionKey}.${fieldKey} = ${value}`);
         success = updateConfigFile(configPath, sectionKey, fieldKey, value);
       }
 

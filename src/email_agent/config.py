@@ -21,7 +21,7 @@ load_dotenv()
 
 # TODO: Configure for your agent
 AGENT_NAME = "email"  # e.g., "gmail", "sheets", "drive"
-AGENT_DISPLAY_NAME = "Email"  # e.g., "Gmail", "Google Sheets", "Google Drive"
+AGENT_DISPLAY_NAME = "Email Agent"  # e.g., "Gmail", "Google Sheets", "Google Drive"
 AGENT_DESCRIPTION = "email management and Gmail operations"  # e.g., "email management", "spreadsheet operations"
 MCP_SERVICE = "google_gmail"  # e.g., "google_gmail", "google_sheets", "google_drive"
 

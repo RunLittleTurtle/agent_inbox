@@ -34,7 +34,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from .state import CalendarAgentState, RoutingDecision, BookingContext
-from .prompt import get_formatted_prompt_with_context, get_no_tools_prompt
+from .prompt import get_formatted_prompt_with_context, get_no_tools_prompt, get_routing_system_prompt
 from uuid import uuid4
 
 
@@ -173,19 +173,18 @@ class CalendarAgentWithMCP:
         if not self.tools:
             prompt = get_no_tools_prompt()
         else:
-            # Get timezone context from config
-            import os
-            from zoneinfo import ZoneInfo
-            from datetime import timedelta
-            timezone_name = USER_TIMEZONE
-            current_time = datetime.now(ZoneInfo(timezone_name))
+            # Get timezone context from config using the context function
+            from .config import get_current_context
+            context = get_current_context()
+            timezone_name = context["timezone_name"]
+            current_time = datetime.fromisoformat(context["current_time"])
 
             # Use the imported prompt function with dynamic context
             prompt = get_formatted_prompt_with_context(
                 timezone_name=timezone_name,
-                current_time_iso=current_time.isoformat(),
-                today_str=f"{current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})",
-                tomorrow_str=f"{(current_time + timedelta(days=1)).strftime('%Y-%m-%d')} ({(current_time + timedelta(days=1)).strftime('%A')})"
+                current_time_iso=context["current_time"],
+                today_str=context["today"],
+                tomorrow_str=context["tomorrow"]
             )
 
         # Create the main calendar agent (read-only operations)
@@ -251,68 +250,12 @@ class CalendarAgentWithMCP:
             available_tools_list = [f"- {tool.name}: {tool.description}" for tool in self.booking_tools] if self.booking_tools else ["- No MCP tools available"]
             available_tools_text = "\n".join(available_tools_list)
 
-            # Enhanced routing prompt with context extraction
+            # Use centralized routing prompt from prompt.py
+            routing_system_prompt = get_routing_system_prompt().format(available_tools=available_tools_text)
             routing_prompt = ChatPromptTemplate.from_messages([
-                            ("system", """You are a smart calendar workflow router. Analyze the conversation to determine the next actions and tools needed.
-
-                        ANALYZE TWO TYPES OF SITUATIONS:
-
-                        1. CALENDAR AGENT EXPLICITLY INDICATES BOOKING APPROVAL NEEDED:
-                           - Look for phrases like "requires booking approval", "transfer you to booking approval", "booking approval workflow"
-                           - If the calendar agent explicitly mentions booking approval is needed, route to booking_approval
-                           - This takes priority over user intent analysis
-
-                        2. USER INTENT ANALYSIS (if no explicit booking approval mentioned):
-                           - Creating new calendar events/meetings
-                           - Scheduling appointments
-                           - Booking time slots
-                           - Updating existing events (time, date, attendees)
-                           - Moving/rescheduling events
-                           - Deleting events
-                           - Any calendar modifications
-
-                        READ-ONLY OPERATIONS (no approval needed):
-                        - Checking availability
-                        - Viewing calendar events
-                        - Asking about free time slots
-                        - General calendar inquiries
-
-                        ROUTING DECISION PRIORITY:
-                        1. First check if calendar agent explicitly mentioned "booking approval" or "approval workflow"
-                        2. If yes, return next_action: "booking_approval"
-                        3. If no explicit mention, analyze user intent
-                        4. If user intent requires booking, return next_action: "booking_approval"
-                        5. Otherwise return next_action: "end"
-
-                        AVAILABLE MCP TOOLS (dynamically detected):
-                        {available_tools}
-
-                        TOOLS SELECTION RULES - Based on actual available tools:
-                        Analyze the user's request and select the appropriate tool(s) from the available tools above:
-
-                        OPERATION ANALYSIS:
-                        - NEW event creation → use 'google_calendar-create-event' if available
-                        - DELETE entire event → use 'google_calendar-delete-event' if available
-                        - QUICK text-based event → use 'google_calendar-quick-add-event' if available
-                        - UPDATE existing event (time/date/duration/title/description) → use 'google_calendar-update-event'
-                        - ADD attendees to existing event → use 'google_calendar-add-attendees-to-event' if available AND no other changes needed
-                        - It is not possible to REMOVE attendees. it is a restriction of the Google Calendar API. please inform the user, BUT YOU MUST continue with other operations.
-
-                        CRITICAL ANALYSIS FOR COMPLEX REQUESTS EXAMPLES:
-                        - If user wants ONLY to add attendees (no other changes) → ['google_calendar-add-attendees-to-event']
-                        - If user wants to ADD attendees and make other changes → ['google_calendar-add-attendees-to-event', 'google_calendar-update-event']
-                        - Multiple separate events → list multiple appropriate tools
-
-                        EXAMPLE ANALYSIS:
-                        "move time to 10am + ADD attendee + change duration + change description" →
-                        This needs TWO operations: ADD attendee + UPDATE other fields → ['google_calendar-add-attendees-to-event', 'google_calendar-update-event']
-
-                        IMPORTANT: Base your tool selection on the actual available tools listed above, not assumptions.
-
-
-                        CRITICAL: Pay special attention to the calendar agent's responses that mention "booking approval workflow" or "requires booking approval"."""),
-                            ("user", "Conversation context:\n{context}\n\nAnalyze this conversation. Does the calendar agent explicitly mention booking approval is needed? Or does the user intent require booking operations? Return the appropriate next_action.")
-                        ])
+                ("system", routing_system_prompt),
+                ("user", "Conversation context:\n{context}\n\nAnalyze this conversation. Does the calendar agent explicitly mention booking approval is needed? Or does the user intent require booking operations? Return the appropriate next_action.")
+            ])
 
 
             try:

@@ -23,18 +23,29 @@ load_dotenv()
 AGENT_NAME = "{AGENT_NAME}"  # e.g., "gmail", "sheets", "drive" - DO NOT CHANGE (internal identifier)
 AGENT_DISPLAY_NAME = "{AGENT_DISPLAY_NAME}"  # e.g., "Gmail", "Google Sheets", "Google Drive"
 AGENT_DESCRIPTION = "{AGENT_DESCRIPTION}"  # e.g., "email management", "spreadsheet operations"
-MCP_SERVICE = "{MCP_SERVICE}"  # e.g., "google_gmail", "google_sheets", "google_drive"
 AGENT_STATUS = "disabled"  # active or disabled
 
 # Import prompts from prompt.py following LangGraph best practices
 from .prompt import AGENT_SYSTEM_PROMPT
 
-# MCP Environment Variable
-MCP_ENV_VAR = f"PIPEDREAM_MCP_SERVER_{MCP_SERVICE}"
+# MCP Configuration
+# ARCHITECTURE NOTE:
+#   1. This config.py reads the MCP URL from the main .env file using os.getenv()
+#   2. The UI config (ui_config.py) reads from THIS file, not from .env
+#   3. Prompts (prompt.py) also read from THIS file, not from .env
+#   This ensures proper separation: .env → config.py → UI/prompts
+#
+# Specify the exact environment variable name that contains your MCP server URL
+# This is flexible - works with any MCP provider (Pipedream, Composio, custom, etc.)
+# Examples:
+#   - Pipedream: "PIPEDREAM_MCP_SERVER_google_gmail"
+#   - Composio: "COMPOSIO_MCP_SERVER_google_classroom"
+#   - Custom: "MY_CUSTOM_MCP_SERVER"
+MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_gmail"  # e.g., "PIPEDREAM_MCP_SERVER_google_gmail"
 
-# MCP Server URL - centralized configuration
-# This gets the URL from the environment variable dynamically
-MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '')
+# MCP Server URL - reads from the specified environment variable in main .env
+# Will be empty if the environment variable doesn't exist or template is unconfigured
+MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '') if MCP_ENV_VAR != "{MCP_ENV_VAR}" else ''
 
 # Timezone Configuration
 # 'global' means use the system-wide USER_TIMEZONE from main .env

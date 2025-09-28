@@ -26,8 +26,14 @@ Edit `config.py` - Replace ALL placeholder values:
 AGENT_NAME = "gmail"  # e.g., "gmail", "sheets", "drive"
 AGENT_DISPLAY_NAME = "Gmail Agent"  # e.g., "Gmail Agent", "Google Sheets"
 AGENT_DESCRIPTION = "email management and organization"  # What your agent does
-MCP_SERVICE = "google_gmail"  # e.g., "google_gmail", "google_sheets"
 AGENT_STATUS = "active"  # "active" or "disabled"
+
+# MCP Configuration - specify the exact environment variable name
+# This is flexible - works with any MCP provider:
+#   - Pipedream: "PIPEDREAM_MCP_SERVER_google_gmail"
+#   - Composio: "COMPOSIO_MCP_SERVER_slack"
+#   - Custom: "MY_CUSTOM_MCP_SERVER"
+MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_gmail"  # Your MCP server env var
 ```
 
 ### Step 3: Discover Available Tools
@@ -113,14 +119,14 @@ load_dotenv()
 AGENT_NAME = "gmail"  # Internal identifier
 AGENT_DISPLAY_NAME = "Gmail Agent"  # UI display name
 AGENT_DESCRIPTION = "email management and organization"  # Brief description
-MCP_SERVICE = "google_gmail"  # MCP service identifier
 AGENT_STATUS = "active"  # "active" or "disabled"
 
 # Import prompts following LangGraph best practices
 from .prompt import AGENT_SYSTEM_PROMPT
 
-# MCP Configuration
-MCP_ENV_VAR = f"PIPEDREAM_MCP_SERVER_{MCP_SERVICE}"
+# MCP Configuration - flexible for any provider
+# Specify the exact environment variable name from your .env file
+MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_gmail"  # e.g., "PIPEDREAM_MCP_SERVER_google_gmail"
 MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '')
 
 # Timezone Configuration
@@ -204,30 +210,43 @@ ANTHROPIC_API_KEY=your_api_key_here
 # Global timezone (used by all agents)
 USER_TIMEZONE=America/Toronto
 
-# MCP Server for your specific agent
-PIPEDREAM_MCP_SERVER_{MCP_SERVICE}=https://mcp.pipedream.net/your-id/service
+# MCP Server URLs - flexible naming based on your provider
+# Examples for different providers:
 
-# Examples for different services:
+# Pipedream:
 PIPEDREAM_MCP_SERVER_google_gmail=https://mcp.pipedream.net/xxx/google_gmail
 PIPEDREAM_MCP_SERVER_google_sheets=https://mcp.pipedream.net/xxx/google_sheets
-PIPEDREAM_MCP_SERVER_google_drive=https://mcp.pipedream.net/xxx/google_drive
+
+# Composio:
+COMPOSIO_MCP_SERVER_slack=https://mcp.composio.dev/xxx/slack
+COMPOSIO_MCP_SERVER_github=https://mcp.composio.dev/xxx/github
+
+# Custom:
+MY_CUSTOM_MCP_SERVER=https://your-server.com/mcp
+COMPANY_MCP_API_ENDPOINT=https://api.company.com/mcp
 ```
 
 ### Service-Specific Examples
 
-**Gmail Agent:**
+**Examples for Different Providers:**
+
+**Pipedream Services:**
 ```bash
 PIPEDREAM_MCP_SERVER_google_gmail=https://mcp.pipedream.net/your-id/google_gmail
-```
-
-**Google Sheets Agent:**
-```bash
 PIPEDREAM_MCP_SERVER_google_sheets=https://mcp.pipedream.net/your-id/google_sheets
+PIPEDREAM_MCP_SERVER_google_drive=https://mcp.pipedream.net/your-id/google_drive
 ```
 
-**Google Drive Agent:**
+**Composio Services:**
 ```bash
-PIPEDREAM_MCP_SERVER_google_drive=https://mcp.pipedream.net/your-id/google_drive
+COMPOSIO_MCP_SERVER_slack=https://mcp.composio.dev/your-id/slack
+COMPOSIO_MCP_SERVER_github=https://mcp.composio.dev/your-id/github
+```
+
+**Custom MCP Servers:**
+```bash
+MY_CUSTOM_MCP_SERVER=https://your-server.com/mcp
+COMPANY_INTERNAL_MCP=https://internal.company.com/mcp
 ```
 
 ## Tool Discovery Workflow
@@ -455,7 +474,7 @@ async def get_agent_tools_with_mcp() -> List[BaseTool]:
 AGENT_NAME = "gmail"
 AGENT_DISPLAY_NAME = "Gmail Agent"
 AGENT_DESCRIPTION = "email management and organization"
-MCP_SERVICE = "google_gmail"
+MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_gmail"  # From your .env file
 ```
 
 **Google Sheets:**
@@ -463,7 +482,7 @@ MCP_SERVICE = "google_gmail"
 AGENT_NAME = "sheets"
 AGENT_DISPLAY_NAME = "Google Sheets"
 AGENT_DESCRIPTION = "spreadsheet operations and data management"
-MCP_SERVICE = "google_sheets"
+MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_sheets"  # From your .env file
 ```
 
 **Google Drive:**
@@ -471,7 +490,7 @@ MCP_SERVICE = "google_sheets"
 AGENT_NAME = "drive"
 AGENT_DISPLAY_NAME = "Google Drive"
 AGENT_DESCRIPTION = "file storage and document management"
-MCP_SERVICE = "google_drive"
+MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_drive"  # From your .env file
 ```
 
 ### Tool Categories

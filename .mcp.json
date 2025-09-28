@@ -1,0 +1,55 @@
+{
+  "mcpServers": {
+    "langgraph-docs": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mcpdoc",
+        "mcpdoc",
+        "--urls",
+        "LangGraph Python:https://langchain-ai.github.io/langgraph/llms.txt LangGraph JS:https://langchain-ai.github.io/langgraphjs/llms.txt LangChain Python:https://python.langchain.com/llms.txt LangChain JS:https://js.langchain.com/llms.txt",
+        "--transport",
+        "stdio"
+      ],
+      "env": {}
+    },
+    "nextjs-docs": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mcpdoc",
+        "mcpdoc",
+        "--urls",
+        "Next.js:https://nextjs.org/docs/llms.txt Next.js App Router:https://nextjs.org/docs/app/llms.txt Next.js Pages Router:https://nextjs.org/docs/pages/llms.txt",
+        "--transport",
+        "stdio"
+      ],
+      "env": {}
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--isolated"
+      ],
+      "env": {}
+    },
+    "agent-inbox-docs": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mcpdoc",
+        "mcpdoc",
+        "--urls",
+        "Agent Inbox GitHub:https://raw.githubusercontent.com/langchain-ai/agent-inbox/main/README.md",
+        "--transport",
+        "stdio"
+      ],
+      "env": {}
+    }
+  }
+}

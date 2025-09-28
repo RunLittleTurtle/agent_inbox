@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Info, AlertTriangle, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ConfigField {
@@ -21,6 +21,7 @@ interface ConfigField {
   placeholder?: string;
   required?: boolean;
   readonly?: boolean;
+  showCopyButton?: boolean;
   options?: string[];
   validation?: any;
   note?: string;
@@ -32,6 +33,7 @@ interface ConfigSection {
   label: string;
   description: string;
   fields: ConfigField[];
+  card_style?: string;
 }
 
 interface ConfigFormProps {
@@ -42,12 +44,25 @@ interface ConfigFormProps {
 
 export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps) {
   const [showPasswords, setShowPasswords] = React.useState<Record<string, boolean>>({});
+  const [copiedFields, setCopiedFields] = React.useState<Record<string, boolean>>({});
 
   const togglePasswordVisibility = (fieldKey: string) => {
     setShowPasswords(prev => ({
       ...prev,
       [fieldKey]: !prev[fieldKey]
     }));
+  };
+
+  const copyToClipboard = async (fieldId: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedFields(prev => ({ ...prev, [fieldId]: true }));
+      setTimeout(() => {
+        setCopiedFields(prev => ({ ...prev, [fieldId]: false }));
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
   };
 
   const getCurrentValue = (section: ConfigSection, field: ConfigField) => {
@@ -112,22 +127,40 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
                 value={currentValue}
                 onChange={(e) => !field.readonly && handleFieldChange(section, field, e.target.value)}
                 placeholder={field.placeholder}
-                className={`pr-10 ${field.readonly ? 'bg-gray-50 text-gray-600' : ''}`}
+                className={`${field.showCopyButton ? 'pr-20' : 'pr-10'} ${field.readonly ? 'bg-gray-50 text-gray-600' : ''}`}
                 readOnly={field.readonly}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
-                onClick={() => togglePasswordVisibility(fieldId)}
-              >
-                {showPasswords[fieldId] ? (
-                  <EyeOff className="h-3 w-3" />
-                ) : (
-                  <Eye className="h-3 w-3" />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                {field.showCopyButton && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => copyToClipboard(fieldId, currentValue)}
+                    title="Copy to clipboard"
+                  >
+                    {copiedFields[fieldId] ? (
+                      <Check className="h-3 w-3 text-green-600" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </Button>
                 )}
-              </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => togglePasswordVisibility(fieldId)}
+                >
+                  {showPasswords[fieldId] ? (
+                    <EyeOff className="h-3 w-3" />
+                  ) : (
+                    <Eye className="h-3 w-3" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         );
@@ -222,30 +255,48 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
               {field.label}
               {field.required && <span className="text-red-500">*</span>}
             </Label>
-            <Input
-              id={fieldId}
-              type="text"
-              value={currentValue}
-              onChange={(e) => {
-                console.log(`Field ${field.key} onChange:`, {
-                  fieldKey: field.key,
-                  readonly: field.readonly,
-                  value: e.target.value,
-                  currentValue,
-                  envVar: field.envVar,
-                  sectionKey: section.key
-                });
-                if (!field.readonly) {
-                  handleFieldChange(section, field, e.target.value);
-                }
-              }}
-              onFocus={() => console.log(`Field ${field.key} focused, readonly: ${field.readonly}`)}
-              onClick={() => console.log(`Field ${field.key} clicked, readonly: ${field.readonly}`)}
-              placeholder={field.placeholder}
-              className={field.readonly ? 'bg-gray-50 text-gray-600' : ''}
-              readOnly={field.readonly}
-              disabled={field.readonly}
-            />
+            <div className="relative">
+              <Input
+                id={fieldId}
+                type="text"
+                value={currentValue}
+                onChange={(e) => {
+                  console.log(`Field ${field.key} onChange:`, {
+                    fieldKey: field.key,
+                    readonly: field.readonly,
+                    value: e.target.value,
+                    currentValue,
+                    envVar: field.envVar,
+                    sectionKey: section.key
+                  });
+                  if (!field.readonly) {
+                    handleFieldChange(section, field, e.target.value);
+                  }
+                }}
+                onFocus={() => console.log(`Field ${field.key} focused, readonly: ${field.readonly}`)}
+                onClick={() => console.log(`Field ${field.key} clicked, readonly: ${field.readonly}`)}
+                placeholder={field.placeholder}
+                className={`${field.showCopyButton ? 'pr-10' : ''} ${field.readonly ? 'bg-gray-50 text-gray-600' : ''}`}
+                readOnly={field.readonly}
+                disabled={field.readonly}
+              />
+              {field.showCopyButton && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                  onClick={() => copyToClipboard(fieldId, currentValue)}
+                  title="Copy to clipboard"
+                >
+                  {copiedFields[fieldId] ? (
+                    <Check className="h-3 w-3 text-green-600" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
         );
     }
@@ -256,7 +307,11 @@ export function ConfigForm({ sections, values, onValueChange }: ConfigFormProps)
       {sections.map((section) => (
         <Card
           key={section.key}
-          className={section.key === 'prompt_templates' ? 'bg-orange-50 border-orange-200' : ''}
+          className={
+            section.key === 'prompt_templates' || section.card_style === 'orange'
+              ? 'bg-orange-50 border-orange-200'
+              : ''
+          }
         >
           <CardHeader>
             <CardTitle className="text-lg">{section.label}</CardTitle>

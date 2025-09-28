@@ -36,10 +36,11 @@ interface AgentConfigData {
 
 const AGENT_CONFIG_PATHS = [
   'ui_config.py',
+  'interface_uis_config.py',
   'src/_react_agent_mcp_template/ui_config.py',
   'src/calendar_agent/ui_config.py',
   'src/drive_react_agent/ui_config.py',
-  'src/executive-ai-assistant/ui_config_wrapper.py',
+  'src/executive-ai-assistant/ui_config.py',
   'src/job_search_agent/ui_config.py',
   'src/email_agent/ui_config.py',
 ];
@@ -112,7 +113,9 @@ export async function GET(request: NextRequest) {
         // Generate ID from file path
         const id = configPath.includes('/')
           ? path.dirname(configPath).replace(/^src\//, '').replace(/[\/\\]/g, '_')
-          : 'global';
+          : configPath === 'interface_uis_config.py'
+            ? 'interface_uis'
+            : 'global';
 
         agents.push({
           id,

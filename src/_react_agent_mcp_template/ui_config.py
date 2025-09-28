@@ -49,17 +49,6 @@ CONFIG_SECTIONS = [
                 'description': 'Enable or disable this agent',
                 'options': ['active', 'disabled'],
                 'required': True
-            },
-            {
-                'key': 'mcp_service',
-                'label': 'MCP Service Name',
-                'type': 'text',
-                'default': 'template_service',
-                'description': 'MCP service identifier (used in environment variable)',
-                'placeholder': 'google_gmail, google_sheets, google_drive',
-                'required': True,
-                'validation': {'pattern': '^[a-z_]+$'},
-                'note': 'This determines the environment variable: PIPEDREAM_MCP_SERVER_{service_name}'
             }
         ]
     },
@@ -130,14 +119,24 @@ CONFIG_SECTIONS = [
         'description': 'API connection settings for external services',
         'fields': [
             {
+                'key': 'mcp_env_var',
+                'label': 'MCP Environment Variable',
+                'type': 'text',
+                'readonly': True,
+                'default': '',
+                'description': 'Name of the environment variable containing the MCP server URL (read-only)',
+                'placeholder': 'PIPEDREAM_MCP_SERVER_google_gmail, COMPOSIO_MCP_SERVER_slack, etc.',
+                'required': False,
+                'note': 'This shows which environment variable is used. Configured in agent code.'
+            },
+            {
                 'key': 'mcp_server_url',
                 'label': 'MCP Server URL',
                 'type': 'text',
-                'envVar': 'PIPEDREAM_MCP_SERVER',
-                'description': 'URL for the MCP server endpoint',
-                'placeholder': 'https://mcp.pipedream.net/xxx/service_name',
-                'required': True,
-                'note': 'Environment variable name depends on your MCP service'
+                'description': 'The MCP server URL (editable - updates .env file)',
+                'placeholder': 'https://mcp.pipedream.net/xxx/google_gmail',
+                'required': False,
+                'note': 'Editing this updates the URL in your .env file'
             }
         ]
     },

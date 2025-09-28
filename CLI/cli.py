@@ -422,6 +422,13 @@ def gmail(
         from dotenv import load_dotenv
         load_dotenv()
 
+        # If using executive assistant, also load its local .env file
+        if executive:
+            executive_env_path = PROJECT_ROOT / "src" / "executive-ai-assistant" / ".env"
+            if executive_env_path.exists():
+                load_dotenv(executive_env_path, override=True)
+                console.print("🔧 Loaded executive assistant environment variables")
+
         # Import Gmail utilities from executive assistant
         sys.path.append(str(PROJECT_ROOT / "src" / "executive-ai-assistant"))
         from eaia.gmail import get_credentials

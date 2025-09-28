@@ -80,18 +80,29 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'mcp_connection',
-        'label': 'MCP Server',
-        'description': 'Google Calendar API connection',
+        'key': 'mcp_integration',
+        'label': 'MCP Server Configuration',
+        'description': 'API connection settings for external services',
         'fields': [
             {
-                'key': 'calendar_mcp_url',
-                'label': 'Calendar MCP URL',
+                'key': 'mcp_env_var',
+                'label': 'MCP Environment Variable',
                 'type': 'text',
-                'envVar': 'PIPEDREAM_MCP_SERVER',
-                'description': 'Google Calendar MCP server endpoint',
+                'readonly': True,
+                'default': 'PIPEDREAM_MCP_SERVER',
+                'description': 'Name of the environment variable containing the MCP server URL (read-only)',
+                'placeholder': 'PIPEDREAM_MCP_SERVER',
+                'required': False,
+                'note': 'This shows which environment variable is used. Configured in agent code.'
+            },
+            {
+                'key': 'mcp_server_url',
+                'label': 'MCP Server URL',
+                'type': 'text',
+                'description': 'The MCP server URL (editable - updates .env file)',
                 'placeholder': 'https://mcp.pipedream.net/xxx/google_calendar',
-                'required': True
+                'required': False,
+                'note': 'Editing this updates the URL in your .env file'
             }
         ]
     },

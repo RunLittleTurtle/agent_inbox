@@ -41,22 +41,6 @@ CONFIG_SECTIONS = [
         'description': 'Core LangGraph and monitoring configuration',
         'fields': [
             {
-                'key': 'agent_inbox_graph_id',
-                'label': 'Agent Inbox Graph ID',
-                'type': 'text',
-                'envVar': 'AGENT_INBOX_GRAPH_ID',
-                'default': 'agent',
-                'description': 'Main graph identifier for agent system'
-            },
-            {
-                'key': 'langgraph_deployment_url',
-                'label': 'LangGraph Deployment URL',
-                'type': 'text',
-                'envVar': 'LANGGRAPH_DEPLOYMENT_URL',
-                'default': 'http://localhost:2024',
-                'description': 'LangGraph server deployment endpoint'
-            },
-            {
                 'key': 'langsmith_api_key',
                 'label': 'LangSmith API Key',
                 'type': 'password',
@@ -70,7 +54,8 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'envVar': 'LANGCHAIN_PROJECT',
                 'default': 'ambient-email-agent',
-                'description': 'Project name for LangSmith organization'
+                'readonly': True,
+                'description': 'Project name for LangSmith organization (read-only - changing this can break things)'
             }
         ]
     },
@@ -79,14 +64,6 @@ CONFIG_SECTIONS = [
         'label': 'Google Workspace',
         'description': 'Google OAuth and service integration',
         'fields': [
-            {
-                'key': 'google_oauth_credentials',
-                'label': 'Google OAuth Credentials Path',
-                'type': 'text',
-                'envVar': 'GOOGLE_OAUTH_CREDENTIALS',
-                'description': 'Path to Google OAuth JSON credentials file',
-                'placeholder': '/path/to/client_secret_xxx.json'
-            },
             {
                 'key': 'google_client_id',
                 'label': 'Google Client ID',
@@ -139,145 +116,6 @@ CONFIG_SECTIONS = [
                     'Asia/Shanghai',
                     'Australia/Sydney'
                 ]
-            }
-        ]
-    },
-    {
-        'key': 'mcp_servers',
-        'label': 'MCP Servers',
-        'description': 'Model Context Protocol server endpoints',
-        'fields': [
-            {
-                'key': 'pipedream_google_calendar',
-                'label': 'Pipedream Google Calendar MCP',
-                'type': 'text',
-                'envVar': 'PIPEDREAM_MCP_SERVER',
-                'description': 'URL for Google Calendar MCP server',
-                'placeholder': 'https://mcp.pipedream.net/xxx/google_calendar'
-            },
-            {
-                'key': 'pipedream_google_gmail',
-                'label': 'Pipedream Gmail MCP',
-                'type': 'text',
-                'envVar': 'PIPEDREAM_MCP_SERVER_google_gmail',
-                'description': 'URL for Gmail MCP server',
-                'placeholder': 'https://mcp.pipedream.net/xxx/gmail'
-            },
-            {
-                'key': 'pipedream_google_drive',
-                'label': 'Pipedream Google Drive MCP',
-                'type': 'text',
-                'envVar': 'PIPEDREAM_MCP_SERVER_google_drive',
-                'description': 'URL for Google Drive MCP server',
-                'placeholder': 'https://mcp.pipedream.net/xxx/google_drive'
-            },
-            {
-                'key': 'pipedream_google_sheets',
-                'label': 'Pipedream Google Sheets MCP',
-                'type': 'text',
-                'envVar': 'PIPEDREAM_MCP_SERVER_google_sheets',
-                'description': 'URL for Google Sheets MCP server',
-                'placeholder': 'https://mcp.pipedream.net/xxx/google_sheets'
-            },
-            {
-                'key': 'pipedream_google_docs',
-                'label': 'Pipedream Google Docs MCP',
-                'type': 'text',
-                'envVar': 'PIPEDREAM_MCP_SERVER_google_docs',
-                'description': 'URL for Google Docs MCP server',
-                'placeholder': 'https://mcp.pipedream.net/xxx/google_docs'
-            },
-            {
-                'key': 'mcp_server_google_workspace',
-                'label': 'Local Google Workspace MCP',
-                'type': 'text',
-                'envVar': 'MCP_SERVER_GOOGLE_WORKSPACE',
-                'default': 'http://localhost:3000/mcp',
-                'description': 'Local Google Workspace MCP server URL',
-                'readonly': True
-            }
-        ]
-    },
-    {
-        'key': 'system_settings',
-        'label': 'System Settings',
-        'description': 'Environment and logging configuration',
-        'fields': [
-            {
-                'key': 'environment',
-                'label': 'Environment',
-                'type': 'select',
-                'envVar': 'ENVIRONMENT',
-                'default': 'development',
-                'description': 'Current environment mode',
-                'options': ['development', 'staging', 'production'],
-                'readonly': True
-            },
-            {
-                'key': 'log_level',
-                'label': 'Log Level',
-                'type': 'select',
-                'envVar': 'LOG_LEVEL',
-                'default': 'INFO',
-                'description': 'System logging level',
-                'options': ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                'readonly': True
-            },
-            {
-                'key': 'force_langgraph_api',
-                'label': 'Force LangGraph API',
-                'type': 'boolean',
-                'envVar': 'FORCE_LANGGRAPH_API',
-                'default': True,
-                'description': 'Force use of LangGraph API mode',
-                'readonly': True
-            },
-            {
-                'key': 'use_enhanced_calendar_agent',
-                'label': 'Use Enhanced Calendar Agent',
-                'type': 'boolean',
-                'envVar': 'USE_ENHANCED_CALENDAR_AGENT',
-                'default': True,
-                'description': 'Enable the enhanced calendar agent features'
-            }
-        ]
-    },
-    {
-        'key': 'third_party_apis',
-        'label': 'Third-Party APIs',
-        'description': 'Additional service integrations',
-        'fields': [
-            {
-                'key': 'linkedin_email',
-                'label': 'LinkedIn Email',
-                'type': 'text',
-                'envVar': 'LINKEDIN_EMAIL',
-                'description': 'LinkedIn account email for job search features',
-                'placeholder': 'user@example.com'
-            },
-            {
-                'key': 'linkedin_password',
-                'label': 'LinkedIn Password',
-                'type': 'password',
-                'envVar': 'LINKEDIN_PASSWORD',
-                'description': 'LinkedIn account password (encrypted storage)',
-                'warning': 'Stored securely for job search automation'
-            },
-            {
-                'key': 'supabase_url',
-                'label': 'Supabase URL',
-                'type': 'text',
-                'envVar': 'NEXT_PUBLIC_SUPABASE_URL',
-                'description': 'Supabase project URL for data storage',
-                'placeholder': 'https://xxx.supabase.co'
-            },
-            {
-                'key': 'supabase_anon_key',
-                'label': 'Supabase Anonymous Key',
-                'type': 'password',
-                'envVar': 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-                'description': 'Supabase anonymous access key',
-                'placeholder': 'eyJhbGciOiJIUzI1NiIs...'
             }
         ]
     }

@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from .state import BookingRequest
 from .execution_result import ExecutionStatus
 from .mcp_executor import MCPToolExecutor
+from .prompt import get_booking_extraction_prompt
 
 
 
@@ -252,108 +253,23 @@ class BookingNode:
 
         conversation_summary = "\n".join(conversation_context)
 
-        # Enhanced extraction prompt with MCP tool schema requirements
-        extraction_prompt = f"""Extract booking details from this request: "{clean_booking_intent}"
-
-CONVERSATION CONTEXT:
-{conversation_summary}
-
-ROUTING ANALYSIS:
-{routing_context.get('reasoning', 'None') if routing_context else 'None'}
-
-EVENT CONTEXT:
-- Event ID found: {event_id if event_id else 'None'}
-- This is {'an UPDATE operation' if event_id else 'a NEW event creation'}
-
-CURRENT TIME CONTEXT:
-- Current time: {current_time.isoformat()}
-- Timezone: {timezone_name}
-- Today's date: {current_time.strftime('%Y-%m-%d')}
-- Current day: {current_time.strftime('%A')}
-- Work hours: {WORK_HOURS_START} - {WORK_HOURS_END}
-- Default meeting duration: {DEFAULT_MEETING_DURATION} minutes
-
-EXTRACTION RULES:
-1. Use the FULL conversation context to understand the booking intent
-2. If the request mentions "instead" or "change to", look for previous booking attempts
-3. Extract relative time references (tonight, tomorrow, next week)
-4. Infer missing details from conversation context
-
-Based on the request and context, extract:
-1. Event title/summary (infer from conversation if not explicit)
-2. Start date/time (convert relative terms using the current context above)
-   - "tomorrow" = {(current_time + timedelta(days=1)).strftime('%Y-%m-%d')}
-   - "tonight" = today ({current_time.strftime('%Y-%m-%d')}) evening
-   - "next week" = week starting {(current_time + timedelta(days=7)).strftime('%Y-%m-%d')}
-3. End date/time (if not specified, assume 1 hour duration)
-4. Description (if any, or infer from conversation)
-5. Location (if any)
-6. Add Attendees (if any)
-
-
-TOOL SELECTION RULES:
-Analyze the conversation context and choose the appropriate tool or tools needed for all operations and tasks:
-- Use "google_calendar-create-event" for NEW bookings (first time booking)
-- Use "google_calendar-add-attendees-to-event" for ADDING attendees (prioritize this when attendees are mentioned, even with other changes)
-- Use "google_calendar-update-event" for OTHER changes to existing bookings (time, title, location changes WITHOUT attendees)
-- Look for keywords like "change", "modify", "update", "instead", "move to", "reschedule", "made a mistake"
-- If conversation shows a previous booking was successful and user wants changes, use UPDATE
-- CRITICAL: If attendees are being added/mentioned, always use "google_calendar-add-attendees-to-event" even if other fields are changing
-- When both time AND attendees are changing, use multiple tools
-- It is not possible to REMOVE attendees. it is a restriction of the Google Calendar API. please inform the user and continue other operations.
-
-Return a JSON object with these fields matching the Pipedream MCP tool format:
-- user_intent: Clear request made by the user based on context
-- tool_name: Choose appropriate tool or, IF MULTIPLE tools are needed, add them as a list based on conversation analysis above
-- event_id: string (CRITICAL: always include event ID when mentioned)
-- title: string (descriptive title based on context)
-- start_time: ISO format with timezone (e.g., "2025-09-03T15:00:00-04:00")
-- end_time: ISO format with timezone
-- description: string or null
-- location: string or null
-- attendees: array of email strings (CRITICAL: always include attendee emails when mentioned)
-- requires_event_id: boolean (true if updating/modifying existing event)
-- color_id: string or null (1-11 for different colors)
-- transparency: "transparent" or "opaque" (for availability)
-- visibility: "default", "public", or "private"
-- recurrence: array of RRULE strings or null (for recurring events)
-- reminders: object with useDefault boolean or overrides array
-- guests_can_invite_others: boolean (default true)
-- guests_can_modify: boolean (default false)
-- guests_can_see_other_guests: boolean (default true)
-- anyone_can_add_self: boolean (default false)
-- conference_data: object or null (for video meetings)
-- original_args: object with complete MCP tool format:
-  {{
-    "event_id": "event123",
-    "summary": "Event title",
-    "start": "2025-09-03T15:00:00-04:00",
-    "end": "2025-09-03T16:00:00-04:00",
-    "description": "Event description",
-    "location": "Location if any",
-    "attendees": ["email1@domain.com", "email2@domain.com"],
-    "colorId": "2",
-    "transparency": "opaque",
-    "visibility": "default",
-    "recurrence": null,
-    "reminders": {{"useDefault": true}},
-    "guestsCanInviteOthers": true,
-    "guestsCanModify": false,
-    "guestsCanSeeOtherGuests": true,
-    "anyoneCanAddSelf": false,
-    "conferenceData": null
-  }}
-
-CRITICAL: Use SIMPLE format - no nested objects, just direct field values.
-ALWAYS include timezone offset in ISO format. Use {timezone_name} timezone.
-If context suggests this is modifying a previous booking, incorporate that into the title.
-
-IMPORTANT INSTRUCTIONS FOR EVENT ID:
-- Add "event_id": "{event_id}" to the original_args
-- Set requires_event_id: true
-- For UPDATE operations, preserve existing attendees unless explicitly removing them
-- When removing attendees, note the API restriction about manual removal
-"""
+        # Use centralized extraction prompt from prompt.py with config variables
+        extraction_prompt = get_booking_extraction_prompt(
+            clean_booking_intent=clean_booking_intent,
+            conversation_summary=conversation_summary,
+            routing_reasoning=routing_context.get('reasoning', 'None') if routing_context else 'None',
+            event_id=event_id if event_id else 'None',
+            operation_type='an UPDATE operation' if event_id else 'a NEW event creation',
+            current_time_iso=current_time.isoformat(),
+            timezone_name=timezone_name,
+            today_date=current_time.strftime('%Y-%m-%d'),
+            current_day=current_time.strftime('%A'),
+            work_hours_start=WORK_HOURS_START,
+            work_hours_end=WORK_HOURS_END,
+            default_duration=DEFAULT_MEETING_DURATION,
+            tomorrow_date=(current_time + timedelta(days=1)).strftime('%Y-%m-%d'),
+            next_week_date=(current_time + timedelta(days=7)).strftime('%Y-%m-%d')
+        )
 
         try:
             response = await self.model.ainvoke([HumanMessage(content=extraction_prompt)])

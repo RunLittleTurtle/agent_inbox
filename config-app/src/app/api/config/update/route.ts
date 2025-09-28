@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import yaml from 'js-yaml';
 
 interface UpdateConfigRequest {
   agentId: string;
-  configPath: string;
+  configPath?: string; // Optional for executive-ai-assistant
   sectionKey: string;
   fieldKey: string;
   value: any;
@@ -76,18 +77,19 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
 
       let configContent = fs.readFileSync(configPyPath, 'utf8');
 
-      // Handle MCP integration fields specially for dynamic env vars
-      if (sectionKey === 'mcp_integration' && fieldKey === 'mcp_server_url') {
-        // For MCP server URL, we need to get the current MCP_SERVICE value
-        // and update the correct environment variable
-        const mcpServiceMatch = configContent.match(/MCP_SERVICE\s*=\s*"([^"]+)"/);
-        if (mcpServiceMatch) {
-          const mcpService = mcpServiceMatch[1];
-          // Skip if it's still a placeholder
-          if (!mcpService.includes('{')) {
-            const dynamicEnvVar = `PIPEDREAM_MCP_SERVER_${mcpService}`;
+      // Handle MCP integration fields
+      if (sectionKey === 'mcp_integration') {
+        if (fieldKey === 'mcp_env_var') {
+          // Update MCP_ENV_VAR in config.py (read-only field, shouldn't be called)
+          const regex = new RegExp(`(MCP_ENV_VAR\\s*=\\s*["'])([^"']+)(["'])`, 'g');
+          configContent = configContent.replace(regex, `$1${value}$3`);
+        } else if (fieldKey === 'mcp_server_url') {
+          // Update the environment variable in .env
+          const mcpEnvVarMatch = configContent.match(/MCP_ENV_VAR\s*=\s*["']([^"']+)["']/);
+          if (mcpEnvVarMatch) {
+            const envVarName = mcpEnvVarMatch[1];
             // Update the environment variable in .env
-            return updateEnvVariable(dynamicEnvVar, value);
+            return updateEnvVariable(envVarName, value);
           }
         }
       }
@@ -133,7 +135,6 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
           'agent_name': 'AGENT_NAME',
           'agent_display_name': 'AGENT_DISPLAY_NAME',
           'agent_description': 'AGENT_DESCRIPTION',
-          'mcp_service': 'MCP_SERVICE',
           'agent_status': 'AGENT_STATUS'
         };
 
@@ -248,7 +249,6 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
           'agent_name': 'AGENT_NAME',
           'agent_display_name': 'AGENT_DISPLAY_NAME',
           'agent_description': 'AGENT_DESCRIPTION',
-          'mcp_service': 'MCP_SERVICE',
           'agent_status': 'AGENT_STATUS'
         };
 
@@ -306,11 +306,20 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
           configContent = configContent.replace(regex, `$1${value}$3`);
         }
       }
-      // Update MCP connection fields - update .env instead
-      else if (sectionKey === 'mcp_connection') {
-        if (fieldKey === 'calendar_mcp_url') {
-          // Update PIPEDREAM_MCP_SERVER environment variable
-          return updateEnvVariable('PIPEDREAM_MCP_SERVER', value);
+      // Update MCP integration fields
+      else if (sectionKey === 'mcp_integration') {
+        if (fieldKey === 'mcp_env_var') {
+          // Update MCP_ENV_VAR in config.py (read-only field, shouldn't be called)
+          const regex = new RegExp(`(MCP_ENV_VAR\\s*=\\s*["'])([^"']+)(["'])`, 'g');
+          configContent = configContent.replace(regex, `$1${value}$3`);
+        } else if (fieldKey === 'mcp_server_url') {
+          // Update the environment variable in .env
+          const mcpEnvVarMatch = configContent.match(/MCP_ENV_VAR\s*=\s*["']([^"']+)["']/);
+          if (mcpEnvVarMatch) {
+            const envVarName = mcpEnvVarMatch[1];
+            // Update the environment variable in .env
+            return updateEnvVariable(envVarName, value);
+          }
         }
       }
       // Update prompt templates fields - these go to prompt.py
@@ -445,6 +454,102 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
       return true;
     }
 
+    // Handle executive-ai-assistant configuration updates
+    if (configPath.includes('executive-ai-assistant')) {
+      const projectRoot = path.join(process.cwd(), '..');
+      const configYamlPath = path.join(projectRoot, 'src/executive-ai-assistant/eaia/main/config.yaml');
+
+      if (!fs.existsSync(configYamlPath)) {
+        console.error(`Config YAML file not found: ${configYamlPath}`);
+        return false;
+      }
+
+      try {
+        // Read current config.yaml
+        const yamlContent = fs.readFileSync(configYamlPath, 'utf8');
+        const configData = yaml.load(yamlContent) as any || {};
+
+        // Update the appropriate field based on section and field key
+        if (sectionKey === 'user_identity') {
+          configData[fieldKey] = value;
+        } else if (sectionKey === 'user_preferences') {
+          configData[fieldKey] = value;
+        } else if (sectionKey === 'email_preferences') {
+          configData[fieldKey] = value;
+        } else if (sectionKey === 'triage_prompts') {
+          configData[fieldKey] = value;
+        } else if (sectionKey === 'ai_models' || sectionKey === 'langgraph_system' || sectionKey === 'google_workspace') {
+          // Handle API keys and credentials - save to executive assistant .env file
+          const envPath = path.join(projectRoot, 'src/executive-ai-assistant/.env');
+          if (fs.existsSync(envPath)) {
+            let envContent = fs.readFileSync(envPath, 'utf8');
+            const lines = envContent.split('\n');
+
+            // Map UI field names to env variable names
+            const envVarMap: Record<string, string> = {
+              // AI Models
+              'anthropic_api_key': 'ANTHROPIC_API_KEY',
+              'openai_api_key': 'OPENAI_API_KEY',
+              // LangGraph System
+              'langsmith_api_key': 'LANGSMITH_API_KEY',
+              'langchain_project': 'LANGCHAIN_PROJECT',
+              // Google Workspace
+              'google_client_id': 'GOOGLE_CLIENT_ID',
+              'google_client_secret': 'GOOGLE_CLIENT_SECRET',
+              'gmail_refresh_token': 'GMAIL_REFRESH_TOKEN',
+              'user_google_email': 'EMAIL_ASSOCIATED'
+            };
+
+            const envVarName = envVarMap[fieldKey];
+            if (envVarName) {
+              const envVarRegex = new RegExp(`^${envVarName}=`);
+              let updated = false;
+
+              // Find and update existing variable
+              for (let i = 0; i < lines.length; i++) {
+                if (envVarRegex.test(lines[i])) {
+                  lines[i] = `${envVarName}=${value}`;
+                  updated = true;
+                  break;
+                }
+              }
+
+              // Add new variable if not found
+              if (!updated) {
+                lines.push(`${envVarName}=${value}`);
+              }
+
+              fs.writeFileSync(envPath, lines.join('\n'));
+              console.log(`Successfully updated ${envVarName} in executive assistant .env`);
+            }
+          }
+          return true;
+        } else if (sectionKey === 'llm_triage' || sectionKey === 'llm_draft' || sectionKey === 'llm_rewrite' || sectionKey === 'llm_scheduling' || sectionKey === 'llm_reflection') {
+          // Store individual LLM configs in YAML
+          configData[fieldKey] = value;
+        } else if (sectionKey === 'system_info') {
+          // System info is mostly read-only, skip updates
+          console.log(`System info updates skipped for executive AI assistant`);
+          return true;
+        }
+
+        // Write updated config back to YAML
+        const updatedYaml = yaml.dump(configData, {
+          defaultFlowStyle: false,
+          quotingType: '"',
+          forceQuotes: false
+        });
+
+        fs.writeFileSync(configYamlPath, updatedYaml, 'utf8');
+        console.log(`Successfully updated ${fieldKey} in ${configYamlPath}`);
+        return true;
+
+      } catch (yamlError) {
+        console.error('Error updating config.yaml:', yamlError);
+        return false;
+      }
+    }
+
     // For other Python config files, implement similar logic as needed
     console.warn(`Config file updates not implemented for: ${configPath}`);
     return false;
@@ -458,9 +563,16 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as UpdateConfigRequest;
-    const { agentId, configPath, sectionKey, fieldKey, value, envVar } = body;
+    const { agentId, sectionKey, fieldKey, value, envVar } = body;
 
-    console.log('Update request:', { agentId, sectionKey, fieldKey, value, envVar });
+    // Auto-determine configPath for executive-ai-assistant
+    let configPath = body.configPath;
+    if (agentId === 'executive-ai-assistant' && !configPath) {
+      // Use relative path since updateConfigFile joins with projectRoot
+      configPath = 'src/executive-ai-assistant/eaia/main/config.yaml';
+    }
+
+    console.log('Update request:', { agentId, configPath, sectionKey, fieldKey, value, envVar });
 
     let success = true;
 

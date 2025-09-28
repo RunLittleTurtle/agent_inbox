@@ -4,7 +4,15 @@ Complete guide for setting up configuration integration between your React Agent
 
 ## Overview
 
-The config system provides a web UI at `http://localhost:3004/config` for managing agent settings with two-way sync between the UI and Python configuration files.
+The config system follows a clear hierarchy:
+
+1. **Main .env file** - Contains all environment variables (MCP URLs, API keys)
+2. **Agent's config.py** - Reads FROM .env using `os.getenv()`, specifies WHICH env vars to use
+3. **UI config & prompts** - Read FROM config.py, never directly from .env
+
+**Key Principle**: The config.py acts as the bridge - it reads from .env, while UI and prompts read from config.py.
+
+The config system provides a web UI at `http://localhost:3004/config` for managing agent settings.
 
 ## Core Components
 
@@ -18,7 +26,27 @@ src/your_agent/
 └── ...
 ```
 
-### 2. Config App Integration
+### 2. Data Flow Architecture
+
+```
+┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+│   Main      │  →→→  │   Agent's   │  →→→  │  UI Config  │
+│   .env      │       │   config.py │       │  & Prompts  │
+└─────────────┘       └─────────────┘       └─────────────┘
+     ↑                       ↑                       ↑
+     │                       │                       │
+  MCP URLs,              os.getenv()            Read from
+  API Keys               reads from             config.py
+                            .env                   only
+```
+
+**Key Points**:
+- The `.env` file contains the actual MCP server URLs and API keys
+- Each agent's `config.py` uses `os.getenv()` to read FROM .env
+- The UI config (`ui_config.py`) and prompts (`prompt.py`) read FROM config.py
+- This ensures secrets stay in .env while agents manage their own configuration
+
+### 3. Config App Integration
 
 The config app (located at `config-app/`) provides:
 - Web UI for editing agent configurations
@@ -29,18 +57,30 @@ The config app (located at `config-app/`) provides:
 
 ### Step 1: Configure Agent Identity
 
-In your agent's `config.py`, replace ALL placeholder values:
+In your agent's `config.py`, replace ALL placeholder values.
+
+**IMPORTANT**: The config.py file reads values FROM the main .env file using `os.getenv()`. The UI config and prompts then read FROM config.py, not directly from .env:
 
 ```python
 # TODO: Configure for your agent
 AGENT_NAME = "gmail"  # Internal identifier (no spaces, lowercase)
 AGENT_DISPLAY_NAME = "Gmail Agent"  # Human-readable name
 AGENT_DESCRIPTION = "email management and organization"  # Brief description
-MCP_SERVICE = "google_gmail"  # MCP service identifier
 AGENT_STATUS = "active"  # "active" or "disabled"
+
+# MCP Configuration - specify the exact environment variable name
+# This is flexible - works with any MCP provider:
+#   - Pipedream: "PIPEDREAM_MCP_SERVER_google_gmail"
+#   - Composio: "COMPOSIO_MCP_SERVER_slack"
+#   - Custom: "MY_CUSTOM_MCP_SERVER"
+MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_gmail"  # Your MCP server env var
 ```
 
-**Critical**: Remove ALL `{PLACEHOLDER}` values - the config UI will not work with placeholders.
+**Critical**:
+- Remove ALL `{PLACEHOLDER}` values - the config UI will not work with placeholders
+- The MCP_ENV_VAR specifies WHICH environment variable to read from .env
+- The actual MCP server URL must exist in your main .env file
+- The config.py uses `os.getenv(MCP_ENV_VAR)` to get the URL from .env
 
 ### Step 2: Set Up UI Configuration Schema
 
@@ -97,12 +137,19 @@ CONFIG_SECTIONS = [
         'label': 'MCP Configuration',
         'fields': [
             {
-                'key': 'mcp_server_url',
-                'label': 'MCP Server URL',
+                'key': 'mcp_env_var',
+                'label': 'MCP Environment Variable',
                 'type': 'text',
-                'envVar': 'PIPEDREAM_MCP_SERVER_google_gmail',  # Replace with your service
-                'required': True,
-                'description': 'Pipedream MCP server endpoint'
+                'description': 'Name of the environment variable containing the MCP server URL',
+                'placeholder': 'PIPEDREAM_MCP_SERVER_google_gmail',
+                'required': False
+            },
+            {
+                'key': 'mcp_server_url',
+                'label': 'Current MCP Server URL',
+                'type': 'text',
+                'readOnly': True,
+                'description': 'The MCP server URL from the environment variable (read-only)'
             }
         ]
     }
@@ -119,7 +166,24 @@ CONFIG_SECTIONS = [
 
 **Important**: Only include fields that are actually implemented in your agent.
 
-### Step 3: Add Agent to Config App Discovery
+### Step 3: Ensure Environment Variables Exist in Main .env
+
+In your project's main `.env` file, add the MCP server URL:
+
+```bash
+# For Pipedream
+PIPEDREAM_MCP_SERVER_google_gmail=https://mcp.pipedream.net/xxx/google_gmail
+
+# For Composio
+COMPOSIO_MCP_SERVER_slack=https://mcp.composio.dev/xxx/slack
+
+# For custom
+MY_CUSTOM_MCP_SERVER=https://your-server.com/mcp
+```
+
+**Remember**: The agent's config.py will read this value using `os.getenv()`.
+
+### Step 4: Add Agent to Config App Discovery
 
 Edit `config-app/src/app/api/config/agents/route.ts`:
 
@@ -132,7 +196,7 @@ const AGENT_CONFIG_PATHS = [
 ];
 ```
 
-### Step 4: Add Config Reading Logic
+### Step 5: Add Config Reading Logic
 
 Edit `config-app/src/app/api/config/values/route.ts` in the `getPythonConfigValues()` function:
 
@@ -166,7 +230,7 @@ if (agentId === 'your_agent') {
 }
 ```
 
-### Step 5: Add Config Writing Logic
+### Step 6: Add Config Writing Logic
 
 Edit `config-app/src/app/api/config/update/route.ts` in the `updateConfigFile()` function:
 
@@ -219,7 +283,7 @@ if (configPath.includes('your_agent')) {
 }
 ```
 
-### Step 6: Environment Variables
+### Step 7: Environment Variables
 
 Add your MCP server URL to the main `.env` file:
 

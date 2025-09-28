@@ -1,6 +1,6 @@
-# MCP Server Setup for LangGraph Documentation Access
+# MCP Server Setup for Enhanced Claude Code Capabilities
 
-This guide explains how to set up the MCP (Model Context Protocol) server to provide Claude Code with access to LangGraph and LangChain documentation.
+This guide explains how to set up MCP (Model Context Protocol) servers to provide Claude Code with access to LangGraph/LangChain documentation and Chrome DevTools for UI testing and debugging.
 
 ## Prerequisites
 
@@ -15,13 +15,16 @@ pip install uv
 
 ## Setup Instructions
 
-### 1. MCP Configuration File
+### 1. MCP Configuration Files
 
-The `mcp.json` file is already created in the root directory with the following configuration:
+Two configuration files are maintained:
+
+#### Project-Level Configuration (`.mcp.json`)
+Located in the project root directory for project-specific MCP settings:
 
 ```json
 {
-  "langgraph-docs-mcp": {
+  "langgraph-docs": {
     "command": "uvx",
     "args": [
       "--from",
@@ -32,6 +35,44 @@ The `mcp.json` file is already created in the root directory with the following 
       "--transport",
       "stdio"
     ]
+  },
+  "chrome-devtools": {
+    "command": "npx",
+    "args": [
+      "chrome-devtools-mcp@latest",
+      "--headless=false",
+      "--isolated=true"
+    ]
+  }
+}
+```
+
+#### Global Claude Desktop Configuration
+Located at `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) for system-wide MCP access:
+
+```json
+{
+  "mcpServers": {
+    "langgraph-docs": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mcpdoc",
+        "mcpdoc",
+        "--urls",
+        "LangGraph Python:https://langchain-ai.github.io/langgraph/llms.txt LangGraph JS:https://langchain-ai.github.io/langgraphjs/llms.txt LangChain Python:https://python.langchain.com/llms.txt LangChain JS:https://js.langchain.com/llms.txt",
+        "--transport",
+        "stdio"
+      ]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--headless=false",
+        "--isolated=true"
+      ]
+    }
   }
 }
 ```
@@ -57,39 +98,65 @@ To use this MCP server with Claude Code:
    claude
    ```
 
-### 3. Available Documentation Sources
+### 3. Available MCP Servers
 
-The MCP server provides access to:
-
+#### LangGraph Documentation Server (MCPDOC)
+Provides access to:
 - **LangGraph Python**: Core graph functionality, state management, routing
 - **LangGraph JS**: JavaScript implementation (for reference)
 - **LangChain Python**: Tool integration, model management, chains
 - **LangChain JS**: JavaScript implementation (for reference)
 
+#### Chrome DevTools Server
+Provides capabilities for:
+- **Browser Automation**: Navigate pages, click elements, fill forms
+- **UI Testing**: Screenshot capture, visual regression testing
+- **Performance Analysis**: Network monitoring, CPU profiling
+- **Debugging**: Console access, element inspection
+- **Emulation**: Device modes, network conditions
+
 ### 4. Testing the MCP Connection
 
-You can test if the MCP server is working by:
+You can test if the MCP servers are working by:
 
-1. **Manual testing:**
+1. **Test LangGraph Documentation Server:**
    ```bash
    # Test the mcpdoc tool directly
    uvx --from mcpdoc mcpdoc --urls "LangGraph Python:https://langchain-ai.github.io/langgraph/llms.txt" --transport stdio
    ```
 
-2. **Within Claude Code:**
+2. **Test Chrome DevTools Server:**
+   ```bash
+   # Test Chrome DevTools MCP
+   npx chrome-devtools-mcp@latest --help
+
+   # Run a quick test (headless mode)
+   node test_chrome_mcp.js
+   ```
+
+3. **Within Claude Code:**
    - Ask Claude Code to search for LangGraph documentation
-   - Request specific implementation examples
-   - Ask about best practices for state management
+   - Request UI testing of your application
+   - Ask to capture screenshots or analyze page performance
 
 ### 5. Usage Examples
 
 Once configured, you can ask Claude Code:
 
+#### Documentation Queries:
 ```
 "Show me examples of LangGraph StateGraph implementation"
 "What are the best practices for LangGraph state management?"
 "How do I implement human-in-the-loop with LangGraph?"
 "Find documentation about LangGraph create_react_agent"
+```
+
+#### UI Testing & Debugging:
+```
+"Test the login flow of my application"
+"Capture a screenshot of the agent inbox UI"
+"Check the performance metrics of the config-app page"
+"Verify that the chat interface is responsive on mobile"
 ```
 
 ## Troubleshooting

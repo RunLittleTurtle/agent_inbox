@@ -2,6 +2,15 @@
 
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+
+
+def get_llm(model_name: str, temperature: float = 0, **kwargs):
+    """Get the appropriate LLM based on model name."""
+    if model_name.startswith('claude') or model_name.startswith('opus'):
+        return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
+    else:  # OpenAI models (gpt-*, o3)
+        return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
 from langchain_core.messages import RemoveMessage
 from langgraph.store.base import BaseStore
 
@@ -44,10 +53,14 @@ Subject: {subject}
 
 
 async def triage_input(state: State, config: RunnableConfig, store: BaseStore):
-    model = config["configurable"].get("model", "gpt-4o")
-    llm = ChatOpenAI(model=model, temperature=0)
-    examples = await get_few_shot_examples(state["email"], store, config)
+    # Get triage-specific model configuration from config.yaml
+    # NOTE: The hardcoded values below are FALLBACK DEFAULTS only, used if config.yaml is missing
+    # The actual model/temperature values are loaded from config.yaml via get_config()
     prompt_config = await get_config(config)
+    model = prompt_config.get("triage_model", "claude-3-5-haiku-20241022")  # Fallback default
+    temperature = prompt_config.get("triage_temperature", 0.1)  # Fallback default
+    llm = get_llm(model, temperature=temperature)
+    examples = await get_few_shot_examples(state["email"], store, config)
     input_message = triage_prompt.format(
         email_thread=state["email"]["page_content"],
         author=state["email"]["from_email"],

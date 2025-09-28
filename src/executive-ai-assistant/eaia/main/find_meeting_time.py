@@ -6,6 +6,15 @@ from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+
+
+def get_llm(model_name: str, temperature: float = 0, **kwargs):
+    """Get the appropriate LLM based on model name."""
+    if model_name.startswith('claude') or model_name.startswith('opus'):
+        return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
+    else:  # OpenAI models (gpt-*, o3)
+        return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
 
 from eaia.gmail import get_events_for_days
 from eaia.schemas import State
@@ -65,8 +74,13 @@ Subject: {subject}
 
 async def find_meeting_time(state: State, config: RunnableConfig):
     """Write an email to a customer."""
-    model = config["configurable"].get("model", "gpt-4o")
-    llm = ChatOpenAI(model=model, temperature=0)
+    # Get scheduling-specific model configuration from config.yaml
+    # NOTE: The hardcoded values below are FALLBACK DEFAULTS only, used if config.yaml is missing
+    # The actual model/temperature values are loaded from config.yaml via get_config()
+    prompt_config = await get_config(config)
+    model = prompt_config.get("scheduling_model", "gpt-4o")  # Fallback default
+    temperature = prompt_config.get("scheduling_temperature", 0.1)  # Fallback default
+    llm = get_llm(model, temperature=temperature)
     agent = create_react_agent(llm, [get_events_for_days], name="meeting_time_finder")
     current_date = datetime.now()
     prompt_config = await get_config(config)

@@ -120,3 +120,13 @@ triage_email: >
 
   Reminder - automated calendar invites do NOT count as real emails
 memory: true
+triage_model: claude-sonnet-4-20250514
+triage_temperature: 0.1
+draft_model: claude-sonnet-4-20250514
+draft_temperature: 0.4
+rewrite_model: gpt-4o
+rewrite_temperature: 0.3
+scheduling_model: claude-sonnet-4-20250514
+scheduling_temperature: 0.1
+reflection_model: o3
+reflection_temperature: 0.1

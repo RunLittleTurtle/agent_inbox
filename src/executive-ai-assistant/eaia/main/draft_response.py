@@ -2,6 +2,7 @@
 
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from langgraph.store.base import BaseStore
 
 from eaia.schemas import (
@@ -15,6 +16,14 @@ from eaia.schemas import (
     email_template,
 )
 from eaia.main.config import get_config
+
+
+def get_llm(model_name: str, temperature: float = 0, **kwargs):
+    """Get the appropriate LLM based on model name."""
+    if model_name.startswith('claude') or model_name.startswith('opus'):
+        return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
+    else:  # OpenAI models (gpt-*, o3)
+        return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
 
 EMAIL_WRITING_INSTRUCTIONS = """You are {full_name}'s executive assistant. You are a top-notch executive assistant who cares about {name} performing as well as possible.
 
@@ -81,10 +90,15 @@ Here is the email thread. Note that this is the full email thread. Pay special a
 
 async def draft_response(state: State, config: RunnableConfig, store: BaseStore):
     """Write an email to a customer."""
-    model = config["configurable"].get("model", "gpt-4o")
-    llm = ChatOpenAI(
-        model=model,
-        temperature=0,
+    # Get draft-specific model configuration from config.yaml
+    # NOTE: The hardcoded values below are FALLBACK DEFAULTS only, used if config.yaml is missing
+    # The actual model/temperature values are loaded from config.yaml via get_config()
+    prompt_config = await get_config(config)
+    model = prompt_config.get("draft_model", "claude-sonnet-4-20250514")  # Fallback default
+    temperature = prompt_config.get("draft_temperature", 0.2)  # Fallback default
+    llm = get_llm(
+        model,
+        temperature=temperature,
         parallel_tool_calls=False,
         tool_choice="required",
     )
@@ -98,7 +112,6 @@ async def draft_response(state: State, config: RunnableConfig, store: BaseStore)
     messages = state.get("messages") or []
     if len(messages) > 0:
         tools.append(Ignore)
-    prompt_config = await get_config(config)
     namespace = (config["configurable"].get("assistant_id", "default"),)
     key = "schedule_preferences"
     result = await store.aget(namespace, key)

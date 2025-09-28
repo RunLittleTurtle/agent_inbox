@@ -4,6 +4,8 @@ ALWAYS use LangGraph v.1, follow these principles and patterns.
 
 ALWAYS activate virtual environment  : source .venv/bin/activate
 
+For a complete launch of everyhting and for testing -> ALWAYS use this commands : python cli.py start
+
 For more extensive information check : src/CLAUDE-large.md
 
 You have access to the LangGraph MCP server, ALWAYS use it : src/mcp.json

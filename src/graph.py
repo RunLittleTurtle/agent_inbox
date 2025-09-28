@@ -96,10 +96,21 @@ async def create_calendar_agent():
             streaming=False
         )
 
-        fallback_prompt = """You are a calendar assistant.
-        I apologize, but I cannot directly access your calendar at the moment due to a technical issue.
-        I can provide general scheduling advice and help you plan your time, but cannot create, modify, or view actual calendar events.
-        Please let me know how I can assist you with scheduling planning."""
+        fallback_prompt = """❌ CALENDAR AGENT ERROR: The calendar agent failed to initialize properly.
+
+        **TECHNICAL ISSUE DETECTED:**
+        - MCP calendar tools could not be loaded
+        - This is likely due to configuration, API key, or import errors
+        - Check the console logs for specific error details
+
+        **CURRENT LIMITATIONS:**
+        - ✅ I can provide general scheduling advice
+        - ❌ I CANNOT access your actual Google Calendar
+        - ❌ I CANNOT create, modify, or view real calendar events
+        - ❌ I CANNOT check availability or book meetings
+
+        **IMMEDIATE ACTION REQUIRED:**
+        Please check system logs and fix the calendar agent configuration before using calendar features."""
 
         return create_react_agent(
             model=calendar_model,
@@ -109,41 +120,6 @@ async def create_calendar_agent():
         )
 
 
-
-async def create_drive_agent():
-    """Create Google Drive agent with MCP integration for file management and Google Drive operations"""
-    try:
-        from src.drive_react_agent.x_agent_orchestrator import create_drive_agent as create_drive_orchestrator
-
-        # Use proper drive agent orchestrator (returns compiled workflow)
-        drive_agent_workflow = create_drive_orchestrator()
-
-        logger.info("Google Drive agent with MCP integration initialized successfully")
-        return drive_agent_workflow
-
-    except Exception as e:
-        logger.error(f"Failed to create drive agent with MCP: {e}")
-        logger.info("Creating fallback drive agent without MCP tools")
-
-        # Fallback: basic drive agent without MCP tools
-        drive_model = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
-            temperature=0,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            streaming=False
-        )
-
-        fallback_prompt = """You are a Google Drive assistant.
-        I apologize, but I cannot directly access Google Drive at the moment due to a technical issue.
-        I can provide general file management assistance and planning, but cannot perform actual operations.
-        Please let me know how I can assist you with file management planning."""
-
-        return create_react_agent(
-            model=drive_model,
-            tools=[],
-            name="drive_agent_fallback",
-            prompt=fallback_prompt
-        )
 
 
 async def create_job_search_agent():
@@ -188,41 +164,37 @@ async def create_job_search_agent():
             prompt=job_prompt
         )
 
-
-async def create_email_agent():
-    """Create Email agent with MCP integration for email management and Gmail operations"""
+async def post_model_hook(messages, model_output=None):
+    """
+    post_model_hook that ensures the supervisor ends with a recap message.
+    """
     try:
-        from src.email_agent.x_agent_orchestrator import create_email_agent as create_email_orchestrator
+        if not messages:
+            return messages
 
-        # Use proper email agent orchestrator (returns compiled workflow)
-        email_agent_workflow = create_email_orchestrator()
+        last_msg = messages[-1]
+        if isinstance(last_msg, AIMessage) and ("recap" in last_msg.content.lower() or "summary" in last_msg.content.lower()):
+            return messages
 
-        logger.info("Email agent with MCP integration initialized successfully")
-        return email_agent_workflow
+        source_text = ""
+        for m in reversed(messages):
+            if isinstance(m, AIMessage) or isinstance(m, ToolMessage):
+                source_text = (m.content or "").strip()
+                if source_text:
+                    break
+
+        if not source_text:
+            recap_content = "Recap: The supervisor completed routing and agent handoff as required."
+        else:
+            short_snippet = " ".join(source_text.splitlines())[:480].strip()
+            recap_content = f"Recap: {short_snippet}"
+
+        messages.append(AIMessage(content=recap_content))
+        return messages
 
     except Exception as e:
-        logger.error(f"Failed to create email agent with MCP: {e}")
-        logger.info("Creating fallback email agent without MCP tools")
-
-        # Fallback: basic email agent without MCP tools
-        email_model = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
-            temperature=0,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            streaming=False
-        )
-
-        fallback_prompt = """You are a Email assistant.
-        I apologize, but I cannot directly access Gmail at the moment due to a technical issue.
-        I can provide general email management and Gmail operations assistance and planning, but cannot perform actual operations.
-        Please let me know how I can assist you with email management and Gmail operations planning."""
-
-        return create_react_agent(
-            model=email_model,
-            tools=[],
-            name="email_agent_fallback",
-            prompt=fallback_prompt
-        )
+        logger.exception("post_model_hook failed — returning original messages.")
+        return messages
 
 def validate_environment():
     """Validate required environment variables"""
@@ -234,57 +206,6 @@ def validate_environment():
 
     logger.info("Environment validation passed")
 
-# -----------------------------
-# Ensure supervisor always ends with a recap
-# -----------------------------
-async def post_model_hook(messages, model_output=None):
-    """
-    post_model_hook that ensures the supervisor ends with a recap message.
-
-    Notes:
-    - Many langgraph supervisor hooks receive the conversation messages and optionally
-      the model output. If the real signature differs in your version of
-      langgraph_supervisor, adapt the parameters accordingly (e.g., remove model_output
-      or accept a kwargs).
-    - We use langchain_core.messages.AIMessage which is already imported above.
-    """
-    try:
-        # Defensive: handle sync or async usage
-        # messages is expected to be a list-like of BaseMessage objects
-        if not messages:
-            return messages
-
-        last_msg = messages[-1]
-        # If last message is an AIMessage and already looks like a recap, do nothing.
-        if isinstance(last_msg, AIMessage) and ("recap" in last_msg.content.lower() or "summary" in last_msg.content.lower()):
-            return messages
-
-        # Create a short recap from the last AI or Tool message content available.
-        # We'll try to extract a short snippet because models may produce long content.
-        source_text = ""
-        # prefer last AIMessage, else fallback to last message content
-        for m in reversed(messages):
-            if isinstance(m, AIMessage) or isinstance(m, ToolMessage):
-                source_text = (m.content or "").strip()
-                if source_text:
-                    break
-
-        # fallback safe default
-        if not source_text:
-            recap_content = "Recap: The supervisor completed routing and agent handoff as required."
-        else:
-            # Keep recap short — first 480 chars, and remove newlines for compactness
-            short_snippet = " ".join(source_text.splitlines())[:480].strip()
-            recap_content = f"Recap: {short_snippet}"
-
-        # Append the recap as an AIMessage
-        messages.append(AIMessage(content=recap_content))
-        return messages
-
-    except Exception as e:
-        logger.exception("post_model_hook failed — returning original messages.")
-        return messages
-
 async def create_supervisor_graph():
     """Create multi-agent supervisor with improved error handling"""
     try:
@@ -294,8 +215,6 @@ async def create_supervisor_graph():
         # Create agents with individual error handling
         logger.info("Creating agents...")
         calendar_agent = await create_calendar_agent()
-        email_agent = await create_email_agent()
-        drive_agent = await create_drive_agent()
         job_search_agent = await create_job_search_agent()
 
 
@@ -356,7 +275,7 @@ When an agent completes their task, analyze if additional routing is needed."""
 
         # Create supervisor workflow
         workflow = create_supervisor(
-            agents=[calendar_agent, email_agent, drive_agent, job_search_agent],
+            agents=[calendar_agent, job_search_agent],
             model=supervisor_model,
             prompt=supervisor_prompt,
             supervisor_name="multi_agent_supervisor",

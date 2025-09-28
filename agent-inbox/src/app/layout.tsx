@@ -28,8 +28,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        <Toaster />
         <React.Suspense fallback={<div>Loading (layout)...</div>}>
-          <Toaster />
           <ThreadsProvider>
             <SidebarProvider>
               <AppSidebar />

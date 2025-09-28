@@ -12,3 +12,18 @@
     ]
   }
 }
+
+{
+  "nextjs-docs-mcp": {
+    "command": "uvx",
+    "args": [
+      "--from",
+      "mcpdoc",
+      "mcpdoc",
+      "--urls",
+      "Next.js:https://nextjs.org/docs/llms-full.txt",
+      "--transport",
+      "stdio"
+    ]
+  }
+}

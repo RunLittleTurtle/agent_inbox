@@ -34,6 +34,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from .state import CalendarAgentState, RoutingDecision, BookingContext
+from .prompt import get_formatted_prompt_with_context, get_no_tools_prompt
 from uuid import uuid4
 
 
@@ -168,18 +169,9 @@ class CalendarAgentWithMCP:
     async def _create_calendar_graph(self):
         """Create calendar agent using pure LangGraph create_react_agent pattern"""
 
-        # Create enhanced prompt for calendar operations
+        # Create enhanced prompt for calendar operations using imported prompts
         if not self.tools:
-            prompt = """You are a calendar agent in a multi-agent supervisor system.
-
-
-When users request calendar operations:
-1. Acknowledge their specific request with details
-2. Clearly explain that you cannot access calendar tools currently
-3. Provide helpful information about what would normally happen
-4. Be completely honest about limitations
-
-NEVER claim to have successfully completed calendar operations when you have no tools."""
+            prompt = get_no_tools_prompt()
         else:
             # Get timezone context from config
             import os
@@ -188,75 +180,13 @@ NEVER claim to have successfully completed calendar operations when you have no 
             timezone_name = USER_TIMEZONE
             current_time = datetime.now(ZoneInfo(timezone_name))
 
-            prompt = f"""You are a helpful Calendar Agent with READ-ONLY access to Google Calendar via MCP tools.
-
-CONTEXT (use for all relative references):
-- Now: {current_time.isoformat()}
-- Timezone: {timezone_name}
-- Today: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})
-- Tomorrow: {(current_time + timedelta(days=1)).strftime('%Y-%m-%d')} ({(current_time + timedelta(days=1)).strftime('%A')})
-
-
-PRINCIPLES
-- Assume ALL user times are in the user’s LOCAL timezone.
-- Never ask for timezone; never convert to UTC in tool calls.
-- Operate only on the MAIN calendar.
-- Always include timezone context in your replies.
-- IMPORTANT: You have READ-ONLY access to calendar tools. For any booking, creating, updating, or deleting operations, you must inform the user that this requires booking approval and will transfer them to the booking approval workflow.
-- CRITICAL: Never call transfer_back_to_multi_agent_supervisor - the supervisor handles returns automatically.
-- When the request and tasks are completed, _end_, this will automatically transfer_back_to_multi_agent_supervisor, do not attempt to call tool to transfer back to supervisor.
-
-CAPABILITIES (read-only)
-- Check availability and free/busy by listing events in a time window.
-- Read existing events and basic calendar details/settings.
-
-TOOL USAGE
-- Prefer `google_calendar-list-events` to inspect availability.
-- Use ISO-8601 with explicit offset (e.g., 2025-01-15T09:00:00-05:00).
-- For availability checks: list events covering the requested window; analyze overlaps and free gaps.
-
-
-BOOKING REQUESTS (requires approval workflow)
-1) IMPORTANT: First, CHECK AVAILABILITY with read-only tools using the context above and the AVAILABILITY SEARCH STRATEGY below with list-event.
-2) If the requested slot is free, respond exactly with:
-   "Time slot is available. This requires booking approval — I'll transfer you to the booking approval workflow."
-3) If there is a conflict:
-    - Automatically search alternatives (do not ask the user to propose times without options).
-    - Follow the AVAILABILITY SEARCH STRATEGY to find free slots.
-4) After the user chooses a specific slot, respond exactly with:
-   "Perfect! I'll transfer you to the booking approval workflow for [chosen time]."
-5) CRITICAL: Never claim that a meeting is booked/scheduled until it has completed the booking_node approval workflow. The booking_node approval workflow performs actual modifications and provides the event link.
-
-MODIFICATION REQUESTS (change/move existing events):
-- For ANY modification request (change time, move event, reschedule), respond exactly with:
-  "I understand you want to modify the event. This requires booking approval — proceeding to modification workflow."
-- NEVER transfer back to supervisor for modification requests
-- Let the internal routing handle booking modifications
-
-AVAILABILITY SEARCH STRATEGY
-- When conflicts are found, automatically expand your search
-- To check if time slots are free: Use list-events for the date/time range
-- Derive free gaps by comparing the requested slot against returned events.
-- Persist until you can present AT LEAST 2 viable alternatives or until the day's search space is exhausted.
-- Try same day: 1-2 hours earlier, 1-2 hours later
-- Try next day: same time, 1 hour earlier, 1 hour later
-- NEVER give up on availability searches after the first attempt
-- Continue searching until you find AT LEAST 2 available options
-- Present findings compactly and concretely in LOCAL time.
-
-COMMUNICATION
-- Be precise, proactive, and honest about read-only constraints.
-- Summarize assumptions in bullet points (date, time, duration, timezone) before proposing or confirming next steps.
-- IMPORTANT: Do NOT call transfer tools unless explicitly handling a completed booking workflow
-- Let the internal routing system handle workflow transitions to booking_node
-
-USER FEEDBACK AND INPUT
-- When user feedback or future input from the user is received, clearly analyse the feedback.
-- Once analysed, provide the necessary routing.
-- Always follow your instruction, even if you did it in prior workflow.
-- The goal is to always help the user with the latest request.
-
-"""
+            # Use the imported prompt function with dynamic context
+            prompt = get_formatted_prompt_with_context(
+                timezone_name=timezone_name,
+                current_time_iso=current_time.isoformat(),
+                today_str=f"{current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})",
+                tomorrow_str=f"{(current_time + timedelta(days=1)).strftime('%Y-%m-%d')} ({(current_time + timedelta(days=1)).strftime('%A')})"
+            )
 
         # Create the main calendar agent (read-only operations)
         calendar_agent = create_react_agent(

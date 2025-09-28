@@ -38,12 +38,17 @@ VENV_PATH = PROJECT_ROOT / ".venv"
 AGENT_INBOX_PATH = PROJECT_ROOT / "agent-inbox"
 AGENT_CHAT_UI_PATH = PROJECT_ROOT / "agent-chat-ui"
 AGENT_CHAT_UI_2_PATH = PROJECT_ROOT / "agent-chat-ui-2"
+CONFIG_APP_PATH = PROJECT_ROOT / "config-app"
 LANGGRAPH_API = "http://127.0.0.1:2024"
 EXECUTIVE_API = "http://127.0.0.1:2025"
 AGENT_INBOX_UI = "http://localhost:3000"
 AGENT_CHAT_UI = "http://localhost:3001"
 AGENT_CHAT_UI_2 = "http://localhost:3002"
-LANGSMITH_STUDIO = "https://smith.langchain.com"
+def get_langsmith_studio_url(langgraph_url, assistant_id="agent-inbox", thread_id="default", session_id="default"):
+    """Generate parameterized LangSmith Studio URL for deep linking"""
+    return f"https://smith.langchain.com/studio?baseUrl={langgraph_url}&assistantId={assistant_id}&threadId={thread_id}&sessionId={session_id}"
+
+LANGSMITH_STUDIO_BASE = "https://smith.langchain.com/studio"
 
 
 def ensure_venv():
@@ -713,29 +718,73 @@ def start(
     chat_port: int = typer.Option(3001, "--chat-port", help="Port for Agent Chat UI"),
     chat_2_port: int = typer.Option(3002, "--chat-2-port", help="Port for Agent Chat UI 2 (original)"),
     config_port: int = typer.Option(3004, "--config-port", help="Port for Configuration UI"),
-    studio: bool = typer.Option(True, "--studio/--no-studio", help="Open LangSmith Studio")
+    clean: bool = typer.Option(True, "--clean/--no-clean", help="Clear agent-inbox cache before starting"),
+    studio: bool = typer.Option(False, "--studio/--no-studio", help="Open LangSmith Studio")
 ):
     """
-    🚀 Start complete AI agent stack with all UIs
+    🚀 Start complete AI agent stack with essential UIs
 
-    Launches LangGraph server, Executive AI Assistant, Agent Inbox, Agent Chat UI, Agent Chat UI 2 (original), Configuration UI, and LangSmith Studio.
+    Launches LangGraph server, Executive AI Assistant, Agent Inbox, Agent Chat UI, Agent Chat UI 2 (original), and Configuration UI.
+    Includes automatic cache cleanup for agent-inbox to prevent webpack errors.
     This is the one-command solution to get everything running.
     """
     console.print(Panel.fit(
         "🚀 [bold green]Starting Complete AI Agent Stack[/bold green]",
-        subtitle="LangGraph + Executive Assistant + Agent Inbox + Agent Chat + Agent Chat 2 + Config UI + LangSmith Studio"
+        subtitle="LangGraph + Executive Assistant + Agent Inbox + Agent Chat + Agent Chat 2 + Config UI"
     ))
 
     ensure_venv()
 
+    # Kill all existing processes first to prevent conflicts
+    console.print("[blue]🔄 Killing existing processes on all ports...[/blue]")
+    ports_to_clean = [langgraph_port, executive_port, inbox_port, chat_port, chat_2_port, config_port]
+    for port in ports_to_clean:
+        killed = kill_processes_on_port(port, f"Port {port}")
+        if killed:
+            console.print(f"[green]✅ Cleaned up processes on port {port}[/green]")
+
+    # Aggressive cache cleanup if requested
+    if clean:
+        console.print("[yellow]🧹 Performing aggressive cache cleanup...[/yellow]")
+        try:
+            cache_cleanup_path = AGENT_INBOX_PATH
+
+            # Kill any remaining Next.js processes
+            subprocess.run(["pkill", "-f", "next"], capture_output=True)
+            subprocess.run(["pkill", "-f", "npm.*dev"], capture_output=True)
+            time.sleep(2)  # Give processes time to die
+
+            # Remove all cache directories
+            console.print("[yellow]   📁 Removing .next directory...[/yellow]")
+            subprocess.run(["rm", "-rf", str(cache_cleanup_path / ".next")], capture_output=True)
+
+            console.print("[yellow]   📁 Removing node_modules cache...[/yellow]")
+            subprocess.run(["rm", "-rf", str(cache_cleanup_path / "node_modules" / ".cache")], capture_output=True)
+
+            console.print("[yellow]   📁 Removing turbo cache...[/yellow]")
+            subprocess.run(["rm", "-rf", str(cache_cleanup_path / ".turbo")], capture_output=True)
+
+            # Change to agent-inbox directory for npm operations
+            original_cwd = os.getcwd()
+            os.chdir(cache_cleanup_path)
+
+            console.print("[yellow]   📁 Clearing npm cache...[/yellow]")
+            subprocess.run(["npm", "cache", "clean", "--force"], capture_output=True)
+
+            console.print("[yellow]   📁 Clearing yarn cache...[/yellow]")
+            subprocess.run(["yarn", "cache", "clean"], capture_output=True)
+
+            os.chdir(original_cwd)
+
+            # Wait for cleanup to complete
+            time.sleep(3)
+            console.print("[green]✅ Aggressive cache cleanup completed![/green]")
+        except Exception as e:
+            console.print(f"[yellow]⚠️  Error during cache cleanup: {e}[/yellow]")
+
     try:
         # Step 1: Start LangGraph server in background
         console.print("[blue]📋 Step 1: Starting LangGraph server...[/blue]")
-
-        # Kill existing LangGraph processes
-        killed_langgraph = kill_processes_on_port(langgraph_port, "LangGraph")
-        if not killed_langgraph:
-            console.print(f"[green]✅ No existing LangGraph processes found on port {langgraph_port}[/green]")
 
         # Start LangGraph in background
         langgraph_env = os.environ.copy()
@@ -760,10 +809,6 @@ def start(
             langgraph_process.terminate()
             raise typer.Exit(1)
 
-        # Kill existing Executive Assistant processes
-        killed_executive = kill_processes_on_port(executive_port, "Executive AI Assistant")
-        if not killed_executive:
-            console.print(f"[green]✅ No existing Executive AI Assistant processes found on port {executive_port}[/green]")
 
         # Start Executive AI Assistant LangGraph server
         executive_env = os.environ.copy()
@@ -787,10 +832,6 @@ def start(
             executive_process.terminate()
             raise typer.Exit(1)
 
-        # Kill existing Agent Inbox processes
-        killed_inbox = kill_processes_on_port(inbox_port, "Agent Inbox")
-        if not killed_inbox:
-            console.print(f"[green]✅ No existing Agent Inbox processes found on port {inbox_port}[/green]")
 
         # Start Agent Inbox
         os.chdir(AGENT_INBOX_PATH)
@@ -810,10 +851,6 @@ def start(
             inbox_process.terminate()
             raise typer.Exit(1)
 
-        # Kill existing Agent Chat processes
-        killed_chat = kill_processes_on_port(chat_port, "Agent Chat UI")
-        if not killed_chat:
-            console.print(f"[green]✅ No existing Agent Chat processes found on port {chat_port}[/green]")
 
         # Start Agent Chat UI
         os.chdir(AGENT_CHAT_UI_PATH)
@@ -834,10 +871,6 @@ def start(
             chat_process.terminate()
             raise typer.Exit(1)
 
-        # Kill existing Agent Chat 2 processes
-        killed_chat_2 = kill_processes_on_port(chat_2_port, "Agent Chat UI 2")
-        if not killed_chat_2:
-            console.print(f"[green]✅ No existing Agent Chat UI 2 processes found on port {chat_2_port}[/green]")
 
         # Start Agent Chat UI 2
         os.chdir(AGENT_CHAT_UI_2_PATH)
@@ -850,13 +883,9 @@ def start(
         # Step 6: Start Configuration UI
         console.print("[blue]📋 Step 6: Starting Configuration UI...[/blue]")
 
-        # Kill existing Config UI processes
-        killed_config = kill_processes_on_port(config_port, "Configuration UI")
-        if not killed_config:
-            console.print(f"[green]✅ No existing Configuration UI processes found on port {config_port}[/green]")
 
         # Start Configuration UI
-        os.chdir(AGENT_INBOX_PATH)
+        os.chdir(CONFIG_APP_PATH)
         config_env = os.environ.copy()
         config_env['PORT'] = str(config_port)
         config_process = subprocess.Popen(["npm", "run", "dev:config"], env=config_env)
@@ -865,23 +894,15 @@ def start(
         console.print("[blue]💭 Waiting for all UIs to initialize...[/blue]")
         time.sleep(8)  # Give all services time to start
 
-        # Step 7: Open all browser interfaces
-        console.print("[blue]📋 Step 7: Opening all browser interfaces...[/blue]")
+        # Step 7: Open all UIs in the correct order
+        console.print("[blue]📋 Step 7: Opening all UIs in correct order...[/blue]")
 
-        langgraph_url = f"http://127.0.0.1:{langgraph_port}"
-        executive_url = f"http://127.0.0.1:{executive_port}"
-        inbox_url = f"http://localhost:{inbox_port}"
         chat_url = f"http://localhost:{chat_port}"
         chat_2_url = f"http://localhost:{chat_2_port}"
-        config_url = f"http://localhost:{config_port}/config"
+        inbox_url = f"http://localhost:{inbox_port}"
+        config_url = f"http://localhost:{config_port}"
 
-        # Open LangSmith Studio first
-        if studio:
-            console.print(f"[green]🎨 Opening LangSmith Studio...[/green]")
-            webbrowser.open(LANGSMITH_STUDIO)
-            time.sleep(1)  # Small delay between browser opens
-
-        # Open Agent Chat UI
+        # Open Agent Chat UI first
         console.print(f"[green]💬 Opening Agent Chat UI at {chat_url}[/green]")
         webbrowser.open(chat_url)
         time.sleep(1)
@@ -896,13 +917,14 @@ def start(
         webbrowser.open(inbox_url)
         time.sleep(1)
 
-        # Open Executive AI Assistant LangGraph Studio (LangSmith hosted version)
-        executive_studio_url = f"https://smith.langchain.com/studio/?baseUrl={executive_url}"
-        console.print(f"[green]🤖 Opening Executive AI Assistant Studio at {executive_studio_url}[/green]")
-        webbrowser.open(executive_studio_url)
-        time.sleep(1)
+        # Open LangSmith Studio if requested
+        if studio:
+            console.print(f"[green]🎨 Opening LangSmith Studio...[/green]")
+            langsmith_url = get_langsmith_studio_url(langgraph_url)
+            webbrowser.open(langsmith_url)
+            time.sleep(1)
 
-        # Open Configuration UI
+        # Open Configuration UI last
         console.print(f"[green]⚙️  Opening Configuration UI at {config_url}[/green]")
         webbrowser.open(config_url)
 
@@ -916,7 +938,7 @@ def start(
             f"💬 Agent Chat UI: [link]{chat_url}[/link]\n"
             f"💬 Agent Chat UI 2 (original): [link]{chat_2_url}[/link]\n"
             f"⚙️  Configuration UI: [link]{config_url}[/link]\n"
-            f"🎨 LangSmith Studio: [link]{LANGSMITH_STUDIO}[/link]\n\n"
+            f"🎨 LangSmith Studio: [link]{get_langsmith_studio_url(langgraph_url)}[/link]\n\n"
             f"[dim]All Studio windows opened automatically in separate browser tabs[/dim]\n"
             f"[dim]Press Ctrl+C to stop all services[/dim]",
             title="✅ All Services Running",
@@ -1069,7 +1091,7 @@ def config(
 
     # Start the config UI
     console.print(f"[green]🚀 Starting Config UI on port {port}...[/green]")
-    os.chdir(AGENT_INBOX_PATH)
+    os.chdir(CONFIG_APP_PATH)
 
     cmd = ["npm", "run", "dev:config"]
 
@@ -1077,7 +1099,7 @@ def config(
         process = subprocess.Popen(cmd)
         time.sleep(3)  # Give it time to start
 
-        config_url = f"http://localhost:{port}/config"
+        config_url = f"http://localhost:{port}"
         console.print(f"[green]✅ Config UI started successfully![/green]")
         console.print(f"[blue]🌐 Opening {config_url}[/blue]")
 

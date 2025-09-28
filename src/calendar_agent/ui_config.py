@@ -25,6 +25,22 @@ CONFIG_SECTIONS = [
                 'readonly': True
             },
             {
+                'key': 'agent_display_name',
+                'label': 'Display Name',
+                'type': 'text',
+                'default': 'Calendar Agent',
+                'description': 'Human-readable agent name shown in UI',
+                'required': True
+            },
+            {
+                'key': 'agent_description',
+                'label': 'Description',
+                'type': 'textarea',
+                'default': 'Google Calendar management and scheduling',
+                'description': 'Brief description of agent capabilities',
+                'required': True
+            },
+            {
                 'key': 'agent_status',
                 'label': 'Status',
                 'type': 'select',
@@ -36,19 +52,20 @@ CONFIG_SECTIONS = [
     },
     {
         'key': 'llm',
-        'label': 'AI Model Settings',
-        'description': 'Configure the AI model for calendar operations',
+        'label': 'Language Model',
+        'description': 'AI model configuration for calendar operations',
         'fields': [
             {
                 'key': 'model',
-                'label': 'Model',
+                'label': 'Model Name',
                 'type': 'select',
-                'default': 'claude-3-5-sonnet-20241022',
-                'description': 'Select AI model for calendar tasks',
+                'default': 'claude-sonnet-4-20250514',
+                'description': 'Primary AI model for calendar tasks',
                 'options': [
-                    'claude-3-5-sonnet-20241022',
                     'claude-sonnet-4-20250514',
-                    'gpt-4o'
+                    'claude-3-5-sonnet-20241022',
+                    'gpt-4o',
+                    'gpt-4o-mini'
                 ],
                 'required': True
             },
@@ -56,9 +73,9 @@ CONFIG_SECTIONS = [
                 'key': 'temperature',
                 'label': 'Temperature',
                 'type': 'number',
-                'default': 0.1,
+                'default': 0.3,
                 'description': 'Response creativity (0=focused, 1=creative)',
-                'validation': {'min': 0, 'max': 1, 'step': 0.1}
+                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
             }
         ]
     },
@@ -128,6 +145,55 @@ CONFIG_SECTIONS = [
                 'default': '30',
                 'description': 'Default duration for new meetings (minutes)',
                 'options': ['15', '30', '45', '60', '90', '120']
+            }
+        ]
+    },
+    {
+        'key': 'prompt_templates',
+        'label': 'System Prompts',
+        'description': 'Customize calendar agent behavior through system prompts',
+        'fields': [
+            {
+                'key': 'agent_system_prompt',
+                'label': 'Main System Prompt',
+                'type': 'textarea',
+                'description': 'Main system prompt that defines calendar agent behavior',
+                'placeholder': 'You are a helpful Calendar Agent...',
+                'required': True,
+                'rows': 15,
+                'note': 'Use {current_time}, {timezone_name}, {today}, {tomorrow} as placeholders'
+            },
+            {
+                'key': 'agent_role_prompt',
+                'label': 'Role Description',
+                'type': 'textarea',
+                'description': 'Define the calendar agent\'s role and capabilities',
+                'rows': 6,
+                'placeholder': 'CAPABILITIES (read-only)\n- Check availability...'
+            },
+            {
+                'key': 'agent_guidelines_prompt',
+                'label': 'Operational Guidelines',
+                'type': 'textarea',
+                'description': 'Guidelines for calendar agent behavior and responses',
+                'rows': 8,
+                'placeholder': 'PRINCIPLES\n- Assume ALL user times are in local timezone...'
+            },
+            {
+                'key': 'routing_system_prompt',
+                'label': 'Workflow Routing Prompt',
+                'type': 'textarea',
+                'description': 'Advanced: Smart routing logic for workflow decisions',
+                'rows': 10,
+                'placeholder': 'You are a smart calendar workflow router...'
+            },
+            {
+                'key': 'booking_extraction_prompt',
+                'label': 'Booking Extraction Prompt',
+                'type': 'textarea',
+                'description': 'Advanced: Template for extracting booking details from conversations',
+                'rows': 12,
+                'placeholder': 'Extract booking details from this request...'
             }
         ]
     }

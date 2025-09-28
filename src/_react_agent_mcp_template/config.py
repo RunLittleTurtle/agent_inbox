@@ -26,9 +26,8 @@ AGENT_DESCRIPTION = "{AGENT_DESCRIPTION}"  # e.g., "email management", "spreadsh
 MCP_SERVICE = "{MCP_SERVICE}"  # e.g., "google_gmail", "google_sheets", "google_drive"
 AGENT_STATUS = "disabled"  # active or disabled
 
-# Agent Prompt Configuration
-AGENT_PROMPT = """You are a helpful AI assistant specialized in {AGENT_DESCRIPTION}.
-Use the available tools to help users efficiently."""
+# Import prompts from prompt.py following LangGraph best practices
+from .prompt import AGENT_SYSTEM_PROMPT
 
 # MCP Environment Variable
 MCP_ENV_VAR = f"PIPEDREAM_MCP_SERVER_{MCP_SERVICE}"
@@ -51,7 +50,7 @@ else:
 
 LLM_CONFIG = {
     "model": "claude-sonnet-4-20250514",
-    "temperature": 0.2,
+    "temperature": 0.3,
     "streaming": False,  # Disable streaming for LangGraph compatibility
     "api_key": os.getenv("ANTHROPIC_API_KEY")
 }

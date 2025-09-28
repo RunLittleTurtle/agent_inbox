@@ -14,7 +14,7 @@ CONFIG_INFO = {
     'name': 'React Agent Template',
     'description': 'Template for creating new MCP-based agents',
     'config_type': 'template_config',
-    'config_path': 'src/_react_agent_mcp_template/config.py'
+    'config_path': 'src/_react_agent_mcp_template/ui_config.py'
 }
 
 CONFIG_SECTIONS = [
@@ -94,22 +94,6 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'agent_configuration',
-        'label': 'Agent Configuration',
-        'description': 'Agent behavior and prompt settings',
-        'fields': [
-            {
-                'key': 'agent_prompt',
-                'label': 'System Prompt',
-                'type': 'textarea',
-                'default': 'You are a helpful AI assistant. Use the available tools to help users efficiently.',
-                'description': 'Main system prompt that defines agent behavior',
-                'placeholder': 'Enter the system prompt for your agent...',
-                'required': True
-            }
-        ]
-    },
-    {
         'key': 'user_preferences',
         'label': 'User Preferences',
         'description': 'Personal settings and preferences',
@@ -156,6 +140,22 @@ CONFIG_SECTIONS = [
                 'note': 'Environment variable name depends on your MCP service'
             }
         ]
+    },
+    {
+        'key': 'prompt_templates',
+        'label': 'System Prompts',
+        'description': 'Customize agent behavior through system prompts',
+        'fields': [
+            {
+                'key': 'agent_system_prompt',
+                'label': 'System Prompt',
+                'type': 'textarea',
+                'description': 'Main system prompt that defines agent behavior',
+                'placeholder': 'Enter the complete system prompt...',
+                'required': True,
+                'rows': 15
+            }
+        ]
     }
 ]
 
@@ -164,6 +164,7 @@ def get_current_config():
     """Get current configuration values from config.py template"""
     try:
         from .config import LLM_CONFIG, AGENT_NAME, AGENT_DISPLAY_NAME, AGENT_DESCRIPTION, MCP_SERVICE
+        from .prompt import AGENT_SYSTEM_PROMPT, AGENT_ROLE_PROMPT, AGENT_GUIDELINES_PROMPT
 
         return {
             'agent_identity': {
@@ -174,6 +175,11 @@ def get_current_config():
             'llm': LLM_CONFIG,
             'mcp_integration': {
                 # MCP server URL comes from environment variable
+            },
+            'prompt_templates': {
+                'agent_system_prompt': AGENT_SYSTEM_PROMPT,
+                'agent_role_prompt': AGENT_ROLE_PROMPT,
+                'agent_guidelines_prompt': AGENT_GUIDELINES_PROMPT
             }
         }
     except ImportError:

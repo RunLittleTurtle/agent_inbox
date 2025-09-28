@@ -129,7 +129,7 @@ export function AppSidebar() {
 
               <div className="flex flex-col gap-3 pl-7">
                 <SettingsPopover />
-                <NextLink href="http://localhost:3004/config" target="_blank" rel="noopener noreferrer">
+                <NextLink href="http://localhost:3004" target="_blank" rel="noopener noreferrer">
                   <PillButton
                     variant="outline"
                     className="flex gap-2 items-center justify-center text-gray-800"

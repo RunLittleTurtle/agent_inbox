@@ -58,3 +58,67 @@ logs/
 agent-chat-ui/.git/
 agent-inbox/.git/
 src/supervisor-py/.git/
+
+# Personal documents and sensitive files
+*.pdf
+CV*
+resume*
+*.doc
+*.docx
+
+# Temporary and development test files
+# (Keep legitimate test files in tests/ directories and src/*/test_*.py)
+/test.py
+/debug.py
+/temp.py
+/scratch.py
+/playground.py
+/experiment.py
+/quick_test.py
+/final_test.py
+/test_*.py
+/final_*.py
+/*_test.py
+/*_debug.py
+/*_temp.py
+/*_scratch.py
+/*_playground.py
+/*_experiment.py
+
+# Temporary files and backups
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Additional macOS files
+.DS_Store*
+._*
+
+# Additional Python development files
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Coverage and test reports
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover

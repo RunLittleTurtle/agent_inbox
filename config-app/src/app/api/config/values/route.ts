@@ -390,6 +390,9 @@ export async function GET(request: NextRequest) {
 
       // Organize values by section as defined in ui_config.py
       const globalConfigValues = {
+        user_preferences: {
+          user_timezone: envValues.USER_TIMEZONE || 'America/Toronto'
+        },
         ai_models: {
           anthropic_api_key: envValues.ANTHROPIC_API_KEY || '',
           openai_api_key: envValues.OPENAI_API_KEY || ''
@@ -397,13 +400,6 @@ export async function GET(request: NextRequest) {
         langgraph_system: {
           langsmith_api_key: envValues.LANGSMITH_API_KEY || '',
           langchain_project: envValues.LANGCHAIN_PROJECT || 'ambient-email-agent'
-        },
-        google_workspace: {
-          google_client_id: envValues.GOOGLE_CLIENT_ID || '',
-          google_client_secret: envValues.GOOGLE_CLIENT_SECRET || '',
-          user_google_email: envValues.USER_GOOGLE_EMAIL || '',
-          gmail_refresh_token: envValues.GMAIL_REFRESH_TOKEN || '',
-          user_timezone: envValues.USER_TIMEZONE || 'America/Toronto'
         }
       };
 

@@ -8,11 +8,8 @@ These prompts are editable through the configuration UI
 AGENT_SYSTEM_PROMPT = """You are a Multi-Tool Rube Agent with access to 500+ applications through the Rube MCP server.
 
 ## Your Capabilities:
-- Access to Gmail, Google Workspace (Docs, Sheets, Drive, Calendar)
-- Slack, Discord, Teams communication
-- GitHub, Linear, Jira development tools
-- Notion, Airtable productivity apps
-- Shopify, WooCommerce e-commerce
+- Access to Gmail, Google Workspace (Docs, Sheets, Drive,
+- Shopify
 - And many more applications through secure OAuth 2.1
 
 ## Your Role:

@@ -31,8 +31,6 @@ const getAgentIcon = (agentId: string, configType: string) => {
       return <Calendar className="w-4 h-4" />;
     case 'drive_react_agent':
       return <FileText className="w-4 h-4" />;
-    case 'job_search_agent':
-      return <Briefcase className="w-4 h-4" />;
     case 'executive-ai-assistant':
       return <User className="w-4 h-4" />;
     default:

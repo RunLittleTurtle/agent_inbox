@@ -64,8 +64,8 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
       return false;
     }
 
-    // Special handling for the React Agent MCP template
-    if (configPath.includes('_react_agent_mcp_template')) {
+    // Special handling for the React Agent MCP template and multi_tool_rube_agent
+    if (configPath.includes('_react_agent_mcp_template') || configPath.includes('multi_tool_rube_agent')) {
       // For the template, update prompt.py for prompts, config.py for other settings
       const configPyPath = fullPath.replace('ui_config.py', 'config.py');
       const promptPyPath = fullPath.replace('ui_config.py', 'prompt.py');
@@ -398,37 +398,6 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
 
       if (!fs.existsSync(configPyPath)) {
         console.error(`Drive agent config.py not found: ${configPyPath}`);
-        return false;
-      }
-
-      let configContent = fs.readFileSync(configPyPath, 'utf8');
-
-      // Update LLM_CONFIG fields
-      if (sectionKey === 'llm') {
-        if (fieldKey === 'model') {
-          configContent = configContent.replace(
-            /("model":\s*")([^"]+)(")/,
-            `$1${value}$3`
-          );
-        } else if (fieldKey === 'temperature') {
-          configContent = configContent.replace(
-            /("temperature":\s*)([\d.]+)/,
-            `$1${value}`
-          );
-        }
-      }
-
-      fs.writeFileSync(configPyPath, configContent, 'utf8');
-      console.log(`Successfully updated ${fieldKey} in ${configPyPath}`);
-      return true;
-    }
-
-    // Handler for job_search_agent
-    if (configPath.includes('job_search_agent')) {
-      const configPyPath = fullPath.replace('ui_config.py', 'config.py');
-
-      if (!fs.existsSync(configPyPath)) {
-        console.error(`Job search agent config.py not found: ${configPyPath}`);
         return false;
       }
 

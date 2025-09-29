@@ -42,7 +42,6 @@ const AGENT_CONFIG_PATHS = [
   'src/calendar_agent/ui_config.py',
   'src/drive_react_agent/ui_config.py',
   'src/executive-ai-assistant/ui_config.py',
-  'src/job_search_agent/ui_config.py',
   'src/email_agent/ui_config.py',
 ];
 
@@ -67,7 +66,7 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
     // Define the standard LLM model options - CENTRALIZED LIST
     // Changing this list will update ALL agents using STANDARD_LLM_MODEL_OPTIONS
     const STANDARD_LLM_MODEL_OPTIONS = [
-      'claude-sonnet-4-20250514',
+      'claude-sonnet-4-5-20250929',
       'claude-3-5-haiku-20241022',
       'gpt-5',
       'gpt-4o',

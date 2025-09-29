@@ -114,7 +114,7 @@ CONFIG_SECTIONS = [
     {
         'key': 'llm_triage',
         'label': 'Email Triage Model',
-        'description': 'AI model for categorizing incoming emails (ignore/notify/respond). This runs first and most frequently - consider a fast, cheap model.',
+        'description': 'AI model for categorizing incoming emails (ignore/notify/respond). This runs first and makes the mark-as-read decision. Runs most frequently - consider a fast, cheap model.',
         'fields': [
             {
                 'key': 'triage_model',
@@ -138,7 +138,7 @@ CONFIG_SECTIONS = [
     {
         'key': 'llm_draft',
         'label': 'Email Drafting Model',
-        'description': 'AI model for writing email responses. This needs good reasoning and writing quality - consider a balanced or high-quality model.',
+        'description': 'AI model for writing initial email responses. This needs good reasoning and writing quality - consider a balanced or high-quality model.',
         'fields': [
             {
                 'key': 'draft_model',
@@ -162,7 +162,7 @@ CONFIG_SECTIONS = [
     {
         'key': 'llm_rewrite',
         'label': 'Email Rewriting Model',
-        'description': 'AI model for rewriting drafts to match your personal tone. This needs excellent style understanding - consider a high-quality model.',
+        'description': 'AI model for rewriting drafts to match your personal tone and style. This needs excellent style understanding - consider a high-quality model.',
         'fields': [
             {
                 'key': 'rewrite_model',
@@ -251,15 +251,15 @@ CONFIG_SECTIONS = [
     },
     {
         'key': 'triage_prompts',
-        'label': 'Triage Prompts',
-        'description': 'AI-powered email classification rules for intelligent inbox management',
+        'label': 'Triage Decision Prompts',
+        'description': 'AI-powered email classification rules. These prompts control the RespondTo tool behavior you see in LangSmith traces.',
         'card_style': 'orange',
         'fields': [
             {
                 'key': 'triage_no',
-                'label': 'Ignore Rules (No Action Required)',
+                'label': 'Ignore Rules - RespondTo tool (response=no)',
                 'type': 'textarea',
-                'description': 'Define criteria for emails that should be automatically ignored or filtered out. These emails will not notify you and require no action.',
+                'description': 'CONTROLS MARK-AS-READ: When RespondTo tool returns response=no, the email is marked as read and ignored. Define criteria for emails that should be automatically filtered. Be specific to avoid dismissing important emails.',
                 'placeholder': '- Automated emails from services that are spam\n- Cold outreach from vendors trying to sell products or services\n- Newsletter subscriptions and marketing emails\n- Automated calendar invitations',
                 'rows': 12,
                 'required': False,
@@ -268,9 +268,9 @@ CONFIG_SECTIONS = [
             },
             {
                 'key': 'triage_notify',
-                'label': 'Notification Rules (Awareness Only)',
+                'label': 'Notify Rules - RespondTo tool (response=notify)',
                 'type': 'textarea',
-                'description': 'Define criteria for emails that should notify you but don\'t require immediate response. You\'ll be informed but can review at your convenience.',
+                'description': 'When RespondTo tool returns response=notify, you will be informed but email is marked as read. Define criteria for emails that need awareness but no response.',
                 'placeholder': '- Google docs that were shared with you\n- DocuSign documents that need to be signed\n- Technical questions about AI development\n- Meeting requests that require attention but not immediate response',
                 'rows': 12,
                 'required': False,
@@ -279,9 +279,9 @@ CONFIG_SECTIONS = [
             },
             {
                 'key': 'triage_email',
-                'label': 'Action Required Rules (Priority Response)',
+                'label': 'Response Rules - RespondTo tool (response=email)',
                 'type': 'textarea',
-                'description': 'Define criteria for emails that require your direct response or action. These will be prioritized and may trigger response drafting.',
+                'description': 'When RespondTo tool returns response=email, a draft is created and email stays unread. Define criteria for emails that require your direct response and AI-assisted drafting.',
                 'placeholder': '- Emails from clients or collaborators that explicitly ask you a question\n- Emails from clients where someone scheduled a meeting and you haven\'t responded\n- Direct emails from lawyers or legal matters\n- Technical collaboration requests about your AI projects',
                 'rows': 15,
                 'required': False,

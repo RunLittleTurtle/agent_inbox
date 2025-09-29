@@ -20,6 +20,11 @@ from pydantic import BaseModel, Field
 
 from eaia.schemas import EmailData
 
+# Load executive AI assistant's local .env file for Gmail credentials
+from dotenv import load_dotenv
+_EXEC_AI_ROOT = Path(__file__).parent.parent
+load_dotenv(_EXEC_AI_ROOT / '.env')
+
 logger = logging.getLogger(__name__)
 _SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",

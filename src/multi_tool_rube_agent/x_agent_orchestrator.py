@@ -4,12 +4,18 @@ Uses centralized config from config.py
 """
 
 import os
+import sys
+from pathlib import Path
 from typing import Dict, Any
 
-from langchain_anthropic import ChatAnthropic
 from langgraph.prebuilt import create_react_agent
 from dotenv import load_dotenv
 
+# Add project root to Python path for utils import
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from utils.llm_utils import get_llm
 from .tools import get_agent_simple_tools
 from .prompt import AGENT_SYSTEM_PROMPT
 from .config import LLM_CONFIG, AGENT_NAME, get_current_context
@@ -23,13 +29,22 @@ class AgentOrchestrator:
     def __init__(self, llm_config: Dict[str, Any] = None):
         self.llm_config = llm_config or LLM_CONFIG
 
-        # Validate API key
-        api_key = self.llm_config.get("api_key") or os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not found")
+        # Extract model and temperature
+        model_name = self.llm_config.get("model", "claude-sonnet-4-20250514")
+        temperature = self.llm_config.get("temperature", 0.3)
 
-        self.llm_config = {**self.llm_config, "api_key": api_key}
-        self.llm = ChatAnthropic(**self.llm_config)
+        # Validate API key based on model provider
+        if model_name.startswith('claude') or model_name.startswith('opus'):
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY not found for Claude model")
+        else:  # OpenAI models
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY not found for OpenAI model")
+
+        # Use centralized get_llm function for cross-provider support
+        self.llm = get_llm(model_name, temperature=temperature)
         self.tools = get_agent_simple_tools()
         self.workflow = self._build_workflow()
 
@@ -61,8 +76,7 @@ def create_default_orchestrator():
     return orchestrator.workflow
 
 
-# TODO: Replace {agent} with your agent name (e.g., gmail, sheets, drive)
-def create_{agent}_agent():
+def create_multi_tool_rube_agent():
     """
     REQUIRED function for supervisor integration
     MUST match pattern: create_{agent}_agent()

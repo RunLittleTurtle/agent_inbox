@@ -1,9 +1,11 @@
 from langgraph.store.base import BaseStore
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from typing import TypedDict, Optional
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.types import Command, Send
+from langchain_core.runnables import RunnableConfig
+
+from eaia.llm_utils import get_llm
+from eaia.main.config import get_config
 
 TONE_INSTRUCTIONS = "Only update the prompt to include instructions on the **style and tone and format** of the response. Do NOT update the prompt to include anything about the actual content - only the style and tone and format. The user sometimes responds differently to different types of people - take that into account, but don't be too specific."
 RESPONSE_INSTRUCTIONS = "Only update the prompt to include instructions on the **content** of the response. Do NOT update the prompt to include anything about the tone or style or format of the response."
@@ -61,9 +63,13 @@ Based on this, return an updated prompt
 You should return the full prompt, so if there's anything from before that you want to include, make sure to do that. Feel free to override or change anything that seems irrelevant. You do not need to update the prompt - if you don't want to, just return `update_prompt = False` and an empty string for new prompt."""
 
 
-async def update_general(state: ReflectionState, config, store: BaseStore):
-    reflection_model = ChatOpenAI(model="o1", disable_streaming=True)
-    # reflection_model = ChatAnthropic(model="claude-3-5-sonnet-latest")
+async def update_general(state: ReflectionState, config: RunnableConfig, store: BaseStore):
+    # Get reflection-specific model configuration from config.yaml
+    prompt_config = await get_config(config)
+    model_name = prompt_config.get("reflection_model", "claude-sonnet-4-20250514")  # Fallback default
+    temperature = prompt_config.get("reflection_temperature", 0.1)  # Fallback default
+
+    reflection_model = get_llm(model_name, temperature=temperature)
     namespace = (state["assistant_key"],)
     key = state["prompt_key"]
     result = await store.aget(namespace, key)
@@ -147,9 +153,13 @@ class MultiMemoryInput(MessagesState):
     assistant_key: str
 
 
-async def determine_what_to_update(state: MultiMemoryInput):
-    reflection_model = ChatOpenAI(model="gpt-4o", disable_streaming=True)
-    reflection_model = ChatAnthropic(model="claude-3-5-sonnet-latest")
+async def determine_what_to_update(state: MultiMemoryInput, config: RunnableConfig):
+    # Get reflection-specific model configuration from config.yaml
+    prompt_config = await get_config(config)
+    model_name = prompt_config.get("reflection_model", "claude-sonnet-4-20250514")  # Fallback default
+    temperature = prompt_config.get("reflection_temperature", 0.1)  # Fallback default
+
+    reflection_model = get_llm(model_name, temperature=temperature)
     trajectory = get_trajectory_clean(state["messages"])
     types_of_prompts = "\n".join(
         [f"`{p_type}`: {MEMORY_TO_UPDATE[p_type]}" for p_type in state["prompt_types"]]

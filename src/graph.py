@@ -2,7 +2,7 @@
 
 This module implements a clean multi-agent architecture with:
 - Calendar agent for Google Calendar operations via MCP
-- Job search agent for job search tasks
+- Multi-Tool Rube agent for multi-application integration
 - Supervisor using official langgraph_supervisor patterns
 - Automatic agent handoff and state management
 - LangSmith tracing for observability
@@ -122,47 +122,7 @@ async def create_calendar_agent():
 
 
 
-async def create_job_search_agent():
-    """Create job search agent using the orchestrator"""
-    try:
-        from src.job_search_agent.job_search_orchestrator import create_default_orchestrator
 
-        logger.info("Creating job search agent with clean orchestrator...")
-
-        # Create the compiled workflow directly
-        workflow = create_default_orchestrator()
-
-        logger.info("Job search agent created successfully with fixed orchestrator")
-        return workflow
-
-    except Exception as e:
-        logger.error(f"Failed to create job search agent: {e}")
-        # Fallback to simple react agent
-        logger.info("Creating fallback job search agent...")
-
-        job_model = ChatOpenAI(
-            model="gpt-4o",
-            temperature=0,
-            openai_api_key=os.getenv("OPENAI_API_KEY")
-        )
-
-        job_prompt = """You are a job search specialist.
-        Help users with job search strategies, application preparation, and career guidance.
-
-        Current capabilities:
-        - Resume and cover letter advice
-        - Interview preparation
-        - Job search strategies
-        - Career planning guidance
-
-        Note: Full job search workflow not available due to technical issues."""
-
-        return create_react_agent(
-            model=job_model,
-            tools=[],
-            name="job_search_agent_fallback",
-            prompt=job_prompt
-        )
 
 async def create_multi_tool_rube_agent():
     """Create Multi-Tool Rube Agent with access to 500+ applications"""
@@ -379,7 +339,6 @@ async def create_supervisor_graph():
         # Create agents with individual error handling
         logger.info("Creating agents...")
         calendar_agent = await create_calendar_agent()
-        job_search_agent = await create_job_search_agent()
         multi_tool_rube_agent = await create_multi_tool_rube_agent()
 
         logger.info("All agents created successfully")
@@ -408,7 +367,6 @@ AGENT CAPABILITIES:
 - calendar_agent: All calendar operations (create/view/modify events, check availability, scheduling)
 - email_agent: **PRIMARY EMAIL AGENT** - Email composition/drafting/writing → email_agent / Email management (list, send drafts, search) → email_agent / Email reading/organization/ → email_agent IMPORTANT : If the agent writes a DRAFTor a NEW email you MUST show it to the user
 - ALL EMAIL TASKS → email_agent (autonomous subgraph)
-- job_search_agent: CV upload, Job Offer, Job search, resume/cover letter advice, interview prep
 - drive_agent: File management, Google Drive integration, file sharing, document collaboration
 - multi_tool_rube_agent: Multi-application tasks across Gmail, Slack, GitHub, Google Workspace, Coda, Linear, Notion, and other connected platforms
 
@@ -421,7 +379,6 @@ ROUTING STRATEGY:
 ROUTING RULES:
 - Calendar/scheduling/appointments/meetings → calendar_agent
 - ALL EMAIL TASKS (composition, sending, management, organization, triage) → email_agent
-- Job search/career/resume/interviews/CV → job_search_agent
 - Multi-app tasks involving Slack, GitHub, Coda, Linear, Notion, Google Workspace → multi_tool_rube_agent
 - Cross-platform workflows and automation → multi_tool_rube_agent
 - General questions of the world → Only if there is no agent related, you can answer
@@ -442,7 +399,7 @@ When an agent completes their task, analyze if additional routing is needed."""
 
         # Create supervisor workflow
         workflow = create_supervisor(
-            agents=[calendar_agent, job_search_agent, multi_tool_rube_agent],
+            agents=[calendar_agent, multi_tool_rube_agent],
             model=supervisor_model,
             prompt=supervisor_prompt,
             supervisor_name="multi_agent_supervisor",

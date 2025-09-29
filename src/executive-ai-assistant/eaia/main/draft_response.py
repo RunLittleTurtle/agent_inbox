@@ -1,8 +1,7 @@
 """Core agent responsible for drafting email."""
 
+import logging
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langgraph.store.base import BaseStore
 
 from eaia.schemas import (
@@ -16,14 +15,9 @@ from eaia.schemas import (
     email_template,
 )
 from eaia.main.config import get_config
+from eaia.llm_utils import get_llm, bind_tools_with_choice
 
-
-def get_llm(model_name: str, temperature: float = 0, **kwargs):
-    """Get the appropriate LLM based on model name."""
-    if model_name.startswith('claude') or model_name.startswith('opus'):
-        return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
-    else:  # OpenAI models (gpt-*, o3)
-        return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
+logger = logging.getLogger(__name__)
 
 EMAIL_WRITING_INSTRUCTIONS = """You are {full_name}'s executive assistant. You are a top-notch executive assistant who cares about {name} performing as well as possible.
 
@@ -94,14 +88,10 @@ async def draft_response(state: State, config: RunnableConfig, store: BaseStore)
     # NOTE: The hardcoded values below are FALLBACK DEFAULTS only, used if config.yaml is missing
     # The actual model/temperature values are loaded from config.yaml via get_config()
     prompt_config = await get_config(config)
-    model = prompt_config.get("draft_model", "claude-sonnet-4-20250514")  # Fallback default
+    model_name = prompt_config.get("draft_model", "claude-sonnet-4-20250514")  # Fallback default
     temperature = prompt_config.get("draft_temperature", 0.2)  # Fallback default
-    llm = get_llm(
-        model,
-        temperature=temperature,
-        parallel_tool_calls=False,
-        tool_choice="required",
-    )
+
+    llm = get_llm(model_name, temperature=temperature)
     tools = [
         NewEmailDraft,
         ResponseEmailDraft,
@@ -154,11 +144,19 @@ async def draft_response(state: State, config: RunnableConfig, store: BaseStore)
         ),
     )
 
-    model = llm.bind_tools(tools)
+    # Bind tools with provider-specific parameters (requires any tool to be called)
+    bound_model = bind_tools_with_choice(
+        llm,
+        model_name,
+        tools,
+        tool_name=None,  # Allow any tool
+        parallel_tool_calls=False  # Disable parallel calls
+    )
+
     messages = [{"role": "user", "content": input_message}] + messages
     i = 0
     while i < 5:
-        response = await model.ainvoke(messages)
+        response = await bound_model.ainvoke(messages)
         if len(response.tool_calls) != 1:
             i += 1
             messages += [{"role": "user", "content": "Please call a valid tool call."}]

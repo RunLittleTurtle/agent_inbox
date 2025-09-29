@@ -1,6 +1,3 @@
-[submodule "src/old-job_search_agent"]
-	path = src/old-job_search_agent
-	url = https://github.com/mcrockett86/job_search_langgraph_mcp.git
 [submodule "agent-chat-ui-2"]
 	path = agent-chat-ui-2
 	url = https://github.com/langchain-ai/agent-chat-ui.git

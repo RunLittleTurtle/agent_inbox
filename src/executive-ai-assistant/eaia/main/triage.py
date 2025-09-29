@@ -1,16 +1,6 @@
 """Agent responsible for triaging the email, can either ignore it, try to respond, or notify user."""
 
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-
-
-def get_llm(model_name: str, temperature: float = 0, **kwargs):
-    """Get the appropriate LLM based on model name."""
-    if model_name.startswith('claude') or model_name.startswith('opus'):
-        return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
-    else:  # OpenAI models (gpt-*, o3)
-        return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
 from langchain_core.messages import RemoveMessage
 from langgraph.store.base import BaseStore
 
@@ -20,6 +10,7 @@ from eaia.schemas import (
 )
 from eaia.main.fewshot import get_few_shot_examples
 from eaia.main.config import get_config
+from eaia.llm_utils import get_llm, get_tool_choice
 
 
 triage_prompt = """You are {full_name}'s executive assistant. You are a top-notch executive assistant who cares about {name} performing as well as possible.
@@ -57,9 +48,9 @@ async def triage_input(state: State, config: RunnableConfig, store: BaseStore):
     # NOTE: The hardcoded values below are FALLBACK DEFAULTS only, used if config.yaml is missing
     # The actual model/temperature values are loaded from config.yaml via get_config()
     prompt_config = await get_config(config)
-    model = prompt_config.get("triage_model", "claude-3-5-haiku-20241022")  # Fallback default
+    model_name = prompt_config.get("triage_model", "claude-3-5-haiku-20241022")  # Fallback default
     temperature = prompt_config.get("triage_temperature", 0.1)  # Fallback default
-    llm = get_llm(model, temperature=temperature)
+    llm = get_llm(model_name, temperature=temperature)
     examples = await get_few_shot_examples(state["email"], store, config)
     input_message = triage_prompt.format(
         email_thread=state["email"]["page_content"],
@@ -75,7 +66,7 @@ async def triage_input(state: State, config: RunnableConfig, store: BaseStore):
         triage_notify=prompt_config["triage_notify"],
     )
     model = llm.with_structured_output(RespondTo).bind(
-        tool_choice={"type": "function", "function": {"name": "RespondTo"}}
+        tool_choice=get_tool_choice(model_name, "RespondTo")
     )
     response = await model.ainvoke(input_message)
     if len(state["messages"]) > 0:

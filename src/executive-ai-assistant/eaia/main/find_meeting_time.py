@@ -5,18 +5,9 @@ from datetime import datetime
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-
-
-def get_llm(model_name: str, temperature: float = 0, **kwargs):
-    """Get the appropriate LLM based on model name."""
-    if model_name.startswith('claude') or model_name.startswith('opus'):
-        return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
-    else:  # OpenAI models (gpt-*, o3)
-        return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
 
 from eaia.gmail import get_events_for_days
+from eaia.llm_utils import get_llm
 from eaia.schemas import State
 
 from eaia.main.config import get_config

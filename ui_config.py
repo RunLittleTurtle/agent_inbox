@@ -87,45 +87,6 @@ CONFIG_SECTIONS = [
                 'description': 'Project name for LangSmith organization (read-only - changing this can break things)'
             }
         ]
-    },
-    {
-        'key': 'google_workspace',
-        'label': 'Google Workspace',
-        'description': 'Google OAuth and service integration',
-        'fields': [
-            {
-                'key': 'google_client_id',
-                'label': 'Google Client ID',
-                'type': 'password',
-                'envVar': 'GOOGLE_CLIENT_ID',
-                'description': 'OAuth 2.0 client ID for Google services',
-                'placeholder': 'xxxxx-xxx.apps.googleusercontent.com'
-            },
-            {
-                'key': 'google_client_secret',
-                'label': 'Google Client Secret',
-                'type': 'password',
-                'envVar': 'GOOGLE_CLIENT_SECRET',
-                'description': 'OAuth 2.0 client secret for Google services',
-                'placeholder': 'GOCSPX-...'
-            },
-            {
-                'key': 'user_google_email',
-                'label': 'User Google Email',
-                'type': 'text',
-                'envVar': 'USER_GOOGLE_EMAIL',
-                'description': 'Primary Google account email address',
-                'placeholder': 'user@example.com'
-            },
-            {
-                'key': 'gmail_refresh_token',
-                'label': 'Gmail Refresh Token',
-                'type': 'password',
-                'envVar': 'GMAIL_REFRESH_TOKEN',
-                'description': 'OAuth refresh token for Gmail access',
-                'placeholder': '1//05...'
-            }
-        ]
     }
 ]
 

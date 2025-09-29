@@ -1,19 +1,8 @@
 """Agent responsible for rewriting the email in a better tone."""
 
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-
-
-def get_llm(model_name: str, temperature: float = 0, **kwargs):
-    """Get the appropriate LLM based on model name."""
-    if model_name.startswith('claude') or model_name.startswith('opus'):
-        return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
-    else:  # OpenAI models (gpt-*, o3)
-        return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
-
 from eaia.schemas import State, ReWriteEmail
-
 from eaia.main.config import get_config
+from eaia.llm_utils import get_llm, get_tool_choice
 
 
 rewrite_prompt = """You job is to rewrite an email draft to sound more like {name}.
@@ -44,9 +33,9 @@ async def rewrite(state: State, config, store):
     # NOTE: The hardcoded values below are FALLBACK DEFAULTS only, used if config.yaml is missing
     # The actual model/temperature values are loaded from config.yaml via get_config()
     prompt_config = await get_config(config)
-    model = prompt_config.get("rewrite_model", "claude-sonnet-4-20250514")  # Fallback default
+    model_name = prompt_config.get("rewrite_model", "claude-sonnet-4-20250514")  # Fallback default
     temperature = prompt_config.get("rewrite_temperature", 0.3)  # Fallback default
-    llm = get_llm(model, temperature=temperature)
+    llm = get_llm(model_name, temperature=temperature)
     prev_message = state["messages"][-1]
     draft = prev_message.tool_calls[0]["args"]["content"]
     namespace = (config["configurable"].get("assistant_id", "default"),)
@@ -70,7 +59,7 @@ async def rewrite(state: State, config, store):
         name=prompt_config["name"],
     )
     model = llm.with_structured_output(ReWriteEmail).bind(
-        tool_choice={"type": "function", "function": {"name": "ReWriteEmail"}}
+        tool_choice=get_tool_choice(model_name, "ReWriteEmail")
     )
     response = await model.ainvoke(input_message)
     tool_calls = [

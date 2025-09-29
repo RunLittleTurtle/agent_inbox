@@ -1,3 +1,8 @@
+# DEPRECATED - MARKED FOR DELETION
+# This configuration has been integrated into the main system
+# Reason: Replaced by config-app system, kept for reference only
+# Date: 2025-09-29
+# Alternative: Use config-app UI for interface configuration
 """
 Interface UIs Configuration
 Reference values for connecting UI interfaces

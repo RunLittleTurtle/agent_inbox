@@ -1,1 +1,0 @@
-Image provided by user - black and white portrait photo of a person with curly hair wearing a dark shirt

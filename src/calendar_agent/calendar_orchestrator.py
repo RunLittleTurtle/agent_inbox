@@ -24,6 +24,13 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langchain-mcp-adapters'))
 
+# Add project root to Python path for utils import
+from pathlib import Path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from utils.llm_utils import get_llm
+
 
 # Local LangGraph imports
 from langgraph.graph import StateGraph, MessagesState, START, END
@@ -50,11 +57,14 @@ class CalendarAgentWithMCP:
         mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None
     ):
         from .config import LLM_CONFIG, MCP_SERVER_URL, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
-        self.model = model or ChatAnthropic(
-            model=LLM_CONFIG.get("model", "claude-3-5-sonnet-20241022"),
-            temperature=LLM_CONFIG.get("temperature", 0.1),
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY")
-        )
+
+        # Use centralized get_llm for cross-provider support
+        if model:
+            self.model = model
+        else:
+            model_name = LLM_CONFIG.get("model", "claude-sonnet-4-5-20250929")
+            temperature = LLM_CONFIG.get("temperature", 0.1)
+            self.model = get_llm(model_name, temperature=temperature)
 
         # MCP server configuration - connect to configured Pipedream Google Calendar MCP server
         pipedream_url = MCP_SERVER_URL

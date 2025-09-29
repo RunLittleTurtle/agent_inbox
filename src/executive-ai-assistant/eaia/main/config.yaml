@@ -44,7 +44,7 @@ rewrite_preferences: >
 
   - When {name} is casual, he generally does not include any greetings or sign
   offs, and just directly says his message
-triage_no: >
+triage_no: >-
   - Automated emails from services that are spam
 
   - Cold outreach from vendors trying to sell products or services
@@ -67,6 +67,9 @@ triage_no: >
   - Automated calendar invitations
 
   - Newsletter subscriptions and marketing emails
+
+  - IMPORTANT : If the email comes from a sender that his name is the same as
+  me, it does not mean that it is me! I am {name}
 triage_notify: >
   - Google docs that were shared with him (do NOT notify him on comments, just
   net new shares)
@@ -120,13 +123,13 @@ triage_email: >
 
   Reminder - automated calendar invites do NOT count as real emails
 memory: true
-triage_model: claude-sonnet-4-20250514
+triage_model: claude-sonnet-4-5-20250929
 triage_temperature: 0.1
-draft_model: claude-sonnet-4-20250514
+draft_model: claude-sonnet-4-5-20250929
 draft_temperature: 0.4
-rewrite_model: gpt-4o
+rewrite_model: claude-sonnet-4-5-20250929
 rewrite_temperature: 0.3
-scheduling_model: claude-sonnet-4-20250514
+scheduling_model: claude-sonnet-4-5-20250929
 scheduling_temperature: 0.1
-reflection_model: o3
+reflection_model: claude-sonnet-4-5-20250929
 reflection_temperature: 0.1

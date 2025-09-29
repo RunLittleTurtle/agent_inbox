@@ -1,6 +1,8 @@
 """Core agent responsible for drafting email."""
 
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from langchain_core.runnables import RunnableConfig
 from langgraph.store.base import BaseStore
 
@@ -22,6 +24,8 @@ logger = logging.getLogger(__name__)
 EMAIL_WRITING_INSTRUCTIONS = """You are {full_name}'s executive assistant. You are a top-notch executive assistant who cares about {name} performing as well as possible.
 
 {background}
+
+Current date and time: {current_date} at {current_time} {tz}
 
 {name} gets lots of emails. This has been determined to be an email that is worth {name} responding to.
 
@@ -75,7 +79,12 @@ Note that you should only call this if working to schedule a meeting - if a meet
 {random_preferences}"""
 draft_prompt = """{instructions}
 
-Remember to call a tool correctly! Use the specified names exactly - not add `functions::` to the start. Pass all required arguments.
+CRITICAL TOOL CALLING INSTRUCTIONS:
+- You MUST call EXACTLY ONE tool at a time - no more, no less
+- Choose the single most appropriate tool for this situation
+- Do NOT call multiple tools simultaneously
+- Use the specified tool names exactly - do not add `functions::` to the start
+- Pass all required arguments for the tool you choose
 
 Here is the email thread. Note that this is the full email thread. Pay special attention to the most recent email.
 
@@ -126,6 +135,12 @@ async def draft_response(state: State, config: RunnableConfig, store: BaseStore)
     else:
         await store.aput(namespace, key, {"data": prompt_config["response_preferences"]})
         response_preferences = prompt_config["response_preferences"]
+
+    # Get timezone-aware current datetime from config.yaml
+    timezone = prompt_config.get("timezone", "America/Toronto")
+    tz = ZoneInfo(timezone)
+    current_datetime = datetime.now(tz)
+
     _prompt = EMAIL_WRITING_INSTRUCTIONS.format(
         schedule_preferences=schedule_preferences,
         random_preferences=random_preferences,
@@ -133,6 +148,9 @@ async def draft_response(state: State, config: RunnableConfig, store: BaseStore)
         name=prompt_config["name"],
         full_name=prompt_config["full_name"],
         background=prompt_config["background"],
+        current_date=current_datetime.strftime("%A, %B %d, %Y"),
+        current_time=current_datetime.strftime("%I:%M %p"),
+        tz=timezone,
     )
     input_message = draft_prompt.format(
         instructions=_prompt,
@@ -154,12 +172,65 @@ async def draft_response(state: State, config: RunnableConfig, store: BaseStore)
     )
 
     messages = [{"role": "user", "content": input_message}] + messages
+
+    # Get email context for logging
+    email_id = state.get("email", {}).get("id", "unknown")
+    email_subject = state.get("email", {}).get("subject", "unknown")
+
+    logger.info(f"[draft_response] Starting for email_id={email_id}, subject='{email_subject}'")
+
     i = 0
-    while i < 5:
+    max_retries = 5
+    while i < max_retries:
         response = await bound_model.ainvoke(messages)
-        if len(response.tool_calls) != 1:
+        num_tool_calls = len(response.tool_calls) if hasattr(response, 'tool_calls') else 0
+
+        logger.info(
+            f"[draft_response] Attempt {i+1}/{max_retries}: "
+            f"num_tool_calls={num_tool_calls}, "
+            f"email_id={email_id}"
+        )
+
+        if num_tool_calls != 1:
             i += 1
-            messages += [{"role": "user", "content": "Please call a valid tool call."}]
+
+            # Log the specific error
+            if num_tool_calls == 0:
+                logger.warning(
+                    f"[draft_response] LLM returned 0 tool calls (expected 1). "
+                    f"email_id={email_id}, attempt={i}/{max_retries}"
+                )
+                retry_msg = (
+                    f"You must call EXACTLY ONE tool. You called 0 tools. "
+                    f"Choose the single most appropriate tool from: "
+                    f"{', '.join(t.__name__ for t in tools)}"
+                )
+            else:  # num_tool_calls > 1
+                tool_names = [tc['name'] for tc in response.tool_calls]
+                logger.warning(
+                    f"[draft_response] LLM returned {num_tool_calls} tool calls (expected 1). "
+                    f"tools={tool_names}, email_id={email_id}, attempt={i}/{max_retries}"
+                )
+                retry_msg = (
+                    f"You called {num_tool_calls} tools: {', '.join(tool_names)}. "
+                    f"You must call EXACTLY ONE tool - choose the single most appropriate one."
+                )
+
+            messages += [{"role": "user", "content": retry_msg}]
         else:
+            tool_name = response.tool_calls[0]['name']
+            logger.info(
+                f"[draft_response] SUCCESS: tool={tool_name}, "
+                f"email_id={email_id}, attempts={i+1}"
+            )
             break
+
+    # Check if we exhausted retries
+    if len(response.tool_calls) != 1:
+        logger.error(
+            f"[draft_response] EXHAUSTED RETRIES: Still got {len(response.tool_calls)} tool calls "
+            f"after {max_retries} attempts. email_id={email_id}, subject='{email_subject}'. "
+            f"This will cause ValueError in take_action()!"
+        )
+
     return {"draft": response, "messages": [response]}

@@ -10,15 +10,12 @@ React Agent MCP Template UI Configuration Schema
 This file defines the configuration interface schema for the Next.js configuration UI.
 """
 
-# Standardized LLM model options - kept in sync across all agents
-STANDARD_LLM_MODEL_OPTIONS = [
-    'claude-sonnet-4-20250514',
-    'claude-3-5-haiku-20241022',
-    'gpt-5',
-    'gpt-4o',
-    'o3',
-    'claude-opus-4-1-20250805'
-]
+# STANDARD OPTIONS LISTS
+# These are Python placeholders that get replaced by TypeScript at runtime
+# The ACTUAL master list is defined in: config-app/src/app/api/config/agents/route.ts
+# That TypeScript file replaces these variable names with the actual arrays when parsing
+STANDARD_LLM_MODEL_OPTIONS = []
+STANDARD_TIMEZONE_OPTIONS = []
 
 CONFIG_INFO = {
     'name': 'React Agent Template',
@@ -106,24 +103,9 @@ CONFIG_SECTIONS = [
                 'key': 'timezone',
                 'label': 'Timezone',
                 'type': 'select',
-                'default': 'global',
-                'description': 'Your timezone - select Use Global for system default',
-                'options': [
-                    'global',
-                    'America/New_York',
-                    'America/Chicago',
-                    'America/Denver',
-                    'America/Los_Angeles',
-                    'America/Toronto',
-                    'America/Montreal',
-                    'Europe/London',
-                    'Europe/Paris',
-                    'Europe/Berlin',
-                    'Asia/Tokyo',
-                    'Asia/Shanghai',
-                    'Asia/Singapore',
-                    'Australia/Sydney'
-                ],
+                'default': 'America/Toronto',
+                'description': 'Your timezone for accurate scheduling and communication',
+                'options': STANDARD_TIMEZONE_OPTIONS,
                 'required': True
             }
         ]
@@ -178,7 +160,7 @@ CONFIG_SECTIONS = [
 def get_current_config():
     """Get current configuration values from config.py template"""
     try:
-        from .config import LLM_CONFIG, AGENT_NAME, AGENT_DISPLAY_NAME, AGENT_DESCRIPTION, MCP_SERVICE
+        from .config import LLM_CONFIG, AGENT_NAME, AGENT_DISPLAY_NAME, AGENT_DESCRIPTION, MCP_SERVICE, TEMPLATE_TIMEZONE
         from .prompt import AGENT_SYSTEM_PROMPT, AGENT_ROLE_PROMPT, AGENT_GUIDELINES_PROMPT
 
         return {
@@ -188,6 +170,9 @@ def get_current_config():
                 'agent_description': AGENT_DESCRIPTION
             },
             'llm': LLM_CONFIG,
+            'user_preferences': {
+                'timezone': TEMPLATE_TIMEZONE
+            },
             'mcp_integration': {
                 # MCP server URL comes from environment variable
             },

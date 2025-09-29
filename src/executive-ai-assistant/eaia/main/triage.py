@@ -1,5 +1,7 @@
 """Agent responsible for triaging the email, can either ignore it, try to respond, or notify user."""
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import RemoveMessage
 from langgraph.store.base import BaseStore
@@ -16,6 +18,8 @@ from eaia.llm_utils import get_llm, get_tool_choice
 triage_prompt = """You are {full_name}'s executive assistant. You are a top-notch executive assistant who cares about {name} performing as well as possible.
 
 {background}.
+
+Current date and time: {current_date} at {current_time} {tz}
 
 {name} gets lots of emails. Your job is to categorize the below email to see whether is it worth responding to.
 
@@ -52,6 +56,12 @@ async def triage_input(state: State, config: RunnableConfig, store: BaseStore):
     temperature = prompt_config.get("triage_temperature", 0.1)  # Fallback default
     llm = get_llm(model_name, temperature=temperature)
     examples = await get_few_shot_examples(state["email"], store, config)
+
+    # Get timezone-aware current datetime from config.yaml
+    timezone = prompt_config.get("timezone", "America/Toronto")
+    tz = ZoneInfo(timezone)
+    current_datetime = datetime.now(tz)
+
     input_message = triage_prompt.format(
         email_thread=state["email"]["page_content"],
         author=state["email"]["from_email"],
@@ -64,6 +74,9 @@ async def triage_input(state: State, config: RunnableConfig, store: BaseStore):
         triage_no=prompt_config["triage_no"],
         triage_email=prompt_config["triage_email"],
         triage_notify=prompt_config["triage_notify"],
+        current_date=current_datetime.strftime("%A, %B %d, %Y"),
+        current_time=current_datetime.strftime("%I:%M %p"),
+        tz=timezone,
     )
     model = llm.with_structured_output(RespondTo).bind(
         tool_choice=get_tool_choice(model_name, "RespondTo")

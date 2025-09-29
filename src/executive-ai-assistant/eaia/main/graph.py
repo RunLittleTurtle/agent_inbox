@@ -1,5 +1,6 @@
 """Overall agent."""
 import json
+import logging
 from typing import TypedDict, Literal
 from langgraph.graph import END, StateGraph
 from langchain_core.messages import HumanMessage
@@ -25,6 +26,8 @@ from eaia.gmail import (
 from eaia.schemas import (
     State,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def route_after_triage(
@@ -53,20 +56,42 @@ def take_action(
     "bad_tool_name",
 ]:
     prediction = state["messages"][-1]
-    if len(prediction.tool_calls) != 1:
+    num_tool_calls = len(prediction.tool_calls) if hasattr(prediction, 'tool_calls') else 0
+
+    # Get email context for logging
+    email_id = state.get("email", {}).get("id", "unknown")
+    email_subject = state.get("email", {}).get("subject", "unknown")
+
+    # Log detailed error information BEFORE raising ValueError
+    if num_tool_calls != 1:
+        tool_calls_info = []
+        if num_tool_calls > 0:
+            tool_calls_info = [tc.get("name", "unknown") for tc in prediction.tool_calls]
+
+        logger.error(
+            f"[take_action] ERROR: Expected exactly 1 tool call but got {num_tool_calls}. "
+            f"email_id={email_id}, subject='{email_subject}', tool_calls={tool_calls_info}. "
+            f"This indicates draft_response exhausted retries."
+        )
         raise ValueError
+
     tool_call = prediction.tool_calls[0]
-    if tool_call["name"] == "Question":
+    tool_name = tool_call["name"]
+
+    logger.info(f"[take_action] Routing to tool={tool_name}, email_id={email_id}")
+
+    if tool_name == "Question":
         return "send_message"
-    elif tool_call["name"] == "ResponseEmailDraft":
+    elif tool_name == "ResponseEmailDraft":
         return "rewrite"
-    elif tool_call["name"] == "Ignore":
+    elif tool_name == "Ignore":
         return "mark_as_read_node"
-    elif tool_call["name"] == "MeetingAssistant":
+    elif tool_name == "MeetingAssistant":
         return "find_meeting_time"
-    elif tool_call["name"] == "SendCalendarInvite":
+    elif tool_name == "SendCalendarInvite":
         return "send_cal_invite"
     else:
+        logger.warning(f"[take_action] Unknown tool name: {tool_name}, routing to bad_tool_name")
         return "bad_tool_name"
 
 
@@ -117,6 +142,7 @@ async def send_cal_invite_node(state, config):
     _args = tool_call["args"]
     config_data = await get_config(config)
     email = config_data["email"]
+    timezone = config_data.get("timezone", "America/Toronto")  # Get user's configured timezone
     try:
         await send_calendar_invite(
             _args["emails"],
@@ -124,6 +150,7 @@ async def send_cal_invite_node(state, config):
             _args["start_time"],
             _args["end_time"],
             email,
+            timezone,  # Pass the user's timezone from config
         )
         message = "Sent calendar invite!"
     except Exception as e:

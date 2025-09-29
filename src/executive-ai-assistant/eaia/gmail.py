@@ -392,7 +392,7 @@ def print_events(events):
 
 
 async def send_calendar_invite(
-    emails, title, start_time, end_time, email_address, timezone="PST"
+    emails, title, start_time, end_time, email_address, timezone="America/Toronto"
 ):
     creds = await get_credentials(email_address)
     service = await asyncio.to_thread(build, "calendar", "v3", credentials=creds)

@@ -1,6 +1,7 @@
 """Agent responsible for managing calendar and finding meeting time."""
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import ToolMessage
@@ -53,7 +54,7 @@ Example 2:
 
 </examples>
 
-The current data is {current_date}
+Current date and time: {current_date} at {current_time} {tz}
 
 Here is the email thread:
 
@@ -73,16 +74,21 @@ async def find_meeting_time(state: State, config: RunnableConfig):
     temperature = prompt_config.get("scheduling_temperature", 0.1)  # Fallback default
     llm = get_llm(model, temperature=temperature)
     agent = create_react_agent(llm, [get_events_for_days], name="meeting_time_finder")
-    current_date = datetime.now()
-    prompt_config = await get_config(config)
+
+    # Get timezone-aware current datetime from config.yaml
+    timezone = prompt_config.get("timezone", "America/Toronto")
+    tz = ZoneInfo(timezone)
+    current_datetime = datetime.now(tz)
+
     input_message = meeting_prompts.format(
         email_thread=state["email"]["page_content"],
         author=state["email"]["from_email"],
         subject=state["email"]["subject"],
-        current_date=current_date.strftime("%A %B %d, %Y"),
+        current_date=current_datetime.strftime("%A, %B %d, %Y"),
+        current_time=current_datetime.strftime("%I:%M %p"),
         name=prompt_config["name"],
         full_name=prompt_config["full_name"],
-        tz=prompt_config["timezone"],
+        tz=timezone,
     )
     messages = state.get("messages") or []
     # we do this because theres currently a tool call just for routing

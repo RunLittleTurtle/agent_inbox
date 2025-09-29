@@ -3,15 +3,12 @@ Calendar Agent UI Configuration Schema
 Optimized configuration for calendar agent settings
 """
 
-# Standardized LLM model options - kept in sync across all agents
-STANDARD_LLM_MODEL_OPTIONS = [
-    'claude-sonnet-4-20250514',
-    'claude-3-5-haiku-20241022',
-    'gpt-5',
-    'gpt-4o',
-    'o3',
-    'claude-opus-4-1-20250805'
-]
+# STANDARD OPTIONS LISTS
+# These are Python placeholders that get replaced by TypeScript at runtime
+# The ACTUAL master list is defined in: config-app/src/app/api/config/agents/route.ts
+# That TypeScript file replaces these variable names with the actual arrays when parsing
+STANDARD_LLM_MODEL_OPTIONS = []
+STANDARD_TIMEZONE_OPTIONS = []
 
 CONFIG_INFO = {
     'name': 'Calendar Agent',
@@ -74,23 +71,10 @@ CONFIG_SECTIONS = [
                 'key': 'timezone',
                 'label': 'Timezone',
                 'type': 'select',
-                'default': 'global',
-                'description': 'Your timezone - select Use Global for system default',
+                'default': 'America/Toronto',
+                'description': 'Your timezone for accurate scheduling and communication',
                 'placeholder': 'Select timezone',
-                'options': [
-                    'global',
-                    'America/Toronto',
-                    'America/Montreal',
-                    'America/New_York',
-                    'America/Los_Angeles',
-                    'America/Chicago',
-                    'Europe/London',
-                    'Europe/Paris',
-                    'Europe/Berlin',
-                    'Asia/Tokyo',
-                    'Asia/Shanghai',
-                    'Australia/Sydney'
-                ]
+                'options': STANDARD_TIMEZONE_OPTIONS
             },
             {
                 'key': 'work_hours_start',

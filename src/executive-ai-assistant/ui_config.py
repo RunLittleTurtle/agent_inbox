@@ -14,15 +14,12 @@ React Agent MCP Template UI Configuration Schema
 This file defines the configuration interface schema for the Next.js configuration UI.
 """
 
-# Standardized LLM model options - kept in sync across all agents
-STANDARD_LLM_MODEL_OPTIONS = [
-    'claude-sonnet-4-20250514',
-    'claude-3-5-haiku-20241022',
-    'gpt-5',
-    'gpt-4o',
-    'o3',
-    'claude-opus-4-1-20250805'
-]
+# STANDARD OPTIONS LISTS
+# These are Python placeholders that get replaced by TypeScript at runtime
+# The ACTUAL master list is defined in: config-app/src/app/api/config/agents/route.ts
+# That TypeScript file replaces these variable names with the actual arrays when parsing
+STANDARD_LLM_MODEL_OPTIONS = []
+STANDARD_TIMEZONE_OPTIONS = []
 
 CONFIG_INFO = {
     'name': 'Executive AI Assistant',
@@ -33,9 +30,9 @@ CONFIG_INFO = {
 
 CONFIG_SECTIONS = [
     {
-        'key': 'user_identity',
-        'label': 'User Identity',
-        'description': 'Personal information and background for the executive assistant',
+        'key': 'user_preferences',
+        'label': 'User Preferences',
+        'description': 'Personal information, background, and scheduling preferences',
         'fields': [
             {
                 'key': 'name',
@@ -69,35 +66,14 @@ CONFIG_SECTIONS = [
                 'placeholder': 'Samuel is a software developer and entrepreneur working on AI agent systems...',
                 'rows': 4,
                 'required': True
-            }
-        ]
-    },
-    {
-        'key': 'user_preferences',
-        'label': 'User Preferences',
-        'description': 'Personal settings and scheduling preferences',
-        'fields': [
+            },
             {
                 'key': 'timezone',
                 'label': 'Timezone',
                 'type': 'select',
                 'default': 'America/Toronto',
                 'description': 'Your timezone for accurate scheduling and communication',
-                'options': [
-                    'America/New_York',
-                    'America/Chicago',
-                    'America/Denver',
-                    'America/Los_Angeles',
-                    'America/Toronto',
-                    'America/Montreal',
-                    'Europe/London',
-                    'Europe/Paris',
-                    'Europe/Berlin',
-                    'Asia/Tokyo',
-                    'Asia/Shanghai',
-                    'Asia/Singapore',
-                    'Australia/Sydney'
-                ],
+                'options': STANDARD_TIMEZONE_OPTIONS,
                 'required': True
             },
             {

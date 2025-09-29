@@ -74,6 +74,23 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
       'claude-opus-4-1-20250805'
     ];
 
+    // Define the standard timezone options - CENTRALIZED LIST
+    // Changing this list will update ALL agents using STANDARD_TIMEZONE_OPTIONS
+    const STANDARD_TIMEZONE_OPTIONS = [
+      'America/Toronto',
+      'America/New_York',
+      'America/Chicago',
+      'America/Denver',
+      'America/Los_Angeles',
+      'Europe/London',
+      'Europe/Paris',
+      'Europe/Berlin',
+      'Asia/Tokyo',
+      'Asia/Shanghai',
+      'Asia/Singapore',
+      'Australia/Sydney'
+    ];
+
     // Convert Python dict syntax to JSON (basic conversion)
     const configInfoStr = configInfoMatch[1]
       .replace(/'/g, '"')
@@ -91,6 +108,12 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
     configSectionsStr = configSectionsStr.replace(
       /STANDARD_LLM_MODEL_OPTIONS/g,
       JSON.stringify(STANDARD_LLM_MODEL_OPTIONS)
+    );
+
+    // Replace STANDARD_TIMEZONE_OPTIONS with the actual array
+    configSectionsStr = configSectionsStr.replace(
+      /STANDARD_TIMEZONE_OPTIONS/g,
+      JSON.stringify(STANDARD_TIMEZONE_OPTIONS)
     );
 
     const configInfo = JSON.parse(configInfoStr);

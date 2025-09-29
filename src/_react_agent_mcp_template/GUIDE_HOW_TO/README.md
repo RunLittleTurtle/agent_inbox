@@ -76,7 +76,7 @@ The following files are deprecated but kept for reference:
 2. **Clear Errors**: No graceful fallbacks, clear error messages
 3. **MessagesState**: Use standard state, avoid custom state classes
 4. **Supervisor Ready**: Automatic integration with supervisor routing
-5. **MCP First**: Leverage Pipedream MCP tools, add local tools sparingly
+5. **MCP First**: Leverage MCP provider tools (Rube, Composio, Pipedream, etc.), add local tools sparingly
 6. **Tool Discovery**: Use automatic discovery to find exact tool names
 
 ## ❓ Need Help?

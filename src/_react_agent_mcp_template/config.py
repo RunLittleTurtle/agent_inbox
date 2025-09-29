@@ -36,16 +36,17 @@ from .prompt import AGENT_SYSTEM_PROMPT
 #   This ensures proper separation: .env → config.py → UI/prompts
 #
 # Specify the exact environment variable name that contains your MCP server URL
-# This is flexible - works with any MCP provider (Pipedream, Composio, custom, etc.)
+# This is flexible - works with any MCP provider (Rube, Composio, Pipedream, custom, etc.)
 # Examples:
-#   - Pipedream: "PIPEDREAM_MCP_SERVER_google_gmail"
+#   - Rube: "RUBE_MCP_SERVER" (universal)
 #   - Composio: "COMPOSIO_MCP_SERVER_google_classroom"
+#   - Pipedream: "PIPEDREAM_MCP_SERVER_google_gmail"
 #   - Custom: "MY_CUSTOM_MCP_SERVER"
-MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_gmail"  # e.g., "PIPEDREAM_MCP_SERVER_google_gmail"
+MCP_ENV_VAR = "{MCP_PROVIDER}_MCP_SERVER_{SERVICE_NAME}"  # e.g., "RUBE_MCP_SERVER", "COMPOSIO_MCP_SERVER_slack"
 
 # MCP Server URL - reads from the specified environment variable in main .env
 # Will be empty if the environment variable doesn't exist or template is unconfigured
-MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '') if MCP_ENV_VAR != "{MCP_ENV_VAR}" else ''
+MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '') if not any(placeholder in MCP_ENV_VAR for placeholder in ["{MCP_ENV_VAR}", "{MCP_PROVIDER}", "{SERVICE_NAME}"]) else ''
 
 # Timezone Configuration
 # 'global' means use the system-wide USER_TIMEZONE from main .env

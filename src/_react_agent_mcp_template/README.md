@@ -12,8 +12,19 @@ cd src/{your_agent}_agent
 
 ### 2. Configure Environment
 ```bash
-# Add to .env
+# Add to .env (choose your MCP provider)
+
+# Rube (Universal Provider)
+RUBE_MCP_SERVER=https://rube.app/mcp
+RUBE_BEARER_TOKEN=your_bearer_token_here
+
+# OR Pipedream
 PIPEDREAM_MCP_SERVER_{SERVICE_NAME}=https://mcp.pipedream.net/{your-id}/{service}
+
+# OR Composio
+COMPOSIO_MCP_SERVER_{SERVICE}=https://mcp.composio.dev/{your-id}/{service}
+
+# Required
 ANTHROPIC_API_KEY=your_key
 USER_TIMEZONE=America/Toronto  # Centralized timezone for all agents
 ```
@@ -22,46 +33,46 @@ USER_TIMEZONE=America/Toronto  # Centralized timezone for all agents
 
 #### `config.py` (centralized configuration):
 ```python
-AGENT_NAME = "gmail"  # Your agent name
-AGENT_DISPLAY_NAME = "Gmail"  # Display name
-AGENT_DESCRIPTION = "email management"  # What your agent does
-MCP_SERVICE = "google_gmail"  # MCP service name
+AGENT_NAME = "your_agent"  # Your agent name
+AGENT_DISPLAY_NAME = "Your Agent"  # Display name
+AGENT_DESCRIPTION = "description of what your agent does"  # What your agent does
+MCP_ENV_VAR = "RUBE_MCP_SERVER"  # Environment variable for your MCP provider
 ```
 
 #### `tools.py`:
 ```python
 USEFUL_TOOL_NAMES = {
-    'gmail-send-email',
-    'gmail-find-email',
-    # Add tools from https://mcp.pipedream.com/app/{service}
-    # OR use the tool discovery script to get exact names (see below)
+    # Use the tool discovery script to get exact names (see below)
+    # Example tools (replace with your actual discovered tools):
+    'example-tool-1',
+    'example-tool-2',
+    # OR check your MCP provider's documentation
 }
 ```
 
 #### `x_agent_orchestrator.py`:
 ```python
-def create_gmail_agent():  # Replace {agent} with your agent name
+def create_your_agent():  # Replace 'your' with your actual agent name
     return create_default_orchestrator()
 ```
 
 ### 4. Add Configuration UI Support
 
-**IMPORTANT**: For the configuration UI to work, you must:
+**IMPORTANT**: The template now includes comprehensive configuration UI integration at `http://localhost:3004`:
 
-1. **Update API endpoints** in `agent-inbox/src/pages/api/config/`:
-   - Add your agent path to `AGENT_CONFIG_PATHS` in `agents.ts`
-   - Add reading logic to `values.ts`
-   - Add writing logic to `update.ts`
+1. **Update API endpoints** in `config-app/src/app/api/config/`:
+   - Add your agent path to `AGENT_CONFIG_PATHS` in `agents/route.ts`
+   - Agent configuration is automatically discovered via `ui_config.py`
 
 2. **Replace ALL placeholder values** in `config.py`:
    - `{AGENT_NAME}` → actual agent name
    - `{AGENT_DISPLAY_NAME}` → display name
    - `{AGENT_DESCRIPTION}` → description
-   - `{MCP_SERVICE}` → MCP service name
+   - `{MCP_PROVIDER}` → your MCP provider prefix
 
 3. **Only include implemented fields** in `ui_config.py`
 
-See `../../MCP_AGENT_CONFIGURATION_GUIDE.md` for complete instructions.
+See `GUIDE_HOW_TO/01_CONFIG_SETUP_GUIDE.md` for complete configuration UI instructions.
 
 ### 5. Add to Supervisor
 
@@ -125,19 +136,19 @@ tools_info = await discover_mcp_tools()
 ### Tool Discovery Output Example
 
 ```bash
-🔍 Discovering GMAIL MCP Tools...
+🔍 Discovering MCP Tools...
 ============================================================
 ✅ Discovered 15 tools:
 
 📋 Copy these lines to your USEFUL_TOOL_NAMES:
 USEFUL_TOOL_NAMES = {
-    # Email Management
-    'gmail-send-email',  # Send an email via Gmail
-    'gmail-find-email',  # Search for emails in Gmail
-    
-    # Label Operations  
-    'gmail-list-labels',  # List all Gmail labels
-    'gmail-create-label',  # Create a new Gmail label
+    # Example discovered tools (replace with your actual tools)
+    'example-tool-1',  # Description of tool 1
+    'example-tool-2',  # Description of tool 2
+
+    # More discovered tools
+    'example-tool-3',  # Description of tool 3
+    'example-tool-4',  # Description of tool 4
 }
 ```
 
@@ -152,32 +163,45 @@ USEFUL_TOOL_NAMES = {
 - **`human_inbox.py`**: Human-in-the-loop integration
 - **`supervisor_snippet_connection.md`**: Supervisor setup guide
 
-## Available Services
+## MCP Provider Examples
 
-Based on your environment variables:
+Based on your chosen MCP provider:
 
+### Rube (Universal Provider)
 ```bash
-# Google Services
-PIPEDREAM_MCP_SERVER_google_gmail          # Gmail
-PIPEDREAM_MCP_SERVER_google_sheets         # Sheets
-PIPEDREAM_MCP_SERVER_google_drive          # Drive
-PIPEDREAM_MCP_SERVER_google_docs           # Docs
-PIPEDREAM_MCP_SERVER_google_calendar       # Calendar
-PIPEDREAM_MCP_SERVER_google_contacts       # Contacts
+RUBE_MCP_SERVER=https://rube.app/mcp
+RUBE_BEARER_TOKEN=your_bearer_token_here
+```
+*Rube provides access to 500+ tools across 100+ applications through a single endpoint.*
 
-# Other Services
-PIPEDREAM_MCP_SERVER_shopify               # Shopify
-PIPEDREAM_MCP_SERVER_linkedin              # LinkedIn
-PIPEDREAM_MCP_SERVER_coda                  # Coda
+### Composio (Service-Specific)
+```bash
+COMPOSIO_MCP_SERVER_slack=https://mcp.composio.dev/{your-id}/slack
+COMPOSIO_MCP_SERVER_github=https://mcp.composio.dev/{your-id}/github
+COMPOSIO_MCP_SERVER_google_sheets=https://mcp.composio.dev/{your-id}/google_sheets
+```
+
+### Pipedream (Service-Specific)
+```bash
+PIPEDREAM_MCP_SERVER_google_gmail=https://mcp.pipedream.net/{your-id}/google_gmail
+PIPEDREAM_MCP_SERVER_google_sheets=https://mcp.pipedream.net/{your-id}/google_sheets
+PIPEDREAM_MCP_SERVER_shopify=https://mcp.pipedream.net/{your-id}/shopify
+```
+
+### Custom MCP Servers
+```bash
+MY_CUSTOM_MCP_SERVER=https://your-server.com/mcp
+COMPANY_INTERNAL_MCP=https://internal.company.com/mcp
 ```
 
 ## Key Patterns
 
 ### MCP Connection Pattern
-- Environment variable: `PIPEDREAM_MCP_SERVER_{SERVICE_NAME}`
+- Flexible environment variables: `{PROVIDER}_MCP_SERVER_{SERVICE}` or `{PROVIDER}_MCP_SERVER`
 - 5-minute tool caching for performance
 - Clear error messages (no graceful fallbacks)
 - 30-second timeout for MCP connections
+- Universal provider support (Rube, Composio, Pipedream, custom)
 
 ### Tool Discovery Pattern **NEW**
 - Use `discover_tools.py` script for tool name discovery
@@ -227,15 +251,16 @@ supervisor = asyncio.run(create_supervisor_graph())
 2. **Clear Errors**: No graceful fallbacks, clear error messages
 3. **MessagesState**: Use standard state, avoid custom state classes
 4. **Supervisor Ready**: Automatic integration with supervisor routing
-5. **MCP First**: Leverage Pipedream MCP tools, add local tools sparingly
+5. **MCP First**: Leverage MCP provider tools (Rube, Composio, Pipedream, etc.), add local tools sparingly
 6. **Tool Discovery**: Use automatic discovery to find exact tool names
 
 ## Common Issues
 
 ### MCP Connection Fails
-- Check environment variable name matches pattern
-- Verify Pipedream server URL is correct
+- Check environment variable name matches your provider's pattern
+- Verify MCP server URL is correct for your provider
 - Check network connectivity
+- For Rube: Verify bearer token is set
 
 ### Supervisor Integration Fails
 - Verify function name: `create_{agent}_agent()`
@@ -244,7 +269,8 @@ supervisor = asyncio.run(create_supervisor_graph())
 
 ### Tool Loading Fails
 - Check USEFUL_TOOL_NAMES matches available tools
-- Visit https://mcp.pipedream.com/app/{service} for tool list
+- Use tool discovery script: `python discover_tools.py`
+- Check your MCP provider's documentation for available tools
 - Verify timeout settings
 
 ## Advanced Features

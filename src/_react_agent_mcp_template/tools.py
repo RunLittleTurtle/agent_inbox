@@ -1,6 +1,6 @@
 """
-MCP Tools for React Agent
-Includes both MCP tools from Pipedream and sub-agent wrapper examples
+MCP Tools for React Agent Template
+Includes MCP tools from any provider (Rube, Composio, Pipedream, etc.) and sub-agent wrapper examples
 """
 
 import os
@@ -35,32 +35,36 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 # CONFIGURATION - USES CENTRALIZED CONFIG
 # =============================================================================
 
-# Environment variable for MCP service
-# This constructs: PIPEDREAM_MCP_SERVER_google_gmail, PIPEDREAM_MCP_SERVER_google_sheets, etc.
-MCP_ENV_VAR = f"PIPEDREAM_MCP_SERVER_{MCP_SERVICE}"
+# Environment variable for MCP service (from centralized config)
+# This uses the MCP_ENV_VAR from config.py which supports any provider
+# Examples: RUBE_MCP_SERVER, COMPOSIO_MCP_SERVER_slack, PIPEDREAM_MCP_SERVER_gmail, etc.
+from .config import MCP_ENV_VAR
 
 # TODO: Configure which tools to include from the MCP server
-# Visit https://mcp.pipedream.com/app/{service} to see available tools
-# OR use the tool discovery script to get exact names: python discover_tools.py --format copy-paste
+# For tool discovery, use: python discover_tools.py --format copy-paste
+# Or check your MCP provider's documentation for available tools
 USEFUL_TOOL_NAMES = {
-    # TODO: Replace these examples with actual tool names from Pipedream
+    # TODO: Replace these examples with actual tool names from your MCP provider
 
-    # Examples for different services:
-    # For Gmail (MCP_SERVICE = "google_gmail"):
+    # Examples for different MCP providers and services:
+
+    # RUBE (Universal Provider):
+    # 'RUBE_SEARCH_TOOLS',
+    # 'RUBE_MULTI_EXECUTE_TOOL',
+
+    # Composio Services:
+    # 'gmail_send_email',
+    # 'slack_send_message',
+    # 'github_create_issue',
+
+    # Pipedream Services:
     # 'gmail-send-email',
-    # 'gmail-find-email',
-    # 'gmail-list-labels',
-    # 'gmail-archive-email',
-
-    # For Google Sheets (MCP_SERVICE = "google_sheets"):
-    # 'sheets-create-spreadsheet',
     # 'sheets-read-values',
-    # 'sheets-update-values',
+    # 'drive-list-files',
 
-    # For Google Drive (MCP_SERVICE = "google_drive"):
-    # 'google_drive-list-files',
-    # 'google_drive-upload-file',
-    # 'google_drive-create-folder',
+    # Custom MCP Servers:
+    # 'custom-tool-name-1',
+    # 'custom-tool-name-2',
 
     # PLACEHOLDER - Remove these and add real tools using discovery script:
     'placeholder-tool-1',
@@ -72,7 +76,7 @@ USEFUL_TOOL_NAMES = {
 # =============================================================================
 
 class AgentMCPConnection:
-    """MCP connection for Pipedream service with caching"""
+    """MCP connection for any MCP provider with caching"""
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -80,12 +84,13 @@ class AgentMCPConnection:
         self._mcp_tools: List[BaseTool] = []
         self._tools_cache_time: Optional[datetime] = None
 
-        # Get Pipedream service URL from config
+        # Get MCP service URL from config (works with any provider)
         self.mcp_url = MCP_SERVER_URL
 
         if self.mcp_url:
+            # Use generic server name instead of provider-specific
             self.mcp_servers = {
-                f"pipedream_{AGENT_NAME}": {
+                f"mcp_{AGENT_NAME}": {
                     "url": self.mcp_url,
                     "transport": "streamable_http"
                 }
@@ -103,10 +108,10 @@ class AgentMCPConnection:
 
         # No MCP server configured
         if not self.mcp_url:
-            self.logger.warning(f"No Pipedream {AGENT_NAME} MCP server configured")
+            self.logger.warning(f"No MCP server configured for {AGENT_NAME} agent. Set {MCP_ENV_VAR} in .env")
             return []
 
-        self.logger.info(f"Connecting to Pipedream {AGENT_NAME} MCP: {self.mcp_url}")
+        self.logger.info(f"Connecting to {AGENT_NAME} MCP server: {self.mcp_url}")
 
         # Reuse MCP client to prevent memory leaks
         if self._mcp_client is None:
@@ -168,7 +173,7 @@ class AgentMCPConnection:
 
         try:
             # Use the direct MCP client session for tool discovery
-            server_name = f"pipedream_{AGENT_NAME}"
+            server_name = f"mcp_{AGENT_NAME}"
             tools_info = []
 
             async with self._mcp_client.session(server_name) as session:
@@ -276,7 +281,7 @@ async def get_agent_tools_with_mcp() -> List[BaseTool]:
     # TODO: Uncomment if you have complex workflows to wrap
     # tools.append(complex_workflow_tool)
 
-    # Add MCP tools from Pipedream
+    # Add MCP tools from configured provider
     try:
         mcp_tools = await _agent_mcp.get_mcp_tools()
         tools.extend(mcp_tools)

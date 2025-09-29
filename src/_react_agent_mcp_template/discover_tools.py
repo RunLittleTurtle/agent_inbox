@@ -169,7 +169,7 @@ def main():
     if not mcp_url:
         print(f"❌ Environment variable {MCP_ENV_VAR} is not set")
         print(f"Please add it to your .env file:")
-        print(f"{MCP_ENV_VAR}=https://mcp.pipedream.net/your-id/{MCP_SERVICE}")
+        print(f"{MCP_ENV_VAR}=https://your-mcp-provider.com/your-id/{MCP_SERVICE}")
         sys.exit(1)
 
     if args.validate_env:

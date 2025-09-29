@@ -72,10 +72,11 @@ AGENT_STATUS = "active"  # "active" or "disabled"
 
 # MCP Configuration - specify the exact environment variable name
 # This is flexible - works with any MCP provider:
-#   - Pipedream: "PIPEDREAM_MCP_SERVER_google_gmail"
+#   - Rube: "RUBE_MCP_SERVER" (universal provider)
 #   - Composio: "COMPOSIO_MCP_SERVER_slack"
+#   - Pipedream: "PIPEDREAM_MCP_SERVER_google_gmail"
 #   - Custom: "MY_CUSTOM_MCP_SERVER"
-MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_gmail"  # Your MCP server env var
+MCP_ENV_VAR = "RUBE_MCP_SERVER"  # Your MCP server env var
 ```
 
 **Critical**:
@@ -198,7 +199,7 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'readonly': True,  # Shows which env var is used
                 'description': 'Name of the environment variable containing the MCP server URL (read-only)',
-                'placeholder': 'PIPEDREAM_MCP_SERVER_google_gmail',
+                'placeholder': 'RUBE_MCP_SERVER, COMPOSIO_MCP_SERVER_slack, PIPEDREAM_MCP_SERVER_gmail',
                 'required': False,
                 'note': 'This shows which environment variable is used. Configured in agent code.'
             },
@@ -207,7 +208,7 @@ CONFIG_SECTIONS = [
                 'label': 'MCP Server URL',
                 'type': 'text',
                 'description': 'The MCP server URL (editable - updates .env file)',
-                'placeholder': 'https://mcp.pipedream.net/xxx/google_gmail',
+                'placeholder': 'https://rube.app/mcp, https://mcp.composio.dev/xxx/slack, https://mcp.pipedream.net/xxx/gmail',
                 'required': False,
                 'note': 'Editing this updates the URL in your .env file'
             }
@@ -251,11 +252,15 @@ The config app automatically selects card types based on section keys and organi
 In your project's main `.env` file, add the MCP server URL:
 
 ```bash
-# For Pipedream
-PIPEDREAM_MCP_SERVER_google_gmail=https://mcp.pipedream.net/xxx/google_gmail
+# For Rube (Universal Provider)
+RUBE_MCP_SERVER=https://rube.app/mcp
+RUBE_BEARER_TOKEN=your_bearer_token_here
 
 # For Composio
 COMPOSIO_MCP_SERVER_slack=https://mcp.composio.dev/xxx/slack
+
+# For Pipedream
+PIPEDREAM_MCP_SERVER_google_gmail=https://mcp.pipedream.net/xxx/google_gmail
 
 # For custom
 MY_CUSTOM_MCP_SERVER=https://your-server.com/mcp
@@ -368,7 +373,13 @@ if (configPath.includes('your_agent')) {
 Add your MCP server URL to the main `.env` file:
 
 ```bash
-# MCP Server for your agent
+# MCP Server for your agent (choose appropriate provider)
+
+# Rube (Universal Provider)
+RUBE_MCP_SERVER=https://rube.app/mcp
+RUBE_BEARER_TOKEN=your_bearer_token_here
+
+# Or Pipedream
 PIPEDREAM_MCP_SERVER_google_gmail=https://mcp.pipedream.net/your-id/google_gmail
 
 # Required API key

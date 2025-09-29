@@ -140,7 +140,7 @@ CONFIG_SECTIONS = [
                 'readonly': True,
                 'default': '',
                 'description': 'Name of the environment variable containing the MCP server URL (read-only)',
-                'placeholder': 'PIPEDREAM_MCP_SERVER_google_gmail, COMPOSIO_MCP_SERVER_slack, etc.',
+                'placeholder': 'RUBE_MCP_SERVER, COMPOSIO_MCP_SERVER_slack, PIPEDREAM_MCP_SERVER_gmail, etc.',
                 'required': False,
                 'note': 'This shows which environment variable is used. Configured in agent code.'
             },
@@ -149,7 +149,7 @@ CONFIG_SECTIONS = [
                 'label': 'MCP Server URL',
                 'type': 'text',
                 'description': 'The MCP server URL (editable - updates .env file)',
-                'placeholder': 'https://mcp.pipedream.net/xxx/google_gmail',
+                'placeholder': 'https://rube.app/mcp, https://mcp.composio.dev/xxx/slack, https://mcp.pipedream.net/xxx/gmail',
                 'required': False,
                 'note': 'Editing this updates the URL in your .env file'
             }

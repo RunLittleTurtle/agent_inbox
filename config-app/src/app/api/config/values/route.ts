@@ -69,7 +69,7 @@ function getPythonConfigValues(agentId: string | null) {
         // Only get the URL if we have a valid env var name (not a placeholder)
         if (mcpEnvVar && !mcpEnvVar.includes('{')) {
           const envValues = getCurrentEnvValues();
-          mcpServerUrl = envValues[mcpEnvVar] || '';
+          mcpServerUrl = envValues[mcpEnvVar as string] || '';
         }
 
         // Read prompts from prompt.py
@@ -285,35 +285,35 @@ function getPythonConfigValues(agentId: string | null) {
           if (fs.existsSync(envPath)) {
             const envContent = fs.readFileSync(envPath, 'utf8');
 
-            // AI Model API Keys
-            const anthropicApiKeyMatch = envContent.match(/ANTHROPIC_API_KEY=(.+)/);
-            const openaiApiKeyMatch = envContent.match(/OPENAI_API_KEY=(.+)/);
+            // AI Model API Keys - fix regex to not capture newlines
+            const anthropicApiKeyMatch = envContent.match(/ANTHROPIC_API_KEY=([^\r\n]+)/);
+            const openaiApiKeyMatch = envContent.match(/OPENAI_API_KEY=([^\r\n]+)/);
 
             aiModelKeys = {
-              anthropic_api_key: anthropicApiKeyMatch?.[1] || '',
-              openai_api_key: openaiApiKeyMatch?.[1] || ''
+              anthropic_api_key: anthropicApiKeyMatch?.[1]?.trim() || '',
+              openai_api_key: openaiApiKeyMatch?.[1]?.trim() || ''
             };
 
             // LangSmith Configuration
-            const langsmithApiKeyMatch = envContent.match(/LANGSMITH_API_KEY=(.+)/);
-            const langchainProjectMatch = envContent.match(/LANGCHAIN_PROJECT=(.+)/);
+            const langsmithApiKeyMatch = envContent.match(/LANGSMITH_API_KEY=([^\r\n]+)/);
+            const langchainProjectMatch = envContent.match(/LANGCHAIN_PROJECT=([^\r\n]+)/);
 
             langsmithConfig = {
-              langsmith_api_key: langsmithApiKeyMatch?.[1] || '',
-              langchain_project: langchainProjectMatch?.[1] || 'ambient-email-agent'
+              langsmith_api_key: langsmithApiKeyMatch?.[1]?.trim() || '',
+              langchain_project: langchainProjectMatch?.[1]?.trim() || 'ambient-email-agent'
             };
 
             // Google Workspace Credentials
-            const googleClientIdMatch = envContent.match(/GOOGLE_CLIENT_ID=(.+)/);
-            const googleClientSecretMatch = envContent.match(/GOOGLE_CLIENT_SECRET=(.+)/);
-            const gmailRefreshTokenMatch = envContent.match(/GMAIL_REFRESH_TOKEN=(.+)/);
-            const emailAssociatedMatch = envContent.match(/EMAIL_ASSOCIATED=(.+)/);
+            const googleClientIdMatch = envContent.match(/GOOGLE_CLIENT_ID=([^\r\n]+)/);
+            const googleClientSecretMatch = envContent.match(/GOOGLE_CLIENT_SECRET=([^\r\n]+)/);
+            const gmailRefreshTokenMatch = envContent.match(/GMAIL_REFRESH_TOKEN=([^\r\n]+)/);
+            const emailAssociatedMatch = envContent.match(/EMAIL_ASSOCIATED=([^\r\n]+)/);
 
             googleCredentials = {
-              google_client_id: googleClientIdMatch?.[1] || '',
-              google_client_secret: googleClientSecretMatch?.[1] || '',
-              gmail_refresh_token: gmailRefreshTokenMatch?.[1] || '',
-              user_google_email: emailAssociatedMatch?.[1] || ''
+              google_client_id: googleClientIdMatch?.[1]?.trim() || '',
+              google_client_secret: googleClientSecretMatch?.[1]?.trim() || '',
+              gmail_refresh_token: gmailRefreshTokenMatch?.[1]?.trim() || '',
+              user_google_email: emailAssociatedMatch?.[1]?.trim() || ''
             };
           }
 
@@ -359,9 +359,11 @@ function getPythonConfigValues(agentId: string | null) {
             ai_models: aiModelKeys,
             langgraph_system: langsmithConfig,
             google_workspace: googleCredentials,
-            system_info: {
-              agent_status: 'active',
-              config_location: 'eaia/main/config.yaml'
+            agent_identity: {
+              agent_name: 'executive-ai-assistant',
+              agent_display_name: 'Executive AI Assistant',
+              agent_description: 'AI-powered executive assistant for email management, scheduling, and task automation',
+              agent_status: 'active'
             }
           };
         } catch (yamlError) {

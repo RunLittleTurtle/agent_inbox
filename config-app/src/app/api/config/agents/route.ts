@@ -63,6 +63,17 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
       return null;
     }
 
+    // Define the standard LLM model options - CENTRALIZED LIST
+    // Changing this list will update ALL agents using STANDARD_LLM_MODEL_OPTIONS
+    const STANDARD_LLM_MODEL_OPTIONS = [
+      'claude-sonnet-4-20250514',
+      'claude-3-5-haiku-20241022',
+      'gpt-5',
+      'gpt-4o',
+      'o3',
+      'claude-opus-4-1-20250805'
+    ];
+
     // Convert Python dict syntax to JSON (basic conversion)
     const configInfoStr = configInfoMatch[1]
       .replace(/'/g, '"')
@@ -70,11 +81,17 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
       .replace(/False/g, 'false')
       .replace(/None/g, 'null');
 
-    const configSectionsStr = configSectionsMatch[1]
+    let configSectionsStr = configSectionsMatch[1]
       .replace(/'/g, '"')
       .replace(/True/g, 'true')
       .replace(/False/g, 'false')
       .replace(/None/g, 'null');
+
+    // Replace STANDARD_LLM_MODEL_OPTIONS with the actual array
+    configSectionsStr = configSectionsStr.replace(
+      /STANDARD_LLM_MODEL_OPTIONS/g,
+      JSON.stringify(STANDARD_LLM_MODEL_OPTIONS)
+    );
 
     const configInfo = JSON.parse(configInfoStr);
     const configSections = JSON.parse(configSectionsStr);

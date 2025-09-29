@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, RefreshCw, Save, AlertCircle } from 'lucide-react';
 import { ConfigSidebarStandalone } from '@/components/config/ConfigSidebarStandalone';
-import { ConfigForm } from '@/components/config/ConfigForm';
+import { EnhancedConfigForm } from '@/components/config/EnhancedConfigForm';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -338,7 +338,7 @@ export default function ConfigPage() {
               </Alert>
             )}
 
-            <ConfigForm
+            <EnhancedConfigForm
               sections={getCurrentConfig()}
               values={configValues}
               onValueChange={handleValueChange}

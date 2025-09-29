@@ -6,7 +6,7 @@ Complete guide for managing system prompts in the React Agent MCP template with 
 
 The template uses a centralized prompt management system with:
 - `prompt.py` - Define prompts following LangGraph best practices
-- Config UI integration - Edit prompts through web interface
+- Config UI integration - Edit prompts through the web interface (orange cards)
 - Dynamic placeholder replacement - Context-aware prompts
 - Modular prompt structure - Separate sections for easy maintenance
 
@@ -105,15 +105,18 @@ def get_formatted_prompt(agent_display_name: str, agent_description: str) -> str
 
 ### UI Configuration Schema (`ui_config.py`)
 
-Add prompt editing capability to your configuration UI:
+Prompts are edited through the configuration UI using **orange prompt cards** that provide enhanced textarea editing with auto-expanding fields.
+
+Add prompt editing capability to your configuration:
 
 ```python
 CONFIG_SECTIONS = [
     # ... other sections ...
     {
-        'key': 'prompt_templates',
+        'key': 'prompt_templates',  # This triggers the orange PromptCard
         'label': 'System Prompts',
         'description': 'Customize agent behavior through system prompts',
+        'card_style': 'orange',  # Explicitly request orange card (optional)
         'fields': [
             {
                 'key': 'agent_system_prompt',
@@ -122,7 +125,7 @@ CONFIG_SECTIONS = [
                 'description': 'Main system prompt that defines agent behavior',
                 'placeholder': 'You are a helpful assistant...',
                 'required': True,
-                'rows': 15,
+                'rows': 15,  # Initial rows, auto-expands with content
                 'note': 'Use {AGENT_DISPLAY_NAME} and {AGENT_DESCRIPTION} as placeholders'
             },
             {
@@ -144,6 +147,9 @@ CONFIG_SECTIONS = [
         ]
     }
 ]
+```
+
+**Note**: Sections with "prompt" in the key or `card_style: 'orange'` automatically render as orange prompt cards with enhanced editing features. See [Config Setup Guide](01_CONFIG_SETUP_GUIDE.md) for the complete card system.
 ```
 
 ### Reading Prompt Values (Config API)
@@ -380,10 +386,11 @@ except Exception as e:
 ### Testing with Config UI
 
 1. Start config server: `npm run dev:config`
-2. Navigate to `http://localhost:3004/config`
-3. Edit prompt in "System Prompts" section
-4. Save changes
-5. Restart agent to test new prompt
+2. Navigate to `http://localhost:3004`
+3. Look for the orange "System Prompts" card in the "Prompts & Instructions" category
+4. Edit prompts directly in the auto-expanding textareas
+5. Changes save automatically to your `prompt.py` file
+6. Restart agent to test new prompts
 
 ## Best Practices
 

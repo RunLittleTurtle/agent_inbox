@@ -12,6 +12,35 @@ CONFIG_INFO = {
 
 CONFIG_SECTIONS = [
     {
+        'key': 'user_preferences',
+        'label': 'User Preferences',
+        'description': 'Personal settings and preferences',
+        'fields': [
+            {
+                'key': 'user_timezone',
+                'label': 'Timezone',
+                'type': 'select',
+                'envVar': 'USER_TIMEZONE',
+                'default': 'America/Toronto',
+                'description': 'User timezone for llms context',
+                'options': [
+                    'America/Toronto',
+                    'America/Montreal',
+                    'America/New_York',
+                    'America/Los_Angeles',
+                    'America/Chicago',
+                    'Europe/London',
+                    'Europe/Paris',
+                    'Europe/Berlin',
+                    'Asia/Tokyo',
+                    'Asia/Shanghai',
+                    'Australia/Sydney'
+                ],
+                'required': True
+            }
+        ]
+    },
+    {
         'key': 'ai_models',
         'label': 'AI Model APIs',
         'description': 'API keys for AI language models',
@@ -95,27 +124,6 @@ CONFIG_SECTIONS = [
                 'envVar': 'GMAIL_REFRESH_TOKEN',
                 'description': 'OAuth refresh token for Gmail access',
                 'placeholder': '1//05...'
-            },
-            {
-                'key': 'user_timezone',
-                'label': 'User Timezone',
-                'type': 'select',
-                'envVar': 'USER_TIMEZONE',
-                'default': 'America/Toronto',
-                'description': 'User timezone for calendar and scheduling',
-                'options': [
-                    'America/Toronto',
-                    'America/Montreal',
-                    'America/New_York',
-                    'America/Los_Angeles',
-                    'America/Chicago',
-                    'Europe/London',
-                    'Europe/Paris',
-                    'Europe/Berlin',
-                    'Asia/Tokyo',
-                    'Asia/Shanghai',
-                    'Australia/Sydney'
-                ]
             }
         ]
     }

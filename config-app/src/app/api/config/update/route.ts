@@ -535,7 +535,6 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
 
         // Write updated config back to YAML
         const updatedYaml = yaml.dump(configData, {
-          defaultFlowStyle: false,
           quotingType: '"',
           forceQuotes: false
         });
@@ -580,10 +579,13 @@ export async function POST(request: NextRequest) {
     if (envVar) {
       console.log(`Updating env var: ${envVar} = ${value}`);
       success = updateEnvVariable(envVar, value);
-    } else {
+    } else if (configPath) {
       // Otherwise, update the config file directly
       console.log(`Updating config file: ${configPath}, ${sectionKey}.${fieldKey} = ${value}`);
       success = updateConfigFile(configPath, sectionKey, fieldKey, value);
+    } else {
+      console.error(`No config path provided for agent: ${agentId}`);
+      success = false;
     }
 
     if (success) {

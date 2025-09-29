@@ -10,6 +10,16 @@ React Agent MCP Template UI Configuration Schema
 This file defines the configuration interface schema for the Next.js configuration UI.
 """
 
+# Standardized LLM model options - kept in sync across all agents
+STANDARD_LLM_MODEL_OPTIONS = [
+    'claude-sonnet-4-20250514',
+    'claude-3-5-haiku-20241022',
+    'gpt-5',
+    'gpt-4o',
+    'o3',
+    'claude-opus-4-1-20250805'
+]
+
 CONFIG_INFO = {
     'name': 'React Agent Template',
     'description': 'Template for creating new MCP-based agents',
@@ -24,12 +34,21 @@ CONFIG_SECTIONS = [
         'description': 'Agent identification and status',
         'fields': [
             {
+                'key': 'agent_name',
+                'label': 'Agent Name',
+                'type': 'text',
+                'default': 'template',
+                'description': 'Internal agent identifier',
+                'readonly': True,
+                'required': True
+            },
+            {
                 'key': 'agent_display_name',
                 'label': 'Display Name',
                 'type': 'text',
                 'default': 'Template Agent',
                 'description': 'Human-readable agent name shown in UI',
-                'placeholder': 'Gmail Agent, Google Sheets, Google Drive',
+                'readonly': True,
                 'required': True
             },
             {
@@ -38,15 +57,16 @@ CONFIG_SECTIONS = [
                 'type': 'textarea',
                 'default': 'Template for creating new MCP-based agents',
                 'description': 'Brief description of agent capabilities',
-                'placeholder': 'email management, spreadsheet operations, file storage',
+                'readonly': True,
+                'rows': 3,
                 'required': True
             },
             {
                 'key': 'agent_status',
-                'label': 'Status',
+                'label': 'Agent Status',
                 'type': 'select',
                 'default': 'disabled',
-                'description': 'Enable or disable this agent',
+                'description': 'Template Agent operational status',
                 'options': ['active', 'disabled'],
                 'required': True
             }
@@ -63,12 +83,7 @@ CONFIG_SECTIONS = [
                 'type': 'select',
                 'default': 'claude-sonnet-4-20250514',
                 'description': 'Primary AI model for agent tasks',
-                'options': [
-                    'claude-sonnet-4-20250514',
-                    'claude-3-5-sonnet-20241022',
-                    'gpt-4o',
-                    'gpt-4o-mini'
-                ],
+                'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True,
                 'note': 'Uses global ANTHROPIC_API_KEY from environment'
             },
@@ -144,6 +159,7 @@ CONFIG_SECTIONS = [
         'key': 'prompt_templates',
         'label': 'System Prompts',
         'description': 'Customize agent behavior through system prompts',
+        'card_style': 'orange',
         'fields': [
             {
                 'key': 'agent_system_prompt',

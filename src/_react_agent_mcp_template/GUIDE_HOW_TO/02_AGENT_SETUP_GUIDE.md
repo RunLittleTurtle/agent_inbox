@@ -73,7 +73,15 @@ def create_gmail_agent():  # ⬅️ Update this function name
     return create_default_orchestrator()
 ```
 
-### Step 5: Test Your Agent
+### Step 5: Configure UI Integration (Optional)
+
+To make your agent configurable through the web UI:
+
+1. Ensure `ui_config.py` has proper `CONFIG_INFO` and `CONFIG_SECTIONS`
+2. Add your agent path to `config-app/src/app/api/config/agents/route.ts`
+3. See [Config Setup Guide](01_CONFIG_SETUP_GUIDE.md) for full UI integration details
+
+### Step 6: Test Your Agent
 
 ```bash
 # Test the agent creation
@@ -81,6 +89,10 @@ python x_agent_orchestrator.py
 
 # Test MCP tool loading
 python tools.py
+
+# Test config UI integration (optional)
+cd config-app && npm run dev:config
+# Open http://localhost:3004 - your agent should appear in sidebar
 ```
 
 ## Detailed Configuration
@@ -89,16 +101,18 @@ python tools.py
 
 ```
 src/your_agent/
-├── config.py              # Main configuration
-├── prompt.py               # System prompts
-├── tools.py                # MCP tools and tool discovery
-├── ui_config.py           # Configuration UI schema
+├── config.py              # Main configuration (reads from .env)
+├── prompt.py              # System prompts (editable via config UI)
+├── tools.py               # MCP tools and tool discovery
+├── ui_config.py           # Configuration UI schema definition
 ├── x_agent_orchestrator.py # React agent creation
-├── discover_tools.py       # Tool discovery script
+├── discover_tools.py      # Tool discovery script
 ├── schemas.py             # Data structures (optional)
 ├── human_inbox.py         # Human-in-the-loop integration
 └── supervisor_snippet_connection.md # Integration guide
 ```
+
+**Note**: The template now includes `ui_config.py` for integration with the configuration UI at `http://localhost:3004`. See the [Config Setup Guide](01_CONFIG_SETUP_GUIDE.md) for detailed UI configuration instructions.
 
 ### Configuration Details (`config.py`)
 
@@ -381,6 +395,10 @@ Expected output:
 # Test complete system
 cd /path/to/agent_inbox_1.18
 python cli.py start
+
+# Optionally test config UI
+cd config-app && npm run dev:config
+# Navigate to http://localhost:3004
 ```
 
 ### Troubleshooting
@@ -399,6 +417,11 @@ python cli.py start
 - Verify function name matches `create_{agent}_agent()` pattern
 - Check import paths in `graph.py`
 - Ensure MessagesState compatibility
+
+**Config UI issues:**
+- Verify `ui_config.py` exists and has valid Python syntax
+- Check agent path is added to `AGENT_CONFIG_PATHS` in routes
+- See [Config Setup Guide](01_CONFIG_SETUP_GUIDE.md) for troubleshooting
 
 ## Advanced Features
 

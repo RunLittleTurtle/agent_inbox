@@ -3,6 +3,16 @@ Calendar Agent UI Configuration Schema
 Optimized configuration for calendar agent settings
 """
 
+# Standardized LLM model options - kept in sync across all agents
+STANDARD_LLM_MODEL_OPTIONS = [
+    'claude-sonnet-4-20250514',
+    'claude-3-5-haiku-20241022',
+    'gpt-5',
+    'gpt-4o',
+    'o3',
+    'claude-opus-4-1-20250805'
+]
+
 CONFIG_INFO = {
     'name': 'Calendar Agent',
     'description': 'Google Calendar management and scheduling',
@@ -13,7 +23,7 @@ CONFIG_INFO = {
 CONFIG_SECTIONS = [
     {
         'key': 'agent_identity',
-        'label': 'Agent Information',
+        'label': 'Agent Identity',
         'description': 'Calendar agent identification and status',
         'fields': [
             {
@@ -22,7 +32,8 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'default': 'calendar',
                 'description': 'Internal agent identifier',
-                'readonly': True
+                'readonly': True,
+                'required': True
             },
             {
                 'key': 'agent_display_name',
@@ -30,6 +41,7 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'default': 'Calendar Agent',
                 'description': 'Human-readable agent name shown in UI',
+                'readonly': True,
                 'required': True
             },
             {
@@ -38,78 +50,25 @@ CONFIG_SECTIONS = [
                 'type': 'textarea',
                 'default': 'Google Calendar management and scheduling',
                 'description': 'Brief description of agent capabilities',
+                'readonly': True,
+                'rows': 3,
                 'required': True
             },
             {
                 'key': 'agent_status',
-                'label': 'Status',
+                'label': 'Agent Status',
                 'type': 'select',
                 'default': 'active',
-                'description': 'Enable or disable this agent',
-                'options': ['active', 'disabled']
-            }
-        ]
-    },
-    {
-        'key': 'llm',
-        'label': 'Language Model',
-        'description': 'AI model configuration for calendar operations',
-        'fields': [
-            {
-                'key': 'model',
-                'label': 'Model Name',
-                'type': 'select',
-                'default': 'claude-sonnet-4-20250514',
-                'description': 'Primary AI model for calendar tasks',
-                'options': [
-                    'claude-sonnet-4-20250514',
-                    'claude-3-5-sonnet-20241022',
-                    'gpt-4o',
-                    'gpt-4o-mini'
-                ],
+                'description': 'Calendar Agent operational status',
+                'options': ['active', 'disabled'],
                 'required': True
-            },
-            {
-                'key': 'temperature',
-                'label': 'Temperature',
-                'type': 'number',
-                'default': 0.3,
-                'description': 'Response creativity (0=focused, 1=creative)',
-                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
-            }
-        ]
-    },
-    {
-        'key': 'mcp_integration',
-        'label': 'MCP Server Configuration',
-        'description': 'API connection settings for external services',
-        'fields': [
-            {
-                'key': 'mcp_env_var',
-                'label': 'MCP Environment Variable',
-                'type': 'text',
-                'readonly': True,
-                'default': 'PIPEDREAM_MCP_SERVER',
-                'description': 'Name of the environment variable containing the MCP server URL (read-only)',
-                'placeholder': 'PIPEDREAM_MCP_SERVER',
-                'required': False,
-                'note': 'This shows which environment variable is used. Configured in agent code.'
-            },
-            {
-                'key': 'mcp_server_url',
-                'label': 'MCP Server URL',
-                'type': 'text',
-                'description': 'The MCP server URL (editable - updates .env file)',
-                'placeholder': 'https://mcp.pipedream.net/xxx/google_calendar',
-                'required': False,
-                'note': 'Editing this updates the URL in your .env file'
             }
         ]
     },
     {
         'key': 'user_preferences',
-        'label': 'Your Preferences',
-        'description': 'Personal calendar settings',
+        'label': 'User Preferences',
+        'description': 'Personal calendar settings and preferences',
         'fields': [
             {
                 'key': 'timezone',
@@ -160,9 +119,34 @@ CONFIG_SECTIONS = [
         ]
     },
     {
+        'key': 'llm',
+        'label': 'Language Model',
+        'description': 'AI model configuration for calendar operations',
+        'fields': [
+            {
+                'key': 'model',
+                'label': 'Model Name',
+                'type': 'select',
+                'default': 'claude-sonnet-4-20250514',
+                'description': 'Primary AI model for calendar tasks',
+                'options': STANDARD_LLM_MODEL_OPTIONS,
+                'required': True
+            },
+            {
+                'key': 'temperature',
+                'label': 'Temperature',
+                'type': 'number',
+                'default': 0.3,
+                'description': 'Response creativity (0=focused, 1=creative)',
+                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
+            }
+        ]
+    },
+    {
         'key': 'prompt_templates',
         'label': 'System Prompts',
         'description': 'Customize calendar agent behavior through system prompts',
+        'card_style': 'orange',
         'fields': [
             {
                 'key': 'agent_system_prompt',
@@ -205,6 +189,33 @@ CONFIG_SECTIONS = [
                 'description': 'Advanced: Template for extracting booking details from conversations',
                 'rows': 12,
                 'placeholder': 'Extract booking details from this request...'
+            }
+        ]
+    },
+    {
+        'key': 'mcp_integration',
+        'label': 'MCP Server Configuration',
+        'description': 'API connection settings for external services',
+        'fields': [
+            {
+                'key': 'mcp_env_var',
+                'label': 'MCP Environment Variable',
+                'type': 'text',
+                'readonly': True,
+                'default': 'PIPEDREAM_MCP_SERVER',
+                'description': 'Name of the environment variable containing the MCP server URL (read-only)',
+                'placeholder': 'PIPEDREAM_MCP_SERVER',
+                'required': False,
+                'note': 'This shows which environment variable is used. Configured in agent code.'
+            },
+            {
+                'key': 'mcp_server_url',
+                'label': 'MCP Server URL',
+                'type': 'text',
+                'description': 'The MCP server URL (editable - updates .env file)',
+                'placeholder': 'https://mcp.pipedream.net/xxx/google_calendar',
+                'required': False,
+                'note': 'Editing this updates the URL in your .env file'
             }
         ]
     }

@@ -14,6 +14,16 @@ React Agent MCP Template UI Configuration Schema
 This file defines the configuration interface schema for the Next.js configuration UI.
 """
 
+# Standardized LLM model options - kept in sync across all agents
+STANDARD_LLM_MODEL_OPTIONS = [
+    'claude-sonnet-4-20250514',
+    'claude-3-5-haiku-20241022',
+    'gpt-5',
+    'gpt-4o',
+    'o3',
+    'claude-opus-4-1-20250805'
+]
+
 CONFIG_INFO = {
     'name': 'Executive AI Assistant',
     'description': 'AI-powered executive assistant for email management, scheduling, and task automation',
@@ -112,14 +122,7 @@ CONFIG_SECTIONS = [
                 'type': 'select',
                 'default': 'claude-3-5-haiku-20241022',
                 'description': 'Model for email categorization. Haiku (fast, cheap) works well for this simple task. Sonnet-4 (balanced), GPT-4o (balanced), GPT-5 (expensive), o3 (reasoning, very expensive), Opus-4 (highest quality, most expensive)',
-                'options': [
-                    'claude-sonnet-4-20250514',
-                    'claude-3-5-haiku-20241022',
-                    'gpt-5',
-                    'gpt-4o',
-                    'o3',
-                    'claude-opus-4-1-20250805'
-                ],
+                'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
             },
             {
@@ -143,14 +146,7 @@ CONFIG_SECTIONS = [
                 'type': 'select',
                 'default': 'claude-sonnet-4-20250514',
                 'description': 'Model for drafting email responses. Sonnet-4 (balanced, good price) recommended. Haiku (fast, cheap), GPT-4o (balanced), GPT-5 (expensive), o3 (reasoning, very expensive), Opus-4 (highest quality, most expensive)',
-                'options': [
-                    'claude-sonnet-4-20250514',
-                    'claude-3-5-haiku-20241022',
-                    'gpt-5',
-                    'gpt-4o',
-                    'o3',
-                    'claude-opus-4-1-20250805'
-                ],
+                'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
             },
             {
@@ -174,14 +170,7 @@ CONFIG_SECTIONS = [
                 'type': 'select',
                 'default': 'claude-sonnet-4-20250514',
                 'description': 'Model for rewriting emails to match your style. Opus-4 (highest quality) best for tone matching. Sonnet-4 (balanced), Haiku (fast, cheap), GPT-4o (balanced), GPT-5 (expensive), o3 (reasoning, very expensive)',
-                'options': [
-                    'claude-sonnet-4-20250514',
-                    'claude-3-5-haiku-20241022',
-                    'gpt-5',
-                    'gpt-4o',
-                    'o3',
-                    'claude-opus-4-1-20250805'
-                ],
+                'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
             },
             {
@@ -205,14 +194,7 @@ CONFIG_SECTIONS = [
                 'type': 'select',
                 'default': 'gpt-4o',
                 'description': 'Model for calendar analysis and meeting scheduling. GPT-4o (balanced) or o3 (reasoning, expensive) work well. Sonnet-4 (balanced), Haiku (fast, cheap), GPT-5 (expensive), Opus-4 (highest quality, most expensive)',
-                'options': [
-                    'claude-sonnet-4-20250514',
-                    'claude-3-5-haiku-20241022',
-                    'gpt-5',
-                    'gpt-4o',
-                    'o3',
-                    'claude-opus-4-1-20250805'
-                ],
+                'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
             },
             {
@@ -236,14 +218,7 @@ CONFIG_SECTIONS = [
                 'type': 'select',
                 'default': 'claude-sonnet-4-20250514',
                 'description': 'Model for analyzing email drafts and providing quality feedback. o3 (reasoning, expensive) best for analysis. Opus-4 (highest quality, most expensive), Sonnet-4 (balanced), GPT-5 (expensive), GPT-4o (balanced), Haiku (fast, cheap)',
-                'options': [
-                    'claude-sonnet-4-20250514',
-                    'claude-3-5-haiku-20241022',
-                    'gpt-5',
-                    'gpt-4o',
-                    'o3',
-                    'claude-opus-4-1-20250805'
-                ],
+                'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
             },
             {
@@ -403,10 +378,38 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'system_info',
-        'label': 'System Information',
-        'description': 'Current configuration and status (read-only)',
+        'key': 'agent_identity',
+        'label': 'Agent Identity',
+        'description': 'Agent identification and operational status',
         'fields': [
+            {
+                'key': 'agent_name',
+                'label': 'Agent Name',
+                'type': 'text',
+                'default': 'executive-ai-assistant',
+                'readonly': True,
+                'description': 'Internal agent identifier',
+                'required': True
+            },
+            {
+                'key': 'agent_display_name',
+                'label': 'Display Name',
+                'type': 'text',
+                'default': 'Executive AI Assistant',
+                'readonly': True,
+                'description': 'Human-readable agent name',
+                'required': True
+            },
+            {
+                'key': 'agent_description',
+                'label': 'Description',
+                'type': 'textarea',
+                'default': 'AI-powered executive assistant for email management, scheduling, and task automation',
+                'readonly': True,
+                'description': 'Agent capabilities and purpose',
+                'rows': 3,
+                'required': True
+            },
             {
                 'key': 'agent_status',
                 'label': 'Agent Status',
@@ -415,15 +418,6 @@ CONFIG_SECTIONS = [
                 'description': 'Executive AI Assistant operational status',
                 'options': ['active', 'disabled'],
                 'required': True
-            },
-            {
-                'key': 'config_location',
-                'label': 'Configuration Source',
-                'type': 'text',
-                'readonly': True,
-                'default': 'eaia/main/config.yaml',
-                'description': 'Location of the main configuration file (read-only)',
-                'required': False
             }
         ]
     }

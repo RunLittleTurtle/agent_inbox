@@ -12,7 +12,7 @@ The config system follows a clear hierarchy:
 
 **Key Principle**: The config.py acts as the bridge - it reads from .env, while UI and prompts read from config.py.
 
-The config system provides a web UI at `http://localhost:3004/config` for managing agent settings.
+The config system provides a modern web UI at `http://localhost:3004` for managing agent settings with a sophisticated card-based interface organized into 7 visual categories.
 
 ## Core Components
 
@@ -49,9 +49,11 @@ src/your_agent/
 ### 3. Config App Integration
 
 The config app (located at `config-app/`) provides:
-- Web UI for editing agent configurations
-- API endpoints for reading/writing config values
+- Modern card-based web UI with 7 distinct card types for different configuration categories
+- Automatic card type selection and visual grouping
+- API endpoints for reading/writing config values with real-time updates
 - Two-way sync between UI and Python files
+- Color-coded categories with visual headers for better organization
 
 ## Step-by-Step Setup
 
@@ -84,14 +86,25 @@ MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER_google_gmail"  # Your MCP server env var
 
 ### Step 2: Set Up UI Configuration Schema
 
-Edit `ui_config.py` to define the configuration interface:
+Edit `ui_config.py` to define the configuration interface. The config app uses a **smart 7-category card system** that automatically selects the appropriate card type:
 
 ```python
+# Import standardized LLM model options - centrally managed
+# This list is shared across all agents for consistency
+STANDARD_LLM_MODEL_OPTIONS = [
+    'claude-sonnet-4-20250514',
+    'claude-3-5-haiku-20241022',
+    'gpt-5',
+    'gpt-4o',
+    'o3',
+    'claude-opus-4-1-20250805'
+]
+
 CONFIG_SECTIONS = [
     {
-        'key': 'agent_identity',
+        'key': 'agent_identity',  # → Grey AgentIdentityCard (Category 1)
         'label': 'Agent Identity',
-        'description': 'Basic agent information',
+        'description': 'Agent identification and status',
         'fields': [
             {
                 'key': 'agent_display_name',
@@ -110,18 +123,29 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'llm',
+        'key': 'user_preferences',  # → Grey AgentIdentityCard (Category 2)
+        'label': 'User Preferences',
+        'description': 'Personal settings and preferences',
+        'fields': [
+            {
+                'key': 'timezone',
+                'label': 'Timezone',
+                'type': 'select',
+                'options': ['global', 'America/New_York', 'America/Los_Angeles', 'Europe/London'],
+                'required': True
+            }
+        ]
+    },
+    {
+        'key': 'llm',  # → Blue LLMCard with model icons (Category 3)
         'label': 'Language Model',
+        'description': 'AI model configuration for agent operations',
         'fields': [
             {
                 'key': 'model',
                 'label': 'Model',
                 'type': 'select',
-                'options': [
-                    'claude-sonnet-4-20250514',
-                    'claude-3-5-sonnet-20241022',
-                    'gpt-4o'
-                ],
+                'options': STANDARD_LLM_MODEL_OPTIONS,  # Uses centralized list
                 'required': True
             },
             {
@@ -133,23 +157,59 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'mcp_integration',
-        'label': 'MCP Configuration',
+        'key': 'prompt_templates',  # → Orange PromptCard (Category 4)
+        'label': 'System Prompts',
+        'description': 'Customize agent behavior through system prompts',
+        'card_style': 'orange',  # Explicit style hint for orange cards
+        'fields': [
+            {
+                'key': 'agent_system_prompt',
+                'label': 'System Prompt',
+                'type': 'textarea',
+                'rows': 15,
+                'required': True,
+                'description': 'Main system prompt that defines agent behavior'
+            }
+        ]
+    },
+    {
+        'key': 'api_credentials',  # → Yellow CredentialsCard (Category 5)
+        'label': 'API Credentials',
+        'description': 'API keys and authentication',
+        'fields': [
+            {
+                'key': 'service_api_key',
+                'label': 'Service API Key',
+                'type': 'password',  # Password type triggers credentials card
+                'envVar': 'SERVICE_API_KEY',  # Links to .env file
+                'required': False,
+                'description': 'API key for external service'
+            }
+        ]
+    },
+    {
+        'key': 'mcp_integration',  # → Green MCPConfigCard (Category 6)
+        'label': 'MCP Server Configuration',
+        'description': 'API connection settings for external services',
         'fields': [
             {
                 'key': 'mcp_env_var',
                 'label': 'MCP Environment Variable',
                 'type': 'text',
-                'description': 'Name of the environment variable containing the MCP server URL',
+                'readonly': True,  # Shows which env var is used
+                'description': 'Name of the environment variable containing the MCP server URL (read-only)',
                 'placeholder': 'PIPEDREAM_MCP_SERVER_google_gmail',
-                'required': False
+                'required': False,
+                'note': 'This shows which environment variable is used. Configured in agent code.'
             },
             {
                 'key': 'mcp_server_url',
-                'label': 'Current MCP Server URL',
+                'label': 'MCP Server URL',
                 'type': 'text',
-                'readOnly': True,
-                'description': 'The MCP server URL from the environment variable (read-only)'
+                'description': 'The MCP server URL (editable - updates .env file)',
+                'placeholder': 'https://mcp.pipedream.net/xxx/google_gmail',
+                'required': False,
+                'note': 'Editing this updates the URL in your .env file'
             }
         ]
     }
@@ -157,12 +217,32 @@ CONFIG_SECTIONS = [
 ```
 
 **Field Types Available:**
-- `text` - Text input
-- `textarea` - Multi-line text
-- `password` - Hidden text input
-- `number` - Numeric input with validation
+- `text` - Text input with optional copy button
+- `textarea` - Multi-line text (auto-expands based on content)
+- `password` - Hidden text input with show/hide toggle and copy button
+- `number` - Numeric input with min/max/step validation
 - `boolean` - Toggle switch
-- `select` - Dropdown with options
+- `select` - Dropdown with options (includes icons for LLM models)
+
+### Card System Architecture (7 Categories)
+
+The config app automatically selects card types based on section keys and organizes them into 7 visual categories:
+
+| Order | Category | Card Type | Color | Icon | Section Key Patterns |
+|-------|----------|-----------|--------|------|-----------------------|
+| 1 | **Agent Identity** | AgentIdentityCard | Grey | User | `agent_identity`, `*identity*` (not user) |
+| 2 | **User Identity & Preferences** | AgentIdentityCard | Grey | User | `user_identity`, `user_preferences` |
+| 3 | **AI Models** | LLMCard | Blue | Brain | `llm*`, `*model*` (not api) |
+| 4 | **Prompts & Instructions** | PromptCard | Orange | Edit | `*prompt*`, `*triage*`, `email_preferences`, `card_style: 'orange'` |
+| 5 | **Credentials & API Keys** | CredentialsCard | Yellow | Key | `ai_models`, `*api*`, `*credentials*`, `langgraph_system`, `google_workspace`, fields with `type: 'password'` |
+| 6 | **Integrations & Services** | MCPConfigCard | Green | Plug | `*mcp*`, `*integration*`, `*server*` |
+| 7 | **Specialized Configuration** | GenericCard | White | - | Everything else, interface UIs |
+
+**Important Notes:**
+- The order above determines the visual layout in the UI
+- Cards are grouped under category headers with matching colors
+- `ai_models` section goes to Credentials (yellow) for API keys, not LLM (blue)
+- Interface UI configs always use generic (white) cards
 
 **Important**: Only include fields that are actually implemented in your agent.
 
@@ -306,7 +386,16 @@ npm run dev:config
 
 ### Access Config UI
 
-Open `http://localhost:3004/config`
+Open `http://localhost:3004`
+
+**UI Features:**
+- **7-Category Organization** - Cards automatically grouped into 7 visual categories
+- **Smart Card Selection** - Appropriate card type chosen based on section content
+- **Color-Coded Headers** - Each category has a distinct color for visual navigation
+- **Model Performance Icons** - LLM models shown with cost/speed indicators (💨 Haiku, 🧠 Sonnet, 💻 Opus)
+- **Secure Credential Handling** - Password fields with show/hide toggles and copy buttons
+- **Live Validation** - Real-time field validation with helpful error messages
+- **Responsive Design** - Optimized for both desktop and mobile devices
 
 ### Verify Two-Way Sync
 
@@ -390,6 +479,16 @@ For fields that should update Python configuration:
 3. **Proper Validation**: Add appropriate validation constraints
 4. **Consistent Naming**: Use consistent field keys between UI and Python config
 5. **Test Everything**: Always test both reading and writing of configuration values
+6. **Card Organization**: Name sections appropriately to trigger the right card type:
+   - Use `agent_identity` for agent info → Grey card
+   - Use `user_*` prefixes for user settings → Grey card
+   - Use `llm` prefix for model configs → Blue card
+   - Use `prompt` or set `card_style: 'orange'` → Orange card
+   - Include password fields or `api`/`credentials` → Yellow card
+   - Use `mcp` or `integration` → Green card
+   - Everything else → White generic card
+7. **Use Standard Options**: Always import `STANDARD_LLM_MODEL_OPTIONS` for model lists
+8. **Group Related Fields**: Keep related settings in the same section for better UX
 
 ## UX-Optimized Field Selection Guidelines
 

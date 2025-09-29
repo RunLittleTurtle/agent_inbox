@@ -38,6 +38,7 @@ const AGENT_CONFIG_PATHS = [
   'ui_config.py',
   'interface_uis_config.py',
   'src/_react_agent_mcp_template/ui_config.py',
+  'src/multi_tool_rube_agent/ui_config.py',
   'src/calendar_agent/ui_config.py',
   'src/drive_react_agent/ui_config.py',
   'src/executive-ai-assistant/ui_config.py',

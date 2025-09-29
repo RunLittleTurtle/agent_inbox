@@ -122,3 +122,11 @@ htmlcov/
 .nox/
 coverage.xml
 *.cover
+
+# Multi-tool agent test and debug files
+src/multi_tool_rube_agent/test_*.py
+src/multi_tool_rube_agent/*_test.py
+src/multi_tool_rube_agent/*_discovery.py
+src/multi_tool_rube_agent/inspect_*.py
+src/multi_tool_rube_agent/debug_*.py
+src/multi_tool_rube_agent/supervisor_snippet_connection.md

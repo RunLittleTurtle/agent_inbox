@@ -42,10 +42,10 @@ function getCurrentEnvValues() {
 
 function getPythonConfigValues(agentId: string | null) {
   try {
-    if (agentId === '_react_agent_mcp_template') {
-      // Read values from the template's config.py
+    if (agentId === '_react_agent_mcp_template' || agentId === 'multi_tool_rube_agent') {
+      // Read values from the agent's config.py
       const projectRoot = path.join(process.cwd(), '..');
-      const configPath = path.join(projectRoot, 'src/_react_agent_mcp_template/config.py');
+      const configPath = path.join(projectRoot, `src/${agentId}/config.py`);
 
       if (fs.existsSync(configPath)) {
         const content = fs.readFileSync(configPath, 'utf8');
@@ -73,7 +73,7 @@ function getPythonConfigValues(agentId: string | null) {
         }
 
         // Read prompts from prompt.py
-        const promptPath = path.join(projectRoot, 'src/_react_agent_mcp_template/prompt.py');
+        const promptPath = path.join(projectRoot, `src/${agentId}/prompt.py`);
         let promptTemplates = {};
         if (fs.existsSync(promptPath)) {
           const promptContent = fs.readFileSync(promptPath, 'utf8');

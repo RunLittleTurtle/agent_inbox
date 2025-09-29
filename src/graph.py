@@ -164,6 +164,170 @@ async def create_job_search_agent():
             prompt=job_prompt
         )
 
+async def create_multi_tool_rube_agent():
+    """Create Multi-Tool Rube Agent with access to 500+ applications"""
+    try:
+        # Import the Multi-Tool Rube Agent configuration
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'multi_tool_rube_agent'))
+        from tools import _agent_mcp
+
+        logger.info("Creating Multi-Tool Rube Agent with Rube MCP integration...")
+
+        # Create model for the agent
+        rube_model = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
+            temperature=0,
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+            streaming=False
+        )
+
+        # Get Rube MCP tools
+        mcp_tools = await _agent_mcp.get_mcp_tools()
+
+        # Filter to useful Rube tools
+        useful_tools = [tool for tool in mcp_tools if hasattr(tool, 'name') and tool.name in {
+            'RUBE_SEARCH_TOOLS',
+            'RUBE_MULTI_EXECUTE_TOOL',
+            'RUBE_CREATE_PLAN',
+            'RUBE_MANAGE_CONNECTIONS',
+            'RUBE_REMOTE_WORKBENCH',
+            'RUBE_REMOTE_BASH_TOOL'
+        }]
+
+        logger.info(f"Found {len(useful_tools)} Rube tools: {[t.name for t in useful_tools]}")
+
+        # Create agent prompt with confirmed capabilities
+        rube_prompt = """You are the Multi-Tool Rube Agent with access to 89 tools across 10 connected applications through Rube MCP server.
+
+**CONFIRMED CAPABILITIES (89 tools available):**
+
+📧 **GMAIL** (11 tools) - Email Operations:
+- Send emails, create drafts, fetch emails, list drafts
+- Move emails to trash, search people, get attachments
+- Access user profile and email management
+
+📄 **CODA** (10 tools) - Document & Database Management:
+- List and create documents, manage tables and rows
+- Search documents, create pages, database operations
+- Collaborative document editing and data management
+
+💬 **SLACK** (8 tools) - Team Communication:
+- Find channels, send messages, fetch conversation history
+- Search messages, list channels and users
+- Workspace communication management
+
+🔧 **GITHUB** (10 tools) - Development & Collaboration:
+- Find repositories, manage branches, create pull requests
+- Merge branches, create issues, search issues/PRs
+- Code review and repository management
+
+📊 **GOOGLE SHEETS** (10 tools) - Spreadsheet Operations:
+- Search spreadsheets, manage sheets, batch updates
+- Add/delete sheets, clear values, update properties
+- Data analysis and spreadsheet automation
+
+📝 **GOOGLE DOCS** (7 tools) - Document Management:
+- Search documents, update existing documents
+- Get documents by ID, create from markdown
+- Insert text and document formatting
+
+📁 **GOOGLE DRIVE** (7 tools) - File Management:
+- Upload files, manage sharing preferences
+- Find and list files, create folders
+- File organization and collaboration
+
+📅 **GOOGLE CALENDAR** (8 tools) - Calendar Management:
+- List calendars, find free slots, create events
+- Get specific calendars, free/busy queries
+- Event scheduling and availability management
+
+📋 **NOTION** (8 tools) - Productivity & Notes:
+- Search pages, create pages, add content blocks
+- Fetch block contents, update pages, query databases
+- Knowledge management and collaboration
+
+🎯 **LINEAR** (10 tools) - Project Management:
+- Manage user profile, list projects and issues
+- Create and update issues, add comments
+- Attach files and track project progress
+
+**HOW TO USE YOUR TOOLS:**
+
+1. **RUBE_SEARCH_TOOLS** - Discover tools by use case or platform
+   - Example: Search for "gmail send email" or "coda create document"
+
+2. **RUBE_MULTI_EXECUTE_TOOL** - Execute discovered tools with parameters
+   - Always show discovered tools before executing
+   - Handle parameters based on tool requirements
+
+3. **RUBE_CREATE_PLAN** - Create multi-step workflow plans
+4. **RUBE_MANAGE_CONNECTIONS** - Check app connection status
+5. **RUBE_REMOTE_WORKBENCH** - Handle file operations
+6. **RUBE_REMOTE_BASH_TOOL** - Execute system commands if needed
+
+**WORKFLOW PATTERN:**
+1. Understand the user's specific request
+2. Use RUBE_SEARCH_TOOLS to find the right tools for the task
+3. Show the user what tools were discovered
+4. Execute using RUBE_MULTI_EXECUTE_TOOL with proper parameters
+5. Present clear results and suggest next steps
+
+**IMPORTANT GUIDELINES:**
+- Always explain what you're doing and why
+- Show discovered tools before executing them
+- Handle errors gracefully and provide alternatives
+- Ask for confirmation before destructive operations
+- Respect user privacy and data security
+- Only claim capabilities for the 10 confirmed applications above
+
+You have verified access to these 89 tools and can perform real operations across all connected applications."""
+
+        # Create the agent
+        rube_agent = create_react_agent(
+            model=rube_model,
+            tools=useful_tools,
+            name="multi_tool_rube_agent",
+            prompt=rube_prompt
+        )
+
+        logger.info("Multi-Tool Rube Agent created successfully")
+        return rube_agent
+
+    except Exception as e:
+        logger.error(f"Failed to create Multi-Tool Rube Agent: {e}")
+        logger.info("Creating fallback Multi-Tool Rube Agent...")
+
+        # Fallback agent without MCP tools
+        fallback_model = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
+            temperature=0,
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+            streaming=False
+        )
+
+        fallback_prompt = """❌ MULTI-TOOL RUBE AGENT ERROR: The Rube integration failed to initialize.
+
+**TECHNICAL ISSUE DETECTED:**
+- Rube MCP server connection failed
+- This is likely due to authentication, network, or configuration errors
+- Check the console logs for specific error details
+
+**CURRENT LIMITATIONS:**
+- ✅ I can provide general guidance about application integrations
+- ❌ I CANNOT access external applications (Gmail, Slack, etc.)
+- ❌ I CANNOT execute tools or automation workflows
+- ❌ I CANNOT manage files or data across platforms
+
+**IMMEDIATE ACTION REQUIRED:**
+Please check system logs and fix the Rube MCP server configuration before using multi-tool features."""
+
+        return create_react_agent(
+            model=fallback_model,
+            tools=[],
+            name="multi_tool_rube_agent_fallback",
+            prompt=fallback_prompt
+        )
+
 async def post_model_hook(messages, model_output=None):
     """
     post_model_hook that ensures the supervisor ends with a recap message.
@@ -216,7 +380,7 @@ async def create_supervisor_graph():
         logger.info("Creating agents...")
         calendar_agent = await create_calendar_agent()
         job_search_agent = await create_job_search_agent()
-
+        multi_tool_rube_agent = await create_multi_tool_rube_agent()
 
         logger.info("All agents created successfully")
 
@@ -246,6 +410,7 @@ AGENT CAPABILITIES:
 - ALL EMAIL TASKS → email_agent (autonomous subgraph)
 - job_search_agent: CV upload, Job Offer, Job search, resume/cover letter advice, interview prep
 - drive_agent: File management, Google Drive integration, file sharing, document collaboration
+- multi_tool_rube_agent: Multi-application tasks across Gmail, Slack, GitHub, Google Workspace, Coda, Linear, Notion, and other connected platforms
 
 ROUTING STRATEGY:
 1. ANALYZE the user's request carefully
@@ -257,6 +422,8 @@ ROUTING RULES:
 - Calendar/scheduling/appointments/meetings → calendar_agent
 - ALL EMAIL TASKS (composition, sending, management, organization, triage) → email_agent
 - Job search/career/resume/interviews/CV → job_search_agent
+- Multi-app tasks involving Slack, GitHub, Coda, Linear, Notion, Google Workspace → multi_tool_rube_agent
+- Cross-platform workflows and automation → multi_tool_rube_agent
 - General questions of the world → Only if there is no agent related, you can answer
 
 EMAIL ROUTING - IMPORTANT:
@@ -275,7 +442,7 @@ When an agent completes their task, analyze if additional routing is needed."""
 
         # Create supervisor workflow
         workflow = create_supervisor(
-            agents=[calendar_agent, job_search_agent],
+            agents=[calendar_agent, job_search_agent, multi_tool_rube_agent],
             model=supervisor_model,
             prompt=supervisor_prompt,
             supervisor_name="multi_agent_supervisor",

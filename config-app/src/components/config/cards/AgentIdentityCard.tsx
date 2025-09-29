@@ -49,7 +49,7 @@ export function AgentIdentityCard({
   };
 
   const handleFieldChange = (field: IdentityField, value: any) => {
-    onValueChange(field.key, value);
+    onValueChange(field.key, value, field.envVar);
   };
 
   const getStatusIcon = (status: string) => {

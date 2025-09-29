@@ -23,19 +23,7 @@ CONFIG_SECTIONS = [
                 'envVar': 'USER_TIMEZONE',
                 'default': 'America/Toronto',
                 'description': 'User timezone for llms context',
-                'options': [
-                    'America/Toronto',
-                    'America/Montreal',
-                    'America/New_York',
-                    'America/Los_Angeles',
-                    'America/Chicago',
-                    'Europe/London',
-                    'Europe/Paris',
-                    'Europe/Berlin',
-                    'Asia/Tokyo',
-                    'Asia/Shanghai',
-                    'Australia/Sydney'
-                ],
+                'options': STANDARD_TIMEZONE_OPTIONS,
                 'required': True
             }
         ]

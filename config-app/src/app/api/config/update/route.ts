@@ -439,9 +439,11 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
         const configData = yaml.load(yamlContent) as any || {};
 
         // Update the appropriate field based on section and field key
-        if (sectionKey === 'user_identity') {
+        if (sectionKey === 'agent_identity') {
+          // Agent identity fields like agent_status go in YAML
           configData[fieldKey] = value;
         } else if (sectionKey === 'user_preferences') {
+          // user_preferences now includes former user_identity fields
           configData[fieldKey] = value;
         } else if (sectionKey === 'email_preferences') {
           configData[fieldKey] = value;

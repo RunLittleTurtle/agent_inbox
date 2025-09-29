@@ -26,7 +26,7 @@ MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER"
 
 # LLM Configuration
 LLM_CONFIG = {
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-4-5-20250929",
     "temperature": 0.3,
     "streaming": False
 }
@@ -38,7 +38,7 @@ MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '')
 # User Preferences
 # Agent-specific timezone setting (set via config UI)
 # 'global' means use the system-wide USER_TIMEZONE from main .env
-CALENDAR_TIMEZONE = 'global'  # This will be updated by config UI
+CALENDAR_TIMEZONE = 'America/Toronto'  # This will be updated by config UI
 
 # CRITICAL: Always define USER_TIMEZONE first as a fallback
 USER_TIMEZONE = os.getenv('USER_TIMEZONE', 'America/Toronto')

@@ -23,7 +23,7 @@ load_dotenv()
 AGENT_NAME = "multi_tool_rube"  # Internal identifier
 AGENT_DISPLAY_NAME = "Multi-Tool Rube Agent"  # Human-readable name
 AGENT_DESCRIPTION = "Universal agent with access to 500+ apps through Rube MCP server"  # Description
-AGENT_STATUS = "disabled"  # active or disabled
+AGENT_STATUS = "active"  # active or disabled
 
 # Import prompts from prompt.py following LangGraph best practices
 try:
@@ -56,7 +56,7 @@ RUBE_AUTH_TOKEN = os.getenv('RUBE_AUTH_TOKEN', '')
 
 # Timezone Configuration
 # 'global' means use the system-wide USER_TIMEZONE from main .env
-TEMPLATE_TIMEZONE = 'global'  # This will be updated by config UI
+TEMPLATE_TIMEZONE = 'America/Toronto'  # This will be updated by config UI
 
 # Effective timezone: Use agent-specific if set, otherwise fall back to global
 if TEMPLATE_TIMEZONE == 'global' or not TEMPLATE_TIMEZONE:

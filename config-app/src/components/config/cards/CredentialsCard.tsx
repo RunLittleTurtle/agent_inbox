@@ -69,7 +69,7 @@ export function CredentialsCard({
   };
 
   const handleFieldChange = (field: CredentialField, value: string) => {
-    onValueChange(field.key, value);
+    onValueChange(field.key, value, field.envVar);
   };
 
   const getSecurityIcon = (field: CredentialField) => {

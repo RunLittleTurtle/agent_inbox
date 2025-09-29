@@ -58,7 +58,7 @@ export function LLMCard({
       processedValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
     }
 
-    onValueChange(field.key, processedValue);
+    onValueChange(field.key, processedValue, field.envVar);
   };
 
   const getModelIcon = (model: string) => {

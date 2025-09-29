@@ -50,7 +50,7 @@ MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '') if not any(placeholder in MCP_ENV_VA
 
 # Timezone Configuration
 # 'global' means use the system-wide USER_TIMEZONE from main .env
-TEMPLATE_TIMEZONE = 'global'  # This will be updated by config UI
+TEMPLATE_TIMEZONE = 'America/Toronto'  # This will be updated by config UI
 
 # Effective timezone: Use agent-specific if set, otherwise fall back to global
 if TEMPLATE_TIMEZONE == 'global' or not TEMPLATE_TIMEZONE:

@@ -45,7 +45,7 @@ export function PromptCard({
   };
 
   const handleFieldChange = (field: PromptField, value: string) => {
-    onValueChange(field.key, value);
+    onValueChange(field.key, value, field.envVar);
   };
 
   return (

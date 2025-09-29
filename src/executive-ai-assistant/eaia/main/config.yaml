@@ -133,3 +133,4 @@ scheduling_model: claude-sonnet-4-5-20250929
 scheduling_temperature: 0.1
 reflection_model: claude-sonnet-4-5-20250929
 reflection_temperature: 0.1
+agent_status: active

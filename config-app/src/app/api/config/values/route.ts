@@ -60,6 +60,10 @@ function getPythonConfigValues(agentId: string | null) {
         const agentNameMatch = content.match(/AGENT_NAME\s*=\s*"([^"]+)"/);
         const displayNameMatch = content.match(/AGENT_DISPLAY_NAME\s*=\s*"([^"]+)"/);
         const descriptionMatch = content.match(/AGENT_DESCRIPTION\s*=\s*"([^"]+)"/);
+        const statusMatch = content.match(/AGENT_STATUS\s*=\s*"([^"]+)"/);
+
+        // Extract timezone
+        const timezoneMatch = content.match(/TEMPLATE_TIMEZONE\s*=\s*'([^']+)'/);
 
         // Extract MCP Configuration - new simplified approach
         const mcpEnvVarMatch = content.match(/MCP_ENV_VAR\s*=\s*["']([^"']+)["']/);
@@ -100,7 +104,11 @@ function getPythonConfigValues(agentId: string | null) {
           agent_identity: {
             agent_name: agentNameMatch?.[1] || '{AGENT_NAME}',
             agent_display_name: displayNameMatch?.[1] || '{AGENT_DISPLAY_NAME}',
-            agent_description: descriptionMatch?.[1] || '{AGENT_DESCRIPTION}'
+            agent_description: descriptionMatch?.[1] || '{AGENT_DESCRIPTION}',
+            agent_status: statusMatch?.[1] || 'active'
+          },
+          user_preferences: {
+            timezone: timezoneMatch?.[1] || 'global'
           },
           mcp_integration: {
             mcp_env_var: mcpEnvVar,
@@ -318,13 +326,11 @@ function getPythonConfigValues(agentId: string | null) {
           }
 
           return {
-            user_identity: {
+            user_preferences: {
               name: configData.name || '',
               full_name: configData.full_name || '',
               email: configData.email || '',
-              background: configData.background || ''
-            },
-            user_preferences: {
+              background: configData.background || '',
               timezone: configData.timezone || 'America/Toronto',
               schedule_preferences: configData.schedule_preferences || ''
             },
@@ -363,7 +369,7 @@ function getPythonConfigValues(agentId: string | null) {
               agent_name: 'executive-ai-assistant',
               agent_display_name: 'Executive AI Assistant',
               agent_description: 'AI-powered executive assistant for email management, scheduling, and task automation',
-              agent_status: 'active'
+              agent_status: configData.agent_status || 'active'
             }
           };
         } catch (yamlError) {

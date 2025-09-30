@@ -8,6 +8,9 @@ from zoneinfo import ZoneInfo
 from typing import Dict
 from dotenv import load_dotenv
 
+# Import centralized defaults for fallback only
+from src.shared_utils import DEFAULT_LLM_MODEL, DEFAULT_STREAMING
+
 load_dotenv()
 
 # Agent Identity
@@ -25,6 +28,8 @@ from .prompt import AGENT_SYSTEM_PROMPT
 MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER"
 
 # LLM Configuration
+# NOTE: These values are updated by the config UI. Use literal values here.
+# The DEFAULT constants are imported for fallback use in code (e.g., .get() calls)
 LLM_CONFIG = {
     "model": "claude-sonnet-4-5-20250929",
     "temperature": 0.3,

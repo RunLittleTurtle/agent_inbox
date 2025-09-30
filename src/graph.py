@@ -26,6 +26,9 @@ from langchain_core.messages import HumanMessage
 # Import the global state from state.py
 from src.state import WorkflowState
 
+# Import centralized configuration constants
+from src.shared_utils import DEFAULT_LLM_MODEL
+
 # Load environment variables for LangSmith integration
 load_dotenv()
 
@@ -71,7 +74,7 @@ async def create_calendar_agent():
 
         # Use Anthropic Claude for calendar operations
         calendar_model = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
+            model=DEFAULT_LLM_MODEL,
             temperature=0,
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             streaming=False
@@ -90,7 +93,7 @@ async def create_calendar_agent():
 
         # Fallback: basic calendar agent without MCP tools
         calendar_model = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
+            model=DEFAULT_LLM_MODEL,
             temperature=0,
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             streaming=False
@@ -135,7 +138,7 @@ async def create_multi_tool_rube_agent():
 
         # Create model for the agent
         rube_model = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
+            model=DEFAULT_LLM_MODEL,
             temperature=0,
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             streaming=False
@@ -259,7 +262,7 @@ You have verified access to these 89 tools and can perform real operations acros
 
         # Fallback agent without MCP tools
         fallback_model = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
+            model=DEFAULT_LLM_MODEL,
             temperature=0,
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             streaming=False
@@ -345,7 +348,7 @@ async def create_supervisor_graph():
 
         # Create supervisor model
         supervisor_model = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
+            model=DEFAULT_LLM_MODEL,
             temperature=0,
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             streaming=False

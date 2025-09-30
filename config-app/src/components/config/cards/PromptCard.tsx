@@ -1,11 +1,13 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Info, AlertTriangle, Maximize2 } from "lucide-react";
 
 interface PromptField {
   key: string;
@@ -71,10 +73,37 @@ export function PromptCard({
           return (
             <div key={field.key} className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor={fieldId} className="flex items-center gap-2 text-orange-900 font-medium">
-                  {field.label}
-                  {field.required && <span className="text-red-500">*</span>}
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={fieldId} className="flex items-center gap-2 text-orange-900 font-medium">
+                    {field.label}
+                    {field.required && <span className="text-red-500">*</span>}
+                  </Label>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-100">
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                      <DialogHeader>
+                        <DialogTitle>{field.label}</DialogTitle>
+                        {field.description && (
+                          <DialogDescription>{field.description}</DialogDescription>
+                        )}
+                      </DialogHeader>
+                      <div className="flex-1 overflow-auto">
+                        <Textarea
+                          value={currentValue}
+                          onChange={(e) => !field.readonly && handleFieldChange(field, e.target.value)}
+                          placeholder={field.placeholder}
+                          rows={30}
+                          className={`min-h-[600px] ${field.readonly ? 'bg-orange-50 text-orange-900' : 'bg-white'} font-mono text-sm`}
+                          readOnly={field.readonly}
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <Textarea
                   id={fieldId}
                   value={currentValue}

@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { config } from 'dotenv';
 import yaml from 'js-yaml';
+import modelConstants from '../../../../../../config/model_constants.json';
 
 function getCurrentEnvValues(): Record<string, string> {
   try {
@@ -97,7 +98,7 @@ function getPythonConfigValues(agentId: string | null) {
 
         return {
           llm: {
-            model: modelMatch?.[1] || 'claude-sonnet-4-20250514',
+            model: modelMatch?.[1] || modelConstants.DEFAULT_LLM_MODEL,
             temperature: tempMatch ? parseFloat(tempMatch[1]) : 0.2,
             max_tokens: maxTokensMatch ? parseInt(maxTokensMatch[1]) : 2000,
             streaming: streamingMatch?.[1] === 'True'
@@ -142,7 +143,7 @@ function getPythonConfigValues(agentId: string | null) {
 
         return {
           llm: {
-            model: modelMatch?.[1] || 'claude-sonnet-4-20250514',
+            model: modelMatch?.[1] || modelConstants.DEFAULT_LLM_MODEL,
             temperature: tempMatch ? parseFloat(tempMatch[1]) : 0.3,
             max_tokens: maxTokensMatch ? parseInt(maxTokensMatch[1]) : 2000,
             streaming: streamingMatch?.[1] === 'True'
@@ -221,7 +222,7 @@ function getPythonConfigValues(agentId: string | null) {
             agent_status: statusMatch?.[1] || 'active'
           },
           llm: {
-            model: modelMatch?.[1] || 'claude-sonnet-4-20250514',
+            model: modelMatch?.[1] || modelConstants.DEFAULT_LLM_MODEL,
             temperature: tempMatch ? parseFloat(tempMatch[1]) : 0.3
           },
           mcp_integration: {
@@ -251,7 +252,7 @@ function getPythonConfigValues(agentId: string | null) {
 
         return {
           llm: {
-            model: modelMatch?.[1] || 'claude-sonnet-4-20250514',
+            model: modelMatch?.[1] || modelConstants.DEFAULT_LLM_MODEL,
             temperature: tempMatch ? parseFloat(tempMatch[1]) : 0.2
           }
         };
@@ -270,7 +271,7 @@ function getPythonConfigValues(agentId: string | null) {
 
         return {
           llm: {
-            model: modelMatch?.[1] || 'claude-sonnet-4-20250514',
+            model: modelMatch?.[1] || modelConstants.DEFAULT_LLM_MODEL,
             temperature: tempMatch ? parseFloat(tempMatch[1]) : 0
           }
         };
@@ -332,27 +333,27 @@ function getPythonConfigValues(agentId: string | null) {
               full_name: configData.full_name || '',
               email: configData.email || '',
               background: configData.background || '',
-              timezone: configData.timezone || 'America/Toronto',
+              timezone: configData.timezone || modelConstants.DEFAULT_TIMEZONE,
               schedule_preferences: configData.schedule_preferences || ''
             },
             llm_triage: {
-              triage_model: configData.triage_model || 'claude-3-5-haiku-20241022',
+              triage_model: configData.triage_model || modelConstants.DEFAULT_TRIAGE_MODEL,
               triage_temperature: configData.triage_temperature || 0.1
             },
             llm_draft: {
-              draft_model: configData.draft_model || 'claude-sonnet-4-20250514',
+              draft_model: configData.draft_model || modelConstants.DEFAULT_DRAFT_MODEL,
               draft_temperature: configData.draft_temperature || 0.2
             },
             llm_rewrite: {
-              rewrite_model: configData.rewrite_model || 'claude-sonnet-4-20250514',
+              rewrite_model: configData.rewrite_model || modelConstants.DEFAULT_REWRITE_MODEL,
               rewrite_temperature: configData.rewrite_temperature || 0.3
             },
             llm_scheduling: {
-              scheduling_model: configData.scheduling_model || 'gpt-4o',
+              scheduling_model: configData.scheduling_model || modelConstants.DEFAULT_SCHEDULING_MODEL,
               scheduling_temperature: configData.scheduling_temperature || 0.1
             },
             llm_reflection: {
-              reflection_model: configData.reflection_model || 'claude-sonnet-4-20250514',
+              reflection_model: configData.reflection_model || modelConstants.DEFAULT_REFLECTION_MODEL,
               reflection_temperature: configData.reflection_temperature || 0.1
             },
             email_preferences: {
@@ -398,11 +399,12 @@ export async function GET(request: NextRequest) {
       // Organize values by section as defined in ui_config.py
       const globalConfigValues = {
         user_preferences: {
-          user_timezone: envValues.USER_TIMEZONE || 'America/Toronto'
+          user_timezone: envValues.USER_TIMEZONE || modelConstants.DEFAULT_TIMEZONE
         },
         ai_models: {
           anthropic_api_key: envValues.ANTHROPIC_API_KEY || '',
-          openai_api_key: envValues.OPENAI_API_KEY || ''
+          openai_api_key: envValues.OPENAI_API_KEY || '',
+          whisper_transcription_mode: envValues.WHISPER_TRANSCRIPTION_MODE || 'api'
         },
         langgraph_system: {
           langsmith_api_key: envValues.LANGSMITH_API_KEY || '',
@@ -460,7 +462,7 @@ export async function GET(request: NextRequest) {
     const globalEnvValues = {
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? 'configured' : '',
       OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'configured' : '',
-      USER_TIMEZONE: process.env.USER_TIMEZONE || 'America/Toronto'
+      USER_TIMEZONE: process.env.USER_TIMEZONE || modelConstants.DEFAULT_TIMEZONE
     };
 
     // Merge only safe global values with agent-specific config

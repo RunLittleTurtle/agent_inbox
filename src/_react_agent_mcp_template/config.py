@@ -61,8 +61,8 @@ else:
     USER_TIMEZONE = TEMPLATE_TIMEZONE
 
 LLM_CONFIG = {
-    "model": "claude-sonnet-4-5-20250929",
-    "temperature": 0.3,
+    "model": "gpt-5",
+    "temperature": 0.1,
     "streaming": False,  # Disable streaming for LangGraph compatibility
     "api_key": os.getenv("ANTHROPIC_API_KEY")
 }

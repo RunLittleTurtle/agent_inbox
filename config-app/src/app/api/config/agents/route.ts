@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import modelConstants from '../../../../../../config/model_constants.json';
 
 interface AgentConfig {
   name: string;
@@ -63,33 +64,12 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
       return null;
     }
 
-    // Define the standard LLM model options - CENTRALIZED LIST
-    // Changing this list will update ALL agents using STANDARD_LLM_MODEL_OPTIONS
-    const STANDARD_LLM_MODEL_OPTIONS = [
-      'claude-sonnet-4-5-20250929',
-      'claude-3-5-haiku-20241022',
-      'gpt-5',
-      'gpt-4o',
-      'o3',
-      'claude-opus-4-1-20250805'
-    ];
-
-    // Define the standard timezone options - CENTRALIZED LIST
-    // Changing this list will update ALL agents using STANDARD_TIMEZONE_OPTIONS
-    const STANDARD_TIMEZONE_OPTIONS = [
-      'America/Toronto',
-      'America/New_York',
-      'America/Chicago',
-      'America/Denver',
-      'America/Los_Angeles',
-      'Europe/London',
-      'Europe/Paris',
-      'Europe/Berlin',
-      'Asia/Tokyo',
-      'Asia/Shanghai',
-      'Asia/Singapore',
-      'Australia/Sydney'
-    ];
+    // Load constants from JSON (single source of truth)
+    // To add new models/timezones, edit config/model_constants.json
+    const STANDARD_LLM_MODEL_OPTIONS = modelConstants.STANDARD_LLM_MODEL_OPTIONS;
+    const STANDARD_TIMEZONE_OPTIONS = modelConstants.STANDARD_TIMEZONE_OPTIONS;
+    const STANDARD_TEMPERATURE_OPTIONS = modelConstants.STANDARD_TEMPERATURE_OPTIONS;
+    const WHISPER_TRANSCRIPTION_OPTIONS = modelConstants.WHISPER_TRANSCRIPTION_OPTIONS;
 
     // Convert Python dict syntax to JSON (basic conversion)
     const configInfoStr = configInfoMatch[1]
@@ -114,6 +94,55 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
     configSectionsStr = configSectionsStr.replace(
       /STANDARD_TIMEZONE_OPTIONS/g,
       JSON.stringify(STANDARD_TIMEZONE_OPTIONS)
+    );
+
+    // Replace STANDARD_TEMPERATURE_OPTIONS with the actual array
+    configSectionsStr = configSectionsStr.replace(
+      /STANDARD_TEMPERATURE_OPTIONS/g,
+      JSON.stringify(STANDARD_TEMPERATURE_OPTIONS)
+    );
+
+    // Replace WHISPER_TRANSCRIPTION_OPTIONS with the actual array
+    configSectionsStr = configSectionsStr.replace(
+      /WHISPER_TRANSCRIPTION_OPTIONS/g,
+      JSON.stringify(WHISPER_TRANSCRIPTION_OPTIONS)
+    );
+
+    // Replace DEFAULT constants with their values (from JSON)
+    configSectionsStr = configSectionsStr.replace(
+      /DEFAULT_LLM_MODEL/g,
+      JSON.stringify(modelConstants.DEFAULT_LLM_MODEL)
+    );
+
+    configSectionsStr = configSectionsStr.replace(
+      /DEFAULT_TIMEZONE/g,
+      JSON.stringify(modelConstants.DEFAULT_TIMEZONE)
+    );
+
+    // Replace executive-specific DEFAULT constants (from JSON)
+    configSectionsStr = configSectionsStr.replace(
+      /DEFAULT_TRIAGE_MODEL/g,
+      JSON.stringify(modelConstants.DEFAULT_TRIAGE_MODEL)
+    );
+
+    configSectionsStr = configSectionsStr.replace(
+      /DEFAULT_DRAFT_MODEL/g,
+      JSON.stringify(modelConstants.DEFAULT_DRAFT_MODEL)
+    );
+
+    configSectionsStr = configSectionsStr.replace(
+      /DEFAULT_REWRITE_MODEL/g,
+      JSON.stringify(modelConstants.DEFAULT_REWRITE_MODEL)
+    );
+
+    configSectionsStr = configSectionsStr.replace(
+      /DEFAULT_SCHEDULING_MODEL/g,
+      JSON.stringify(modelConstants.DEFAULT_SCHEDULING_MODEL)
+    );
+
+    configSectionsStr = configSectionsStr.replace(
+      /DEFAULT_REFLECTION_MODEL/g,
+      JSON.stringify(modelConstants.DEFAULT_REFLECTION_MODEL)
     );
 
     const configInfo = JSON.parse(configInfoStr);

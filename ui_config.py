@@ -3,6 +3,12 @@ Main .env Configuration UI Schema
 Defines all global environment variables for the config UI
 """
 
+# Import centralized configuration constants
+from src.shared_utils import (
+    STANDARD_TIMEZONE_OPTIONS,
+    DEFAULT_TIMEZONE
+)
+
 CONFIG_INFO = {
     'name': 'Global Environment',
     'description': 'Core system-wide configuration and API keys',
@@ -21,7 +27,7 @@ CONFIG_SECTIONS = [
                 'label': 'Timezone',
                 'type': 'select',
                 'envVar': 'USER_TIMEZONE',
-                'default': 'America/Toronto',
+                'default': DEFAULT_TIMEZONE,
                 'description': 'User timezone for llms context',
                 'options': STANDARD_TIMEZONE_OPTIONS,
                 'required': True
@@ -49,6 +55,17 @@ CONFIG_SECTIONS = [
                 'envVar': 'OPENAI_API_KEY',
                 'description': 'API key for GPT models (backup)',
                 'placeholder': 'sk-proj-...'
+            },
+            {
+                'key': 'whisper_transcription_mode',
+                'label': 'Voice Transcription Mode',
+                'type': 'select',
+                'envVar': 'WHISPER_TRANSCRIPTION_MODE',
+                'options': WHISPER_TRANSCRIPTION_OPTIONS,
+                'default': 'api',
+                'description': 'API: Fast cloud transcription (recommended). Browser: Downloads 450MB model once, works offline.',
+                'note': 'Browser mode downloads model on first use (~1-2 min). Persists in browser cache across sessions.',
+                'warning': 'If browser cache is cleared, you may need to re-download the model or switch back to API mode.'
             }
         ]
     },

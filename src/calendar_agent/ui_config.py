@@ -3,12 +3,14 @@ Calendar Agent UI Configuration Schema
 Optimized configuration for calendar agent settings
 """
 
-# STANDARD OPTIONS LISTS
-# These are Python placeholders that get replaced by TypeScript at runtime
-# The ACTUAL master list is defined in: config-app/src/app/api/config/agents/route.ts
-# That TypeScript file replaces these variable names with the actual arrays when parsing
-STANDARD_LLM_MODEL_OPTIONS = []
-STANDARD_TIMEZONE_OPTIONS = []
+# Import centralized configuration constants
+from src.shared_utils import (
+    STANDARD_LLM_MODEL_OPTIONS,
+    STANDARD_TIMEZONE_OPTIONS,
+    STANDARD_TEMPERATURE_OPTIONS,
+    DEFAULT_LLM_MODEL,
+    DEFAULT_TIMEZONE
+)
 
 CONFIG_INFO = {
     'name': 'Calendar Agent',
@@ -71,7 +73,7 @@ CONFIG_SECTIONS = [
                 'key': 'timezone',
                 'label': 'Timezone',
                 'type': 'select',
-                'default': 'America/Toronto',
+                'default': DEFAULT_TIMEZONE,
                 'description': 'Your timezone for accurate scheduling and communication',
                 'placeholder': 'Select timezone',
                 'options': STANDARD_TIMEZONE_OPTIONS
@@ -111,7 +113,7 @@ CONFIG_SECTIONS = [
                 'key': 'model',
                 'label': 'Model Name',
                 'type': 'select',
-                'default': 'claude-sonnet-4-20250514',
+                'default': DEFAULT_LLM_MODEL,
                 'description': 'Primary AI model for calendar tasks',
                 'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
@@ -119,10 +121,9 @@ CONFIG_SECTIONS = [
             {
                 'key': 'temperature',
                 'label': 'Temperature',
-                'type': 'number',
-                'default': 0.3,
-                'description': 'Response creativity (0=focused, 1=creative)',
-                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
+                'type': 'select',
+                'options': STANDARD_TEMPERATURE_OPTIONS,
+                'description': 'Response creativity (0=focused, 1=creative)'
             }
         ]
     },

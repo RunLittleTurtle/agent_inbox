@@ -30,6 +30,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from utils.llm_utils import get_llm
+from src.shared_utils import DEFAULT_LLM_MODEL
 
 
 # Local LangGraph imports
@@ -62,7 +63,7 @@ class CalendarAgentWithMCP:
         if model:
             self.model = model
         else:
-            model_name = LLM_CONFIG.get("model", "claude-sonnet-4-5-20250929")
+            model_name = LLM_CONFIG.get("model", DEFAULT_LLM_MODEL)
             temperature = LLM_CONFIG.get("temperature", 0.1)
             self.model = get_llm(model_name, temperature=temperature)
 

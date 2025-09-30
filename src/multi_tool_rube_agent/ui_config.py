@@ -10,12 +10,14 @@ React Agent MCP Template UI Configuration Schema
 This file defines the configuration interface schema for the Next.js configuration UI.
 """
 
-# STANDARD OPTIONS LISTS
-# These are Python placeholders that get replaced by TypeScript at runtime
-# The ACTUAL master list is defined in: config-app/src/app/api/config/agents/route.ts
-# That TypeScript file replaces these variable names with the actual arrays when parsing
-STANDARD_LLM_MODEL_OPTIONS = []
-STANDARD_TIMEZONE_OPTIONS = []
+# Import centralized configuration constants
+from src.shared_utils import (
+    STANDARD_LLM_MODEL_OPTIONS,
+    STANDARD_TIMEZONE_OPTIONS,
+    STANDARD_TEMPERATURE_OPTIONS,
+    DEFAULT_LLM_MODEL,
+    DEFAULT_TIMEZONE
+)
 
 CONFIG_INFO = {
     'name': 'Multi-Tool Rube Agent',
@@ -78,7 +80,7 @@ CONFIG_SECTIONS = [
                 'key': 'model',
                 'label': 'Model Name',
                 'type': 'select',
-                'default': 'claude-sonnet-4-20250514',
+                'default': DEFAULT_LLM_MODEL,
                 'description': 'Primary AI model for agent tasks',
                 'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True,
@@ -87,10 +89,9 @@ CONFIG_SECTIONS = [
             {
                 'key': 'temperature',
                 'label': 'Temperature',
-                'type': 'number',
-                'default': 0.2,
-                'description': 'Model creativity level (0.0 = focused, 1.0 = creative)',
-                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
+                'type': 'select',
+                'options': STANDARD_TEMPERATURE_OPTIONS,
+                'description': 'Response creativity (0=focused, 1=creative)'
             }
         ]
     },
@@ -103,7 +104,7 @@ CONFIG_SECTIONS = [
                 'key': 'timezone',
                 'label': 'Timezone',
                 'type': 'select',
-                'default': 'America/Toronto',
+                'default': DEFAULT_TIMEZONE,
                 'description': 'Your timezone for accurate scheduling and communication',
                 'options': STANDARD_TIMEZONE_OPTIONS,
                 'required': True
@@ -188,7 +189,7 @@ def get_current_config():
                 'agent_description': 'Universal agent with access to 500+ apps through Rube MCP server'
             },
             'llm': {
-                'model': 'claude-sonnet-4-20250514',
+                'model': DEFAULT_LLM_MODEL,
                 'temperature': 0.2,
                 'max_tokens': 2000
             },

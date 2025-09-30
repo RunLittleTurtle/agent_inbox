@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Cpu, Zap, Brain, DollarSign } from "lucide-react";
+import { Info, AlertTriangle, Cpu, Zap, Brain, DollarSign, Thermometer } from "lucide-react";
+import modelConstants from '../../../../../config/model_constants.json';
 
 interface LLMField {
   key: string;
@@ -62,7 +63,10 @@ export function LLMCard({
     onValueChange(field.key, processedValue, field.envVar);
   };
 
-  const getModelIcon = (model: string) => {
+  const getModelIcon = (model: unknown) => {
+    // Type guard: ensure model is a string
+    if (typeof model !== 'string') return <Cpu className="h-4 w-4 text-gray-500" />;
+
     if (model.includes('haiku')) return <Zap className="h-4 w-4 text-green-500" />;
     if (model.includes('sonnet')) return <Brain className="h-4 w-4 text-blue-500" />;
     if (model.includes('opus')) return <Cpu className="h-4 w-4 text-purple-500" />;
@@ -72,16 +76,29 @@ export function LLMCard({
     return <Cpu className="h-4 w-4 text-gray-500" />;
   };
 
-  const getModelDescription = (model: string) => {
-    const descriptions: Record<string, string> = {
-      'claude-3-5-haiku-20241022': 'Fast, cost-effective for simple tasks',
-      'claude-sonnet-4-20250514': 'Balanced performance and cost',
-      'claude-opus-4-1-20250805': 'Highest quality, most expensive',
-      'gpt-4o': 'Balanced performance, good reasoning',
-      'gpt-5': 'Advanced capabilities, expensive',
-      'o3': 'Specialized reasoning, very expensive'
-    };
+  const getModelDescription = (model: unknown) => {
+    // Type guard: ensure model is a string
+    if (typeof model !== 'string') return 'AI language model';
+
+    // Load descriptions from JSON (single source of truth)
+    const descriptions: Record<string, string> = modelConstants.MODEL_DESCRIPTIONS as Record<string, string>;
     return descriptions[model] || 'AI language model';
+  };
+
+  const getTemperatureDescription = (temp: unknown) => {
+    // Type guard: ensure temp is a number
+    if (typeof temp !== 'number' && typeof temp !== 'string') return '';
+
+    // Convert to string for lookup
+    const tempStr = String(temp);
+
+    // Load descriptions from JSON (single source of truth)
+    const descriptions: Record<string, string> = (modelConstants as any).TEMPERATURE_DESCRIPTIONS as Record<string, string>;
+    return descriptions[tempStr] || '';
+  };
+
+  const isTemperatureField = (field: LLMField) => {
+    return field.key.toLowerCase().includes('temperature');
   };
 
   const getContextRecommendation = () => {
@@ -136,16 +153,22 @@ export function LLMCard({
                     onValueChange={(value) => handleFieldChange(field, value)}
                   >
                     <SelectTrigger className="bg-white border-blue-300 focus:border-blue-400 focus:ring-blue-400">
-                      <SelectValue placeholder="Select a model" />
+                      <SelectValue placeholder={isTemperatureField(field) ? "Select temperature" : "Select a model"} />
                     </SelectTrigger>
                     <SelectContent>
                       {field.options?.map((option) => (
                         <SelectItem key={option} value={option}>
                           <div className="flex items-center gap-2">
-                            {getModelIcon(option)}
+                            {isTemperatureField(field) ? (
+                              <Thermometer className="h-4 w-4 text-orange-500" />
+                            ) : (
+                              getModelIcon(option)
+                            )}
                             <span>{option}</span>
                             <span className="text-xs text-gray-500 ml-2">
-                              {getModelDescription(option)}
+                              {isTemperatureField(field)
+                                ? getTemperatureDescription(option)
+                                : getModelDescription(option)}
                             </span>
                           </div>
                         </SelectItem>

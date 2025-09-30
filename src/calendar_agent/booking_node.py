@@ -19,12 +19,18 @@ load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langchain-mcp-adapters'))
 
+# Add project root to Python path for imports
+from pathlib import Path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_anthropic import ChatAnthropic
 from langgraph.graph import MessagesState
 from langgraph.types import interrupt, Command
 from pydantic import BaseModel, Field
 
+from src.shared_utils import DEFAULT_LLM_MODEL
 
 from .state import BookingRequest
 from .execution_result import ExecutionStatus
@@ -49,7 +55,7 @@ class BookingNode:
         from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
         self.booking_tools = booking_tools
         self.model = model or ChatAnthropic(
-            model=LLM_CONFIG.get("model", "claude-3-5-sonnet-20241022"),
+            model=LLM_CONFIG.get("model", DEFAULT_LLM_MODEL),
             temperature=LLM_CONFIG.get("temperature", 0.1),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY")
         )

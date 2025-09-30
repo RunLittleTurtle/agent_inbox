@@ -14,12 +14,19 @@ React Agent MCP Template UI Configuration Schema
 This file defines the configuration interface schema for the Next.js configuration UI.
 """
 
-# STANDARD OPTIONS LISTS
-# These are Python placeholders that get replaced by TypeScript at runtime
-# The ACTUAL master list is defined in: config-app/src/app/api/config/agents/route.ts
-# That TypeScript file replaces these variable names with the actual arrays when parsing
-STANDARD_LLM_MODEL_OPTIONS = []
-STANDARD_TIMEZONE_OPTIONS = []
+# Import centralized configuration constants
+from src.shared_utils import (
+    STANDARD_LLM_MODEL_OPTIONS,
+    STANDARD_TIMEZONE_OPTIONS,
+    STANDARD_TEMPERATURE_OPTIONS,
+    DEFAULT_LLM_MODEL,
+    DEFAULT_TIMEZONE,
+    DEFAULT_TRIAGE_MODEL,
+    DEFAULT_DRAFT_MODEL,
+    DEFAULT_REWRITE_MODEL,
+    DEFAULT_SCHEDULING_MODEL,
+    DEFAULT_REFLECTION_MODEL
+)
 
 CONFIG_INFO = {
     'name': 'Executive AI Assistant',
@@ -71,7 +78,7 @@ CONFIG_SECTIONS = [
                 'key': 'timezone',
                 'label': 'Timezone',
                 'type': 'select',
-                'default': 'America/Toronto',
+                'default': DEFAULT_TIMEZONE,
                 'description': 'Your timezone for accurate scheduling and communication',
                 'options': STANDARD_TIMEZONE_OPTIONS,
                 'required': True
@@ -96,7 +103,7 @@ CONFIG_SECTIONS = [
                 'key': 'triage_model',
                 'label': 'Triage Model',
                 'type': 'select',
-                'default': 'claude-3-5-haiku-20241022',
+                'default': DEFAULT_TRIAGE_MODEL,
                 'description': 'Model for email categorization. Haiku (fast, cheap) works well for this simple task. Sonnet-4 (balanced), GPT-4o (balanced), GPT-5 (expensive), o3 (reasoning, very expensive), Opus-4 (highest quality, most expensive)',
                 'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
@@ -104,10 +111,10 @@ CONFIG_SECTIONS = [
             {
                 'key': 'triage_temperature',
                 'label': 'Temperature',
-                'type': 'number',
-                'default': 0.1,
-                'description': 'Model creativity (0.0 = very focused for consistent categorization)',
-                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
+                'type': 'select',
+                'options': STANDARD_TEMPERATURE_OPTIONS,
+                'description': 'Model creativity (lower = more focused and consistent)',
+                'required': True
             }
         ]
     },
@@ -120,7 +127,7 @@ CONFIG_SECTIONS = [
                 'key': 'draft_model',
                 'label': 'Draft Model',
                 'type': 'select',
-                'default': 'claude-sonnet-4-20250514',
+                'default': DEFAULT_DRAFT_MODEL,
                 'description': 'Model for drafting email responses. Sonnet-4 (balanced, good price) recommended. Haiku (fast, cheap), GPT-4o (balanced), GPT-5 (expensive), o3 (reasoning, very expensive), Opus-4 (highest quality, most expensive)',
                 'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
@@ -128,10 +135,10 @@ CONFIG_SECTIONS = [
             {
                 'key': 'draft_temperature',
                 'label': 'Temperature',
-                'type': 'number',
-                'default': 0.2,
-                'description': 'Model creativity (0.2 = balanced for professional emails)',
-                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
+                'type': 'select',
+                'options': STANDARD_TEMPERATURE_OPTIONS,
+                'description': 'Model creativity (lower = more focused and consistent)',
+                'required': True
             }
         ]
     },
@@ -144,7 +151,7 @@ CONFIG_SECTIONS = [
                 'key': 'rewrite_model',
                 'label': 'Rewrite Model',
                 'type': 'select',
-                'default': 'claude-sonnet-4-20250514',
+                'default': DEFAULT_REWRITE_MODEL,
                 'description': 'Model for rewriting emails to match your style. Opus-4 (highest quality) best for tone matching. Sonnet-4 (balanced), Haiku (fast, cheap), GPT-4o (balanced), GPT-5 (expensive), o3 (reasoning, very expensive)',
                 'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
@@ -152,10 +159,10 @@ CONFIG_SECTIONS = [
             {
                 'key': 'rewrite_temperature',
                 'label': 'Temperature',
-                'type': 'number',
-                'default': 0.3,
-                'description': 'Model creativity (0.3 = more creative for natural tone adaptation)',
-                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
+                'type': 'select',
+                'options': STANDARD_TEMPERATURE_OPTIONS,
+                'description': 'Model creativity (lower = more focused and consistent)',
+                'required': True
             }
         ]
     },
@@ -168,7 +175,7 @@ CONFIG_SECTIONS = [
                 'key': 'scheduling_model',
                 'label': 'Scheduling Model',
                 'type': 'select',
-                'default': 'gpt-4o',
+                'default': DEFAULT_SCHEDULING_MODEL,
                 'description': 'Model for calendar analysis and meeting scheduling. GPT-4o (balanced) or o3 (reasoning, expensive) work well. Sonnet-4 (balanced), Haiku (fast, cheap), GPT-5 (expensive), Opus-4 (highest quality, most expensive)',
                 'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
@@ -176,10 +183,10 @@ CONFIG_SECTIONS = [
             {
                 'key': 'scheduling_temperature',
                 'label': 'Temperature',
-                'type': 'number',
-                'default': 0.1,
-                'description': 'Model creativity (0.1 = focused for accurate calendar analysis)',
-                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
+                'type': 'select',
+                'options': STANDARD_TEMPERATURE_OPTIONS,
+                'description': 'Model creativity (lower = more focused and consistent)',
+                'required': True
             }
         ]
     },
@@ -192,7 +199,7 @@ CONFIG_SECTIONS = [
                 'key': 'reflection_model',
                 'label': 'Reflection Model',
                 'type': 'select',
-                'default': 'claude-sonnet-4-20250514',
+                'default': DEFAULT_REFLECTION_MODEL,
                 'description': 'Model for analyzing email drafts and providing quality feedback. o3 (reasoning, expensive) best for analysis. Opus-4 (highest quality, most expensive), Sonnet-4 (balanced), GPT-5 (expensive), GPT-4o (balanced), Haiku (fast, cheap)',
                 'options': STANDARD_LLM_MODEL_OPTIONS,
                 'required': True
@@ -200,10 +207,10 @@ CONFIG_SECTIONS = [
             {
                 'key': 'reflection_temperature',
                 'label': 'Temperature',
-                'type': 'number',
-                'default': 0.1,
-                'description': 'Model creativity (0.1 = analytical and focused for email quality assessment)',
-                'validation': {'min': 0.0, 'max': 1.0, 'step': 0.1}
+                'type': 'select',
+                'options': STANDARD_TEMPERATURE_OPTIONS,
+                'description': 'Model creativity (lower = more focused and consistent)',
+                'required': True
             }
         ]
     },
@@ -431,7 +438,7 @@ def get_current_config():
                 'agent_description': 'Template for creating new MCP-based agents'
             },
             'llm': {
-                'model': 'claude-sonnet-4-20250514',
+                'model': DEFAULT_LLM_MODEL,
                 'temperature': 0.2,
                 'max_tokens': 2000
             },

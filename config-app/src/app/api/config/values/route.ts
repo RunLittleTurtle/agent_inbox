@@ -4,7 +4,7 @@ import path from 'path';
 import { config } from 'dotenv';
 import yaml from 'js-yaml';
 
-function getCurrentEnvValues() {
+function getCurrentEnvValues(): Record<string, string> {
   try {
     // Get the project root - go up from config-app directory to main project
     const projectRoot = path.join(process.cwd(), '..');
@@ -29,11 +29,12 @@ function getCurrentEnvValues() {
         }
       });
 
-      // Merge with process.env, preferring fresh file values
-      return { ...process.env, ...envVars };
+      // Return fresh file values only - no need to merge with process.env
+      // since we only need user-defined values from .env (API keys, MCP URLs, etc.)
+      return envVars;
     }
 
-    return process.env;
+    return {};
   } catch (error) {
     console.error('Error reading .env file:', error);
     return {};
@@ -73,7 +74,7 @@ function getPythonConfigValues(agentId: string | null) {
         // Only get the URL if we have a valid env var name (not a placeholder)
         if (mcpEnvVar && !mcpEnvVar.includes('{')) {
           const envValues = getCurrentEnvValues();
-          mcpServerUrl = envValues[mcpEnvVar as string] || '';
+          mcpServerUrl = envValues[mcpEnvVar] || '';
         }
 
         // Read prompts from prompt.py

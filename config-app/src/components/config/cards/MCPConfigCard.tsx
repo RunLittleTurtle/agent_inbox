@@ -20,6 +20,7 @@ interface MCPField {
   warning?: string;
   envVar?: string;
   showCopyButton?: boolean;
+  default?: any;
 }
 
 interface MCPConfigCardProps {

@@ -102,19 +102,27 @@ export default function ConfigPage() {
         setLoading(true);
         setError(null);
 
+        console.log('[ConfigPage] Starting to load configuration...');
+
         // Load agents first
+        console.log('[ConfigPage] Fetching agents from /api/config/agents');
         const agentsResponse = await fetchWithRetry('/api/config/agents');
         const agentsData = await agentsResponse.json();
+
+        console.log('[ConfigPage] Loaded', agentsData.agents?.length || 0, 'agents');
         setAgents(agentsData.agents);
 
         // Load values for the current selection
         const agentId = showMainMenu ? null : selectedAgent;
+        console.log('[ConfigPage] Loading values for agentId:', agentId);
         await loadAgentValues(agentId);
 
+        console.log('[ConfigPage] Configuration loaded successfully');
       } catch (err) {
-        console.error('Error loading configuration:', err);
+        console.error('[ConfigPage] Error loading configuration:', err);
         setError(err instanceof Error ? err.message : 'Failed to load configuration');
       } finally {
+        console.log('[ConfigPage] Setting loading to false');
         setLoading(false);
       }
     };
@@ -188,12 +196,9 @@ export default function ConfigPage() {
         description: `${fieldKey} has been updated successfully.`,
       });
 
-      // Small delay to ensure file write is complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Refresh values from server to ensure UI shows saved state
-      const agentId = showMainMenu ? null : selectedAgent;
-      await loadAgentValues(agentId);
+      // Don't reload values immediately after update to avoid race conditions
+      // The optimistic update (lines 145-164) already updated local state
+      // Values will be reloaded when user switches agents or explicitly refreshes
 
     } catch (error) {
       console.error('Error updating configuration:', error);

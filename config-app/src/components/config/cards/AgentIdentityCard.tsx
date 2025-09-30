@@ -22,6 +22,7 @@ interface IdentityField {
   note?: string;
   warning?: string;
   default?: any;
+  envVar?: string;
 }
 
 interface AgentIdentityCardProps {
@@ -29,7 +30,7 @@ interface AgentIdentityCardProps {
   description: string;
   fields: IdentityField[];
   values: Record<string, any>;
-  onValueChange: (fieldKey: string, value: any) => void;
+  onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
 }
 

@@ -126,11 +126,11 @@ memory: true
 triage_model: claude-sonnet-4-5-20250929
 triage_temperature: 0.1
 draft_model: claude-sonnet-4-5-20250929
-draft_temperature: 0.4
+draft_temperature: 0.2
 rewrite_model: claude-sonnet-4-5-20250929
-rewrite_temperature: 0.3
+rewrite_temperature: 0.2
 scheduling_model: claude-sonnet-4-5-20250929
-scheduling_temperature: 0.1
+scheduling_temperature: 0
 reflection_model: claude-sonnet-4-5-20250929
-reflection_temperature: 0.1
+reflection_temperature: 0.3
 agent_status: active

@@ -18,6 +18,8 @@ interface PromptField {
   rows?: number;
   note?: string;
   warning?: string;
+  default?: any;
+  envVar?: string;
 }
 
 interface PromptCardProps {
@@ -25,7 +27,7 @@ interface PromptCardProps {
   description: string;
   fields: PromptField[];
   values: Record<string, any>;
-  onValueChange: (fieldKey: string, value: any) => void;
+  onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
 }
 

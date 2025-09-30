@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+"use client";
+
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,11 +9,6 @@ const inter = Inter({
   preload: true,
   display: "swap",
 });
-
-export const metadata: Metadata = {
-  title: "Agent Configuration - Agent Inbox",
-  description: "Configure agents and environment settings",
-};
 
 export default function RootLayout({
   children,

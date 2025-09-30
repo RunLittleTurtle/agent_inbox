@@ -898,8 +898,11 @@ def start(
         config_process = subprocess.Popen(["npm", "run", "dev:config"], env=config_env)
 
         console.print(f"[green]✅ Configuration UI starting on port {config_port}[/green]")
-        console.print("[blue]💭 Waiting for all UIs to initialize...[/blue]")
-        time.sleep(8)  # Give all services time to start
+        console.print("[blue]💭 Waiting for all UIs to compile and initialize...[/blue]")
+        console.print("[yellow]   Note: First compile may take 30-45 seconds...[/yellow]")
+
+        # Wait longer for Next.js to compile client components
+        time.sleep(30)  # Increased wait time for client component compilation
 
         # Step 7: Open all UIs in the correct order
         console.print("[blue]📋 Step 7: Opening all UIs in correct order...[/blue]")

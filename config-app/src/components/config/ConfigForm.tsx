@@ -26,6 +26,7 @@ interface ConfigField {
   validation?: any;
   note?: string;
   warning?: string;
+  rows?: number;
 }
 
 interface ConfigSection {

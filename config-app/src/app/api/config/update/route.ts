@@ -53,7 +53,7 @@ function updateEnvVariable(envVar: string, value: any) {
   }
 }
 
-function updateConfigFile(configPath: string, sectionKey: string, fieldKey: string, value: any) {
+async function updateConfigFile(configPath: string, sectionKey: string, fieldKey: string, value: any) {
   try {
     // Get the project root - go up from config-app directory to main project
     const projectRoot = path.join(process.cwd(), '..');
@@ -511,6 +511,11 @@ function updateConfigFile(configPath: string, sectionKey: string, fieldKey: stri
         });
 
         fs.writeFileSync(configYamlPath, updatedYaml, 'utf8');
+
+        // Add delay to ensure file system has fully flushed the YAML write
+        // This prevents stale reads when frontend reloads immediately after
+        await new Promise(resolve => setTimeout(resolve, 150));
+
         console.log(`Successfully updated ${fieldKey} in ${configYamlPath}`);
         return true;
 
@@ -553,7 +558,7 @@ export async function POST(request: NextRequest) {
     } else if (configPath) {
       // Otherwise, update the config file directly
       console.log(`Updating config file: ${configPath}, ${sectionKey}.${fieldKey} = ${value}`);
-      success = updateConfigFile(configPath, sectionKey, fieldKey, value);
+      success = await updateConfigFile(configPath, sectionKey, fieldKey, value);
     } else {
       console.error(`No config path provided for agent: ${agentId}`);
       success = false;

@@ -20,7 +20,7 @@ export function AgentInbox<
   const [_selectedInbox, setSelectedInbox] =
     React.useState<ThreadStatusWithAll>("interrupted");
   const { saveScrollPosition, restoreScrollPosition } = useScrollPosition();
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null!) as React.RefObject<HTMLDivElement>;
 
   const selectedThreadIdParam = searchParams.get(VIEW_STATE_THREAD_QUERY_PARAM);
   const isStateViewOpen = !!selectedThreadIdParam;

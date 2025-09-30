@@ -20,6 +20,7 @@ interface CredentialField {
   warning?: string;
   default?: any;
   showCopyButton?: boolean;
+  envVar?: string;
 }
 
 interface CredentialsCardProps {
@@ -27,7 +28,7 @@ interface CredentialsCardProps {
   description: string;
   fields: CredentialField[];
   values: Record<string, any>;
-  onValueChange: (fieldKey: string, value: any) => void;
+  onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
 }
 

@@ -23,6 +23,7 @@ interface LLMField {
   default?: any;
   note?: string;
   warning?: string;
+  envVar?: string;
 }
 
 interface LLMCardProps {
@@ -30,7 +31,7 @@ interface LLMCardProps {
   description: string;
   fields: LLMField[];
   values: Record<string, any>;
-  onValueChange: (fieldKey: string, value: any) => void;
+  onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
   context?: 'triage' | 'draft' | 'rewrite' | 'scheduling' | 'reflection' | 'general';
 }

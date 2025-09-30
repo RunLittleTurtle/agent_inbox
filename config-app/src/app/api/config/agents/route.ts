@@ -69,7 +69,6 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
     const STANDARD_LLM_MODEL_OPTIONS = modelConstants.STANDARD_LLM_MODEL_OPTIONS;
     const STANDARD_TIMEZONE_OPTIONS = modelConstants.STANDARD_TIMEZONE_OPTIONS;
     const STANDARD_TEMPERATURE_OPTIONS = modelConstants.STANDARD_TEMPERATURE_OPTIONS;
-    const WHISPER_TRANSCRIPTION_OPTIONS = modelConstants.WHISPER_TRANSCRIPTION_OPTIONS;
 
     // Convert Python dict syntax to JSON (basic conversion)
     const configInfoStr = configInfoMatch[1]
@@ -100,12 +99,6 @@ function parseConfigFile(filePath: string): AgentConfigData | null {
     configSectionsStr = configSectionsStr.replace(
       /STANDARD_TEMPERATURE_OPTIONS/g,
       JSON.stringify(STANDARD_TEMPERATURE_OPTIONS)
-    );
-
-    // Replace WHISPER_TRANSCRIPTION_OPTIONS with the actual array
-    configSectionsStr = configSectionsStr.replace(
-      /WHISPER_TRANSCRIPTION_OPTIONS/g,
-      JSON.stringify(WHISPER_TRANSCRIPTION_OPTIONS)
     );
 
     // Replace DEFAULT constants with their values (from JSON)

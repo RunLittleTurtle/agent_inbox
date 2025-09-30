@@ -11,10 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
-import {
-  useSpeechTranscription,
-  TranscriptionMode,
-} from "@/hooks/use-speech-transcription";
+import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
 import {
   Tooltip,
   TooltipContent,
@@ -22,13 +19,14 @@ import {
   TooltipTrigger,
 } from "./tooltip";
 
+// Configuration URL (same as sidebar configuration button)
+const CONFIG_URL = "http://localhost:3004";
+
 export interface VoiceRecorderProps {
   onTranscription: (text: string) => void;
   onError?: (error: string) => void;
   className?: string;
   disabled?: boolean;
-  transcriptionMode?: TranscriptionMode;
-  preferOpenAI?: boolean;
 }
 
 export function VoiceRecorder({
@@ -36,8 +34,6 @@ export function VoiceRecorder({
   onError,
   className,
   disabled = false,
-  transcriptionMode = "auto",
-  preferOpenAI = true,
 }: VoiceRecorderProps) {
   const {
     isRecording,
@@ -58,12 +54,7 @@ export function VoiceRecorder({
     progress: modelLoadProgress,
     transcribe,
     isModelReady,
-    currentMode,
-    availableModes,
-  } = useSpeechTranscription({
-    mode: transcriptionMode,
-    preferOpenAI,
-  });
+  } = useSpeechTranscription();
 
   const [recordingState, setRecordingState] = useState<
     "idle" | "recording" | "processing" | "transcribing"
@@ -186,7 +177,18 @@ export function VoiceRecorder({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            Loading speech recognition model... {modelLoadProgress}%
+            <div className="flex flex-col gap-1">
+              <span>Downloading browser model... {modelLoadProgress}%</span>
+              <span className="text-xs text-muted-foreground">~450MB, persists in cache</span>
+              <a
+                href={CONFIG_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 underline text-xs"
+              >
+                Switch to API mode →
+              </a>
+            </div>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -269,9 +271,19 @@ export function VoiceRecorder({
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          {!isModelReady
-            ? `Loading speech recognition (${currentMode || "auto"})...`
-            : `Voice recording (${currentMode}) - French/English supported`}
+          {transcriptionError === 'API_KEY_MISSING'
+            ? (<div className="flex flex-col gap-1">
+                <span>OpenAI API key not configured</span>
+                <a
+                  href={CONFIG_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 underline text-sm"
+                >
+                  Configure now →
+                </a>
+              </div>)
+            : 'Voice recording - French/English supported'}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

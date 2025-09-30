@@ -23,7 +23,6 @@
   ],
   "STANDARD_TEMPERATURE_OPTIONS": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
   "STANDARD_AGENT_STATUS_OPTIONS": ["active", "disabled"],
-  "WHISPER_TRANSCRIPTION_OPTIONS": ["api", "browser"],
   "MODEL_DESCRIPTIONS": {
     "claude-sonnet-4-5-20250929": "The best overall model - Expensive",
     "claude-3-5-haiku-20241022": "Fast, cost-effective for simple tasks",

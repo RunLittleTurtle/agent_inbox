@@ -1,8 +1,17 @@
 import { useState, useCallback } from "react";
-import {
-  TranscriptionResult,
-  TranscriptionState,
-} from "./use-whisper-transcription";
+
+export interface TranscriptionState {
+  isLoading: boolean;
+  isModelLoading: boolean;
+  error: string | null;
+  progress: number;
+}
+
+export interface TranscriptionResult {
+  text: string;
+  language?: string;
+  confidence?: number;
+}
 
 export interface UseOpenAITranscriptionReturn extends TranscriptionState {
   transcribe: (audioBlob: Blob) => Promise<TranscriptionResult | null>;
@@ -50,9 +59,22 @@ export function useOpenAITranscription(): UseOpenAITranscriptionReturn {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || `Transcription API error: ${response.status}`,
-          );
+          const errorMessage = errorData.error || `Transcription API error: ${response.status}`;
+
+          // Check if this is an API key configuration error
+          const isConfigError = errorMessage.includes('API key') || errorMessage.includes('not configured');
+
+          if (isConfigError) {
+            // Return null for config errors to allow graceful fallback or user messaging
+            setState((prev) => ({
+              ...prev,
+              isLoading: false,
+              error: 'API_KEY_MISSING', // Special error code
+            }));
+            return null;
+          }
+
+          throw new Error(errorMessage);
         }
 
         const result = await response.json();

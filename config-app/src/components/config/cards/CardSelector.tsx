@@ -70,11 +70,13 @@ function GenericCard({ section, values, onValueChange }: {
   };
 
   const getCurrentValue = (field: ConfigField) => {
-    if (field.envVar && values[field.envVar] !== undefined) {
-      return values[field.envVar];
-    }
+    // First check the nested section structure (e.g., values.ai_models.openai_api_key)
     if (values[section.key]?.[field.key] !== undefined) {
       return values[section.key][field.key];
+    }
+    // Fallback to flat envVar structure (e.g., values.OPENAI_API_KEY)
+    if (field.envVar && values[field.envVar] !== undefined) {
+      return values[field.envVar];
     }
     return field.default || '';
   };

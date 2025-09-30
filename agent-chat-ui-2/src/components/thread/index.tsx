@@ -260,7 +260,24 @@ export function Thread() {
   }, []);
 
   const handleVoiceError = useCallback((error: string) => {
-    toast.error(`Voice recording error: ${error}`);
+    // Show helpful message with config link for API key errors
+    if (error === 'API_KEY_MISSING') {
+      toast.error(
+        <div className="flex flex-col gap-2">
+          <span>OpenAI API key not configured</span>
+          <a
+            href="http://localhost:3004"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline text-sm"
+          >
+            Configure API key →
+          </a>
+        </div>
+      );
+    } else {
+      toast.error(`Voice recording error: ${error}`);
+    }
   }, []);
 
   const chatStarted = !!threadId || !!messages.length;
@@ -516,8 +533,6 @@ export function Thread() {
                           onTranscription={handleVoiceTranscription}
                           onError={handleVoiceError}
                           disabled={isLoading}
-                          transcriptionMode="auto"
-                          preferOpenAI={true}
                         />
                         <Label
                           htmlFor="file-input"

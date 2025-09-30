@@ -403,8 +403,7 @@ export async function GET(request: NextRequest) {
         },
         ai_models: {
           anthropic_api_key: envValues.ANTHROPIC_API_KEY || '',
-          openai_api_key: envValues.OPENAI_API_KEY || '',
-          whisper_transcription_mode: envValues.WHISPER_TRANSCRIPTION_MODE || 'api'
+          openai_api_key: envValues.OPENAI_API_KEY || ''
         },
         langgraph_system: {
           langsmith_api_key: envValues.LANGSMITH_API_KEY || '',

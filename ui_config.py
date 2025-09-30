@@ -53,19 +53,8 @@ CONFIG_SECTIONS = [
                 'label': 'OpenAI API Key',
                 'type': 'password',
                 'envVar': 'OPENAI_API_KEY',
-                'description': 'API key for GPT models (backup)',
+                'description': 'API key for GPT models and voice transcription',
                 'placeholder': 'sk-proj-...'
-            },
-            {
-                'key': 'whisper_transcription_mode',
-                'label': 'Voice Transcription Mode',
-                'type': 'select',
-                'envVar': 'WHISPER_TRANSCRIPTION_MODE',
-                'options': WHISPER_TRANSCRIPTION_OPTIONS,
-                'default': 'api',
-                'description': 'API: Fast cloud transcription (recommended). Browser: Downloads 450MB model once, works offline.',
-                'note': 'Browser mode downloads model on first use (~1-2 min). Persists in browser cache across sessions.',
-                'warning': 'If browser cache is cleared, you may need to re-download the model or switch back to API mode.'
             }
         ]
     },

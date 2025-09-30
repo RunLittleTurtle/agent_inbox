@@ -147,21 +147,16 @@ export default function ConfigPage() {
       [changeKey]: { sectionKey, fieldKey, value, envVar }
     }));
 
-    // Update both envVar and nested structure for immediate UI feedback
-    if (envVar) {
-      setConfigValues(prev => ({
-        ...prev,
-        [envVar]: value
-      }));
-    } else {
-      setConfigValues(prev => ({
-        ...prev,
-        [sectionKey]: {
-          ...(prev[sectionKey] || {}),
-          [fieldKey]: value
-        }
-      }));
-    }
+    // Update nested structure for immediate UI feedback (always)
+    setConfigValues(prev => ({
+      ...prev,
+      [sectionKey]: {
+        ...(prev[sectionKey] || {}),
+        [fieldKey]: value
+      },
+      // Also update flat envVar structure if provided (for backward compatibility)
+      ...(envVar ? { [envVar]: value } : {})
+    }));
 
     try {
       // Send update to server

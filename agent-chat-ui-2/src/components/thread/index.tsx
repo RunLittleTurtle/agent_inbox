@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useStreamContext } from "@/providers/Stream";
@@ -45,6 +45,7 @@ import {
   ArtifactTitle,
   useArtifactContext,
 } from "./artifact";
+import { VoiceRecorder } from "../ui/voice-recorder";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -249,6 +250,18 @@ export function Thread() {
       streamResumable: true,
     });
   };
+
+  // Voice transcription handlers
+  const handleVoiceTranscription = useCallback((text: string) => {
+    setInput((prev) => {
+      const newText = prev ? `${prev} ${text}` : text;
+      return newText;
+    });
+  }, []);
+
+  const handleVoiceError = useCallback((error: string) => {
+    toast.error(`Voice recording error: ${error}`);
+  }, []);
 
   const chatStarted = !!threadId || !!messages.length;
   const hasNoAIOrToolMessages = !messages.find(
@@ -499,6 +512,13 @@ export function Thread() {
                             </Label>
                           </div>
                         </div>
+                        <VoiceRecorder
+                          onTranscription={handleVoiceTranscription}
+                          onError={handleVoiceError}
+                          disabled={isLoading}
+                          transcriptionMode="auto"
+                          preferOpenAI={true}
+                        />
                         <Label
                           htmlFor="file-input"
                           className="flex cursor-pointer items-center gap-2"

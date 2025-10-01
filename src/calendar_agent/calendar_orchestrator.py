@@ -30,7 +30,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from utils.llm_utils import get_llm
-from src.shared_utils import DEFAULT_LLM_MODEL
+from shared_utils import DEFAULT_LLM_MODEL
 
 
 # Local LangGraph imports

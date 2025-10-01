@@ -25,10 +25,10 @@ from langchain_core.messages import HumanMessage
 
 
 # Import the global state from state.py
-from src.state import WorkflowState
+from state import WorkflowState
 
 # Import centralized configuration constants
-from src.shared_utils import DEFAULT_LLM_MODEL
+from shared_utils import DEFAULT_LLM_MODEL
 
 # Load environment variables for LangSmith integration
 load_dotenv()
@@ -144,7 +144,7 @@ async def create_calendar_agent(config: Optional[RunnableConfig] = None):
     # Get user-specific API keys (or fallback to .env for local dev)
     api_keys = get_api_keys_from_config(config)
 
-    from src.calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
+    from calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
 
     # Create model with user's API key
     calendar_model = ChatAnthropic(

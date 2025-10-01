@@ -9,7 +9,7 @@ from typing import Dict
 from dotenv import load_dotenv
 
 # Import centralized defaults for fallback only
-from src.shared_utils import DEFAULT_LLM_MODEL, DEFAULT_STREAMING
+from shared_utils import DEFAULT_LLM_MODEL, DEFAULT_STREAMING
 
 load_dotenv()
 

@@ -30,7 +30,7 @@ from langgraph.graph import MessagesState
 from langgraph.types import interrupt, Command
 from pydantic import BaseModel, Field
 
-from src.shared_utils import DEFAULT_LLM_MODEL
+from shared_utils import DEFAULT_LLM_MODEL
 
 from .state import BookingRequest
 from .execution_result import ExecutionStatus

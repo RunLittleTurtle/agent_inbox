@@ -11,7 +11,7 @@ This file defines the configuration interface schema for the Next.js configurati
 """
 
 # Import centralized configuration constants
-from src.shared_utils import (
+from shared_utils import (
     STANDARD_LLM_MODEL_OPTIONS,
     STANDARD_TIMEZONE_OPTIONS,
     STANDARD_TEMPERATURE_OPTIONS,

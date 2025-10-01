@@ -17,8 +17,9 @@ import logging
 from dotenv import load_dotenv
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 
@@ -67,100 +68,150 @@ def get_current_context():
             "timezone_name": "UTC"
         }
 
-async def create_calendar_agent():
-    """Create calendar agent with graceful fallback handling"""
-    try:
-        from src.calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
+def get_api_keys_from_config(config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
+    """Extract API keys from config.configurable or fallback to environment variables.
 
-        # Use Anthropic Claude for calendar operations
-        calendar_model = ChatAnthropic(
-            model=DEFAULT_LLM_MODEL,
-            temperature=0,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            streaming=False
-        )
+    Multi-Tenant Production Pattern (LangGraph Platform 2025):
+    - API keys are passed via config.configurable on every request
+    - Each user's keys are injected by the frontend API route
+    - LangGraph Platform automatically propagates config through the graph
 
-        # Create calendar agent instance with MCP integration
-        calendar_agent_instance = CalendarAgentWithMCP(model=calendar_model)
-        await calendar_agent_instance.initialize()
+    Local Development Fallback:
+    - Falls back to .env variables when config is None
+    - Allows local testing without mocking config
 
-        logger.info("Calendar agent with MCP integration initialized successfully")
-        return await calendar_agent_instance.get_agent()
+    Args:
+        config: RunnableConfig with configurable dict containing user-specific keys
 
-    except Exception as e:
-        logger.error(f"Failed to create calendar agent with MCP: {e}")
-        logger.info("Creating fallback calendar agent without MCP tools")
+    Returns:
+        Dict with openai_api_key, anthropic_api_key, and user_id
 
-        # Fallback: basic calendar agent without MCP tools
-        calendar_model = ChatAnthropic(
-            model=DEFAULT_LLM_MODEL,
-            temperature=0,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            streaming=False
-        )
+    Raises:
+        EnvironmentError: If in production and keys are missing from config
+    """
+    # Check if we have config with configurable keys (production multi-tenant mode)
+    if config and "configurable" in config:
+        configurable = config["configurable"]
 
-        fallback_prompt = """❌ CALENDAR AGENT ERROR: The calendar agent failed to initialize properly.
+        # Extract keys from config (user-specific)
+        openai_key = configurable.get("openai_api_key")
+        anthropic_key = configurable.get("anthropic_api_key")
+        user_id = configurable.get("user_id", "unknown_user")
 
-        **TECHNICAL ISSUE DETECTED:**
-        - MCP calendar tools could not be loaded
-        - This is likely due to configuration, API key, or import errors
-        - Check the console logs for specific error details
+        # In production, require at least one API key
+        if not openai_key and not anthropic_key:
+            error_msg = f"Production mode: No API keys provided in config for user {user_id}"
+            logger.error(error_msg)
+            raise EnvironmentError(error_msg)
 
-        **CURRENT LIMITATIONS:**
-        - ✅ I can provide general scheduling advice
-        - ❌ I CANNOT access your actual Google Calendar
-        - ❌ I CANNOT create, modify, or view real calendar events
-        - ❌ I CANNOT check availability or book meetings
+        logger.info(f"Multi-tenant mode: Using API keys from config for user: {user_id}")
 
-        **IMMEDIATE ACTION REQUIRED:**
-        Please check system logs and fix the calendar agent configuration before using calendar features."""
+        return {
+            "openai_api_key": openai_key or os.getenv("OPENAI_API_KEY"),
+            "anthropic_api_key": anthropic_key or os.getenv("ANTHROPIC_API_KEY"),
+            "user_id": user_id,
+        }
 
-        return create_react_agent(
-            model=calendar_model,
-            tools=[],
-            name="calendar_agent_fallback",
-            prompt=fallback_prompt
-        )
+    # Fallback to environment variables (local development)
+    logger.info("Local development mode: Using API keys from .env")
+
+    openai_key = os.getenv("OPENAI_API_KEY")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+
+    if not openai_key and not anthropic_key:
+        error_msg = "Local development: No API keys found in environment variables"
+        logger.error(error_msg)
+        raise EnvironmentError(error_msg)
+
+    return {
+        "openai_api_key": openai_key,
+        "anthropic_api_key": anthropic_key,
+        "user_id": "local_dev_user",
+    }
+
+async def create_calendar_agent(config: Optional[RunnableConfig] = None):
+    """Create calendar agent with MCP integration (multi-tenant).
+
+    Args:
+        config: RunnableConfig with user-specific API keys in configurable dict
+
+    Returns:
+        Calendar agent graph with MCP tools
+
+    Raises:
+        Exception: Clear error if MCP connection or initialization fails
+    """
+    # Get user-specific API keys (or fallback to .env for local dev)
+    api_keys = get_api_keys_from_config(config)
+
+    from src.calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
+
+    # Create model with user's API key
+    calendar_model = ChatAnthropic(
+        model=DEFAULT_LLM_MODEL,
+        temperature=0,
+        anthropic_api_key=api_keys["anthropic_api_key"],
+        streaming=False
+    )
+
+    # Create calendar agent instance with MCP integration
+    calendar_agent_instance = CalendarAgentWithMCP(model=calendar_model)
+    await calendar_agent_instance.initialize()
+
+    logger.info(f"Calendar agent initialized for user: {api_keys['user_id']}")
+    return await calendar_agent_instance.get_agent()
 
 
 
 
 
 
-async def create_multi_tool_rube_agent():
-    """Create Multi-Tool Rube Agent with access to 500+ applications"""
-    try:
-        # Import the Multi-Tool Rube Agent configuration
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'multi_tool_rube_agent'))
-        from tools import _agent_mcp
+async def create_multi_tool_rube_agent(config: Optional[RunnableConfig] = None):
+    """Create Multi-Tool Rube Agent with access to 500+ applications (multi-tenant).
 
-        logger.info("Creating Multi-Tool Rube Agent with Rube MCP integration...")
+    Args:
+        config: RunnableConfig with user-specific API keys in configurable dict
 
-        # Create model for the agent
-        rube_model = ChatAnthropic(
-            model=DEFAULT_LLM_MODEL,
-            temperature=0,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            streaming=False
-        )
+    Returns:
+        Multi-Tool Rube agent with MCP tools
 
-        # Get Rube MCP tools
-        mcp_tools = await _agent_mcp.get_mcp_tools()
+    Raises:
+        Exception: Clear error if Rube MCP connection fails
+    """
+    # Get user-specific API keys (or fallback to .env for local dev)
+    api_keys = get_api_keys_from_config(config)
 
-        # Filter to useful Rube tools
-        useful_tools = [tool for tool in mcp_tools if hasattr(tool, 'name') and tool.name in {
-            'RUBE_SEARCH_TOOLS',
-            'RUBE_MULTI_EXECUTE_TOOL',
-            'RUBE_CREATE_PLAN',
-            'RUBE_MANAGE_CONNECTIONS',
-            'RUBE_REMOTE_WORKBENCH',
-            'RUBE_REMOTE_BASH_TOOL'
-        }]
+    # Import the Multi-Tool Rube Agent configuration
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'multi_tool_rube_agent'))
+    from tools import _agent_mcp
 
-        logger.info(f"Found {len(useful_tools)} Rube tools: {[t.name for t in useful_tools]}")
+    logger.info(f"Creating Multi-Tool Rube Agent for user: {api_keys['user_id']}...")
 
-        # Create agent prompt with confirmed capabilities
-        rube_prompt = """You are the Multi-Tool Rube Agent with access to 89 tools across 10 connected applications through Rube MCP server.
+    # Create model with user's API key
+    rube_model = ChatAnthropic(
+        model=DEFAULT_LLM_MODEL,
+        temperature=0,
+        anthropic_api_key=api_keys["anthropic_api_key"],
+        streaming=False
+    )
+
+    # Get Rube MCP tools
+    mcp_tools = await _agent_mcp.get_mcp_tools()
+
+    # Filter to useful Rube tools
+    useful_tools = [tool for tool in mcp_tools if hasattr(tool, 'name') and tool.name in {
+        'RUBE_SEARCH_TOOLS',
+        'RUBE_MULTI_EXECUTE_TOOL',
+        'RUBE_CREATE_PLAN',
+        'RUBE_MANAGE_CONNECTIONS',
+        'RUBE_REMOTE_WORKBENCH',
+        'RUBE_REMOTE_BASH_TOOL'
+    }]
+
+    logger.info(f"Found {len(useful_tools)} Rube tools for user {api_keys['user_id']}: {[t.name for t in useful_tools]}")
+
+    # Create agent prompt with confirmed capabilities
+    rube_prompt = """You are the Multi-Tool Rube Agent with access to 89 tools across 10 connected applications through Rube MCP server.
 
 **CONFIRMED CAPABILITIES (89 tools available):**
 
@@ -245,51 +296,16 @@ async def create_multi_tool_rube_agent():
 
 You have verified access to these 89 tools and can perform real operations across all connected applications."""
 
-        # Create the agent
-        rube_agent = create_react_agent(
-            model=rube_model,
-            tools=useful_tools,
-            name="multi_tool_rube_agent",
-            prompt=rube_prompt
-        )
+    # Create the agent
+    rube_agent = create_react_agent(
+        model=rube_model,
+        tools=useful_tools,
+        name="multi_tool_rube_agent",
+        prompt=rube_prompt
+    )
 
-        logger.info("Multi-Tool Rube Agent created successfully")
-        return rube_agent
-
-    except Exception as e:
-        logger.error(f"Failed to create Multi-Tool Rube Agent: {e}")
-        logger.info("Creating fallback Multi-Tool Rube Agent...")
-
-        # Fallback agent without MCP tools
-        fallback_model = ChatAnthropic(
-            model=DEFAULT_LLM_MODEL,
-            temperature=0,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            streaming=False
-        )
-
-        fallback_prompt = """❌ MULTI-TOOL RUBE AGENT ERROR: The Rube integration failed to initialize.
-
-**TECHNICAL ISSUE DETECTED:**
-- Rube MCP server connection failed
-- This is likely due to authentication, network, or configuration errors
-- Check the console logs for specific error details
-
-**CURRENT LIMITATIONS:**
-- ✅ I can provide general guidance about application integrations
-- ❌ I CANNOT access external applications (Gmail, Slack, etc.)
-- ❌ I CANNOT execute tools or automation workflows
-- ❌ I CANNOT manage files or data across platforms
-
-**IMMEDIATE ACTION REQUIRED:**
-Please check system logs and fix the Rube MCP server configuration before using multi-tool features."""
-
-        return create_react_agent(
-            model=fallback_model,
-            tools=[],
-            name="multi_tool_rube_agent_fallback",
-            prompt=fallback_prompt
-        )
+    logger.info(f"Multi-Tool Rube Agent created successfully for user: {api_keys['user_id']}")
+    return rube_agent
 
 async def post_model_hook(messages, model_output=None):
     """
@@ -333,32 +349,46 @@ def validate_environment():
 
     logger.info("Environment validation passed")
 
-async def create_supervisor_graph():
-    """Create multi-agent supervisor with improved error handling"""
-    try:
-        # Validate environment first
+async def create_supervisor_graph(config: Optional[RunnableConfig] = None):
+    """Create multi-agent supervisor with multi-tenant support.
+
+    Args:
+        config: RunnableConfig with user-specific API keys in configurable dict
+
+    Returns:
+        Compiled supervisor graph
+
+    Raises:
+        Exception: Clear error if agent creation or graph compilation fails
+    """
+    # Get user-specific API keys (or fallback to .env for local dev)
+    api_keys = get_api_keys_from_config(config)
+
+    # Validate environment only in local dev mode (no config provided)
+    if not config or not config.get("configurable"):
+        logger.info("Local development mode: Validating environment variables")
         validate_environment()
 
-        # Create agents with individual error handling
-        logger.info("Creating agents...")
-        calendar_agent = await create_calendar_agent()
-        multi_tool_rube_agent = await create_multi_tool_rube_agent()
+    # Create agents with user-specific config
+    logger.info(f"Creating agents for user: {api_keys['user_id']}...")
+    calendar_agent = await create_calendar_agent(config)
+    multi_tool_rube_agent = await create_multi_tool_rube_agent(config)
 
-        logger.info("All agents created successfully")
+    logger.info(f"All agents created successfully for user: {api_keys['user_id']}")
 
-        # Create supervisor model
-        supervisor_model = ChatAnthropic(
-            model=DEFAULT_LLM_MODEL,
-            temperature=0,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            streaming=False
-        )
+    # Create supervisor model with user's API key
+    supervisor_model = ChatAnthropic(
+        model=DEFAULT_LLM_MODEL,
+        temperature=0,
+        anthropic_api_key=api_keys["anthropic_api_key"],
+        streaming=False
+    )
 
-        # Get dynamic context
-        context = get_current_context()
+    # Get dynamic context
+    context = get_current_context()
 
-        # Improved supervisor prompt with clearer instructions
-        supervisor_prompt = f"""You are a team supervisor dispatching requests and managing specialized agents.
+    # Improved supervisor prompt with clearer instructions
+    supervisor_prompt = f"""You are a team supervisor dispatching requests and managing specialized agents.
 
 CURRENT CONTEXT:
 - Today: {datetime.fromisoformat(context['current_time']).strftime("%Y-%m-%d")} at {datetime.fromisoformat(context['current_time']).strftime("%I:%M %p")}
@@ -400,48 +430,57 @@ CRITICAL GUIDELINES:
 
 When an agent completes their task, analyze if additional routing is needed."""
 
-        # Create supervisor workflow
-        workflow = create_supervisor(
-            agents=[calendar_agent, multi_tool_rube_agent],
-            model=supervisor_model,
-            prompt=supervisor_prompt,
-            supervisor_name="multi_agent_supervisor",
-            output_mode="last_message",
-            add_handoff_back_messages=True,
-            post_model_hook=post_model_hook,
-        )
+    # Create supervisor workflow
+    workflow = create_supervisor(
+        agents=[calendar_agent, multi_tool_rube_agent],
+        model=supervisor_model,
+        prompt=supervisor_prompt,
+        supervisor_name="multi_agent_supervisor",
+        output_mode="last_message",
+        add_handoff_back_messages=True,
+        post_model_hook=post_model_hook,
+    )
 
-        # Compile the workflow
-        compiled_graph = workflow.compile(name="multi_agent_system")
-        logger.info("Multi-agent supervisor created successfully")
-        return compiled_graph
+    # Compile the workflow
+    compiled_graph = workflow.compile(name="multi_agent_system")
+    logger.info(f"Multi-agent supervisor created successfully for user: {api_keys['user_id']}")
+    return compiled_graph
 
-    except Exception as e:
-        logger.error(f"Failed to create supervisor graph: {e}")
-        raise
+async def make_graph(config: Optional[RunnableConfig] = None):
+    """Factory function for LangGraph Platform with multi-tenant support.
 
-async def make_graph():
-    """Factory function for LangGraph server integration with error handling"""
-    try:
-        graph_instance = await create_supervisor_graph()
-        logger.info("Graph creation completed successfully")
-        return graph_instance
-    except Exception as e:
-        logger.error(f"Graph creation failed: {e}")
-        raise
+    This function is called by LangGraph Platform on every request.
+    The config parameter is automatically injected with user-specific data.
 
-def create_graph():
-    """Synchronous graph factory with proper error handling"""
-    try:
-        return asyncio.run(make_graph())
-    except Exception as e:
-        logger.error(f"Synchronous graph creation failed: {e}")
-        raise
+    Args:
+        config: RunnableConfig with user API keys (injected by LangGraph Platform)
 
-# Create graph instance with error handling
-try:
-    graph = create_graph()
-    logger.info("Graph initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize graph: {e}")
-    graph = None
+    Returns:
+        Compiled graph instance
+
+    Raises:
+        Exception: Clear error if graph creation fails
+    """
+    graph_instance = await create_supervisor_graph(config)
+    logger.info("Graph creation completed successfully")
+    return graph_instance
+
+def create_graph(config: Optional[RunnableConfig] = None):
+    """Synchronous graph factory for local development.
+
+    Args:
+        config: Optional RunnableConfig (None for local dev, injected in production)
+
+    Returns:
+        Compiled graph instance
+
+    Raises:
+        Exception: Clear error if graph creation fails
+    """
+    return asyncio.run(make_graph(config))
+
+# Export graph for LangGraph Platform
+# In local dev: Uses .env keys
+# In production: LangGraph Platform injects config per request
+graph = create_graph()
+logger.info("Graph initialized successfully for export")

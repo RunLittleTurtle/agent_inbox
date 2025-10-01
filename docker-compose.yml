@@ -1,0 +1,43 @@
+# LangGraph Platform Local Development Stack
+# Based on: https://github.com/langchain-ai/langchain-academy/blob/main/module-6/deployment/docker-compose-example.yml
+#
+# This provides Postgres + Redis for local LangGraph development
+# Run `langgraph dev` separately after starting these services
+#
+# Usage:
+#   docker-compose up -d        # Start services in background
+#   docker-compose ps           # Check health status
+#   docker-compose logs -f      # View logs
+#   docker-compose down         # Stop services
+
+volumes:
+    langgraph-data:
+        driver: local
+
+services:
+    langgraph-redis:
+        image: redis:6
+        healthcheck:
+            test: redis-cli ping
+            interval: 5s
+            timeout: 1s
+            retries: 5
+        ports:
+            - "6379:6379"
+
+    langgraph-postgres:
+        image: postgres:16
+        ports:
+            - "5432:5432"
+        environment:
+            POSTGRES_DB: postgres
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+        volumes:
+            - langgraph-data:/var/lib/postgresql/data
+        healthcheck:
+            test: pg_isready -U postgres
+            start_period: 10s
+            timeout: 1s
+            retries: 5
+            interval: 5s

@@ -37,10 +37,11 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Add local libraries to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph_supervisor-py'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langchain-mcp-adapters'))
+# Local dev only - uses git submodules from library/
+# In deployment, these packages come from requirements.txt (pip-installed from PyPI)
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph'))
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langgraph_supervisor-py'))
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../library/langchain-mcp-adapters'))
 
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic

@@ -15,14 +15,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Add local libraries to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langchain-mcp-adapters'))
-
-# Add project root to Python path for imports
-from pathlib import Path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+# Local dev only - uses git submodules from library/
+# In deployment, these packages come from requirements.txt (pip-installed from PyPI)
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langchain-mcp-adapters'))
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_anthropic import ChatAnthropic

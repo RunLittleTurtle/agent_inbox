@@ -11,17 +11,26 @@ import json
 from pathlib import Path
 
 # Load constants from JSON (single source of truth)
-# For LangGraph Platform: config/ must be inside src/ directory
-_CONFIG_PATH = Path(__file__).parent.parent / "config" / "model_constants.json"
+# Dual-path loading: supports both deployment (src/config/) and local dev (root config/)
+_CONFIG_PATH_DEPLOYMENT = Path(__file__).parent.parent / "config" / "model_constants.json"
+_CONFIG_PATH_LOCAL = Path(__file__).parent.parent.parent / "config" / "model_constants.json"
+
+# Try deployment path first (LangGraph Platform), fall back to local dev path
+if _CONFIG_PATH_DEPLOYMENT.exists():
+    _CONFIG_PATH = _CONFIG_PATH_DEPLOYMENT
+elif _CONFIG_PATH_LOCAL.exists():
+    _CONFIG_PATH = _CONFIG_PATH_LOCAL
+else:
+    raise FileNotFoundError(
+        f"Configuration file not found at {_CONFIG_PATH_DEPLOYMENT} or {_CONFIG_PATH_LOCAL}. "
+        "Please ensure config/model_constants.json exists in either src/config/ or root config/."
+    )
 
 try:
     with open(_CONFIG_PATH, 'r') as f:
         _config = json.load(f)
-except FileNotFoundError:
-    raise FileNotFoundError(
-        f"Configuration file not found at {_CONFIG_PATH}. "
-        "Please ensure config/model_constants.json exists."
-    )
+except Exception as e:
+    raise RuntimeError(f"Failed to load configuration from {_CONFIG_PATH}: {e}")
 
 # ============================================================================
 # LLM MODEL OPTIONS

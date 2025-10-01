@@ -25,8 +25,8 @@ import sys
 import os
 from pathlib import Path
 
-# Add current directory to path for imports
-sys.path.insert(0, os.path.dirname(__file__))
+# Local dev only - this script is for development use
+# sys.path.insert(0, os.path.dirname(__file__))  # Not needed in src/ structure
 
 try:
     from tools import discover_mcp_tools_sync, _agent_mcp

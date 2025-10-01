@@ -11,10 +11,6 @@ from typing import Dict, Any
 from langgraph.prebuilt import create_react_agent
 from dotenv import load_dotenv
 
-# Add project root to Python path for utils import
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
 from utils.llm_utils import get_llm
 from .tools import get_agent_simple_tools
 from .prompt import AGENT_SYSTEM_PROMPT

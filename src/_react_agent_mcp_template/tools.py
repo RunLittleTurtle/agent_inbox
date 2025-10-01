@@ -26,8 +26,9 @@ except ImportError:
 # Load environment variables
 load_dotenv()
 
-# Add library path for langchain-mcp-adapters
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../library/langchain-mcp-adapters'))
+# Local dev only - uses git submodules from library/
+# In deployment, these packages come from requirements.txt (pip-installed from PyPI)
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../library/langchain-mcp-adapters'))
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 

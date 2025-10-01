@@ -21,16 +21,18 @@ from pathlib import Path
 
 def get_global_timezone() -> str:
     """
-    Get the system-wide USER_TIMEZONE from root .env file.
+    Get the system-wide USER_TIMEZONE from environment variables.
+
+    Works in both local dev (loads from .env) and deployment (env vars injected by platform).
 
     Returns:
         str: Timezone name (e.g., 'America/Toronto')
     """
     from dotenv import load_dotenv
 
-    # Load from root .env
-    root_env = Path(__file__).parent.parent.parent / '.env'
-    load_dotenv(root_env)
+    # Load .env if it exists (local dev) - searches parent directories automatically
+    # In deployment, this is a no-op (no .env file), env vars are injected by platform
+    load_dotenv()
 
     return os.getenv('USER_TIMEZONE', 'America/Toronto')
 

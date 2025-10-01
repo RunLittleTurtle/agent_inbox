@@ -18,16 +18,12 @@ from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 
-# Add local libraries to path
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langchain-mcp-adapters'))
-
-# Add project root to Python path for utils import
-from pathlib import Path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+# Local dev only - uses git submodules from library/
+# In deployment, these packages come from requirements.txt (pip-installed from PyPI)
+# import sys
+# import os
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langchain-mcp-adapters'))
 
 from utils.llm_utils import get_llm
 from shared_utils import DEFAULT_LLM_MODEL

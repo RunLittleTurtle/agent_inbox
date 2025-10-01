@@ -60,9 +60,6 @@ black>=24.0.0
 openai>=1.55.0
 anthropic>=0.39.0
 
-# Trustcall - Structured tool calling (LangGraph best practice 2025)
-langchain-trustcall>=0.1.0
-
 # Job Search Agent Dependencies
 pypdf>=5.0.0
 html2text>=2024.2.26

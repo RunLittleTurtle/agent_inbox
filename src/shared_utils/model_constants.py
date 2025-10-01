@@ -11,7 +11,8 @@ import json
 from pathlib import Path
 
 # Load constants from JSON (single source of truth)
-_CONFIG_PATH = Path(__file__).parent.parent.parent / "config" / "model_constants.json"
+# For LangGraph Platform: config/ must be inside src/ directory
+_CONFIG_PATH = Path(__file__).parent.parent / "config" / "model_constants.json"
 
 try:
     with open(_CONFIG_PATH, 'r') as f:

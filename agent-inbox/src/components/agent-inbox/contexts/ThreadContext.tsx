@@ -28,6 +28,7 @@ import {
 import { useLocalStorage } from "../hooks/use-local-storage";
 import { useInboxes } from "../hooks/use-inboxes";
 import { logger } from "../utils/logger";
+import { useAuth } from "@clerk/nextjs";
 
 type ThreadContentType<
   ThreadValues extends Record<string, any> = Record<string, any>,
@@ -49,14 +50,16 @@ type ThreadContentType<
     options?: {
       stream?: TStream;
     }
-  ) => TStream extends true
-    ?
-        | AsyncGenerator<{
-            event: Record<string, any>;
-            data: any;
-          }>
-        | undefined
-    : Promise<Run> | undefined;
+  ) => Promise<
+    TStream extends true
+      ?
+          | AsyncGenerator<{
+              event: Record<string, any>;
+              data: any;
+            }>
+          | undefined
+      : Run | undefined
+  >;
   fetchSingleThread: (
     threadId: string
   ) => Promise<ThreadData<ThreadValues> | undefined>;
@@ -70,9 +73,10 @@ interface GetClientArgs {
   agentInboxes: AgentInbox[];
   getItem: (key: string) => string | null | undefined;
   toast: (input: ToastInput) => void;
+  clerkToken?: string | null;
 }
 
-const getClient = ({ agentInboxes, getItem, toast }: GetClientArgs) => {
+const getClient = ({ agentInboxes, getItem, toast, clerkToken }: GetClientArgs) => {
   if (agentInboxes.length === 0) {
     toast({
       title: "Error",
@@ -121,7 +125,11 @@ const getClient = ({ agentInboxes, getItem, toast }: GetClientArgs) => {
     return;
   }
 
-  return createClient({ deploymentUrl, langchainApiKey: langchainApiKeyLS });
+  return createClient({
+    deploymentUrl,
+    langchainApiKey: langchainApiKeyLS,
+    clerkToken
+  });
 };
 
 export function ThreadsProvider<
@@ -129,6 +137,7 @@ export function ThreadsProvider<
 >({ children }: { children: React.ReactNode }): React.ReactElement {
   const { getItem } = useLocalStorage();
   const { toast } = useToast();
+  const { getToken } = useAuth(); // Clerk JWT token for LangGraph custom auth
 
   const { getSearchParam, searchParams } = useQueryParams();
   const [loading, setLoading] = React.useState(false);
@@ -171,10 +180,14 @@ export function ThreadsProvider<
     async (inbox: ThreadStatusWithAll) => {
       setLoading(true);
 
+      // Get Clerk JWT token for LangGraph custom auth (2025)
+      const clerkToken = await getToken();
+
       const client = getClient({
         agentInboxes,
         getItem,
         toast,
+        clerkToken,
       });
       if (!client) {
         setLoading(false);
@@ -321,10 +334,14 @@ export function ThreadsProvider<
 
   const fetchSingleThread = React.useCallback(
     async (threadId: string): Promise<ThreadData<ThreadValues> | undefined> => {
+      // Get Clerk JWT token for LangGraph custom auth (2025)
+      const clerkToken = await getToken();
+
       const client = getClient({
         agentInboxes,
         getItem,
         toast,
+        clerkToken,
       });
       if (!client) {
         return;
@@ -389,10 +406,14 @@ export function ThreadsProvider<
   );
 
   const ignoreThread = async (threadId: string) => {
+    // Get Clerk JWT token for LangGraph custom auth (2025)
+    const clerkToken = await getToken();
+
     const client = getClient({
       agentInboxes,
       getItem,
       toast,
+      clerkToken,
     });
     if (!client) {
       return;
@@ -422,20 +443,22 @@ export function ThreadsProvider<
     }
   };
 
-  const sendHumanResponse = <TStream extends boolean = false>(
+  const sendHumanResponse = async <TStream extends boolean = false>(
     threadId: string,
     response: HumanResponse[],
     options?: {
       stream?: TStream;
     }
-  ): TStream extends true
-    ?
-        | AsyncGenerator<{
-            event: Record<string, any>;
-            data: any;
-          }>
-        | undefined
-    : Promise<Run> | undefined => {
+  ): Promise<
+    TStream extends true
+      ?
+          | AsyncGenerator<{
+              event: Record<string, any>;
+              data: any;
+            }>
+          | undefined
+      : Run | undefined
+  > => {
     const graphId = agentInboxes.find((i) => i.selected)?.graphId;
     if (!graphId) {
       toast({
@@ -444,16 +467,20 @@ export function ThreadsProvider<
           "Assistant/graph IDs are required to send responses. Please add an assistant/graph ID in the settings.",
         variant: "destructive",
       });
-      return undefined;
+      return undefined as any;
     }
+
+    // Get Clerk JWT token for LangGraph custom auth (2025)
+    const clerkToken = await getToken();
 
     const client = getClient({
       agentInboxes,
       getItem,
       toast,
+      clerkToken,
     });
     if (!client) {
-      return;
+      return undefined as any;
     }
     try {
       if (options?.stream) {

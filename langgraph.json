@@ -3,5 +3,16 @@
   "graphs": {
     "agent": "./src/graph.py:graph"
   },
-  "env": ".env"
+  "env": ".env",
+  "python_version": "3.11",
+  "store": {
+    "index": {
+      "embed": "openai:text-embedding-3-small",
+      "dims": 1536,
+      "fields": ["$"]
+    }
+  },
+  "auth": {
+    "path": "./src/auth.py:auth"
+  }
 }

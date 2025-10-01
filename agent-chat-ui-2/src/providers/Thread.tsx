@@ -12,6 +12,7 @@ import {
   SetStateAction,
 } from "react";
 import { createClient } from "./client";
+import { useAuth } from "@clerk/nextjs";
 
 interface ThreadContextType {
   getThreads: () => Promise<Thread[]>;
@@ -38,10 +39,15 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
   const [assistantId] = useQueryState("assistantId");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
+  const { getToken } = useAuth(); // Clerk JWT token for LangGraph custom auth
 
   const getThreads = useCallback(async (): Promise<Thread[]> => {
     if (!apiUrl || !assistantId) return [];
-    const client = createClient(apiUrl, getApiKey() ?? undefined);
+
+    // Get Clerk JWT token for LangGraph custom auth (2025)
+    const clerkToken = await getToken();
+
+    const client = createClient(apiUrl, getApiKey() ?? undefined, clerkToken);
 
     const threads = await client.threads.search({
       metadata: {
@@ -51,7 +57,7 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
     });
 
     return threads;
-  }, [apiUrl, assistantId]);
+  }, [apiUrl, assistantId, getToken]);
 
   const value = {
     getThreads,

@@ -1,5 +1,5 @@
 {
-  "dependencies": ["./src"],
+  "dependencies": ["./src", "./src/executive-ai-assistant"],
   "graphs": {
     "agent": "./src/graph.py:graph",
     "executive_main": "./src/executive-ai-assistant/eaia/main/graph.py:app",

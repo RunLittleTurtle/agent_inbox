@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
+import modelConstants from '../../../../../../config/model_constants.json';
 
 interface UpdateConfigRequest {
   agentId: string;
@@ -498,6 +499,20 @@ async function updateConfigFile(configPath: string, sectionKey: string, fieldKey
         } else if (sectionKey === 'llm_triage' || sectionKey === 'llm_draft' || sectionKey === 'llm_rewrite' || sectionKey === 'llm_scheduling' || sectionKey === 'llm_reflection') {
           // Store individual LLM configs in YAML
           configData[fieldKey] = value;
+
+          // AUTO-FORCE TEMPERATURE=1 FOR REASONING MODELS
+          // Uses REASONING_MODELS_NO_TEMPERATURE list from config/model_constants.json
+          // When a model field is updated, check if it's a reasoning model that doesn't support temperature
+          if (fieldKey.includes('_model')) {
+            const reasoningModels = (modelConstants as any).REASONING_MODELS_NO_TEMPERATURE as string[];
+
+            if (reasoningModels && reasoningModels.includes(value)) {
+              // Extract temperature field name (e.g., triage_model -> triage_temperature)
+              const tempFieldKey = fieldKey.replace('_model', '_temperature');
+              configData[tempFieldKey] = 1;
+              console.log(`🤖 Auto-forcing ${tempFieldKey}=1 for reasoning model: ${value}`);
+            }
+          }
         } else if (sectionKey === 'system_info') {
           // System info is mostly read-only, skip updates
           console.log(`System info updates skipped for executive AI assistant`);

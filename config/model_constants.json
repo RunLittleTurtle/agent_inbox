@@ -3,10 +3,22 @@
     "claude-sonnet-4-5-20250929",
     "claude-3-5-haiku-20241022",
     "gpt-5",
+    "gpt-5-mini",
     "gpt-4o",
     "o3",
     "claude-opus-4-1-20250805"
   ],
+  "REASONING_MODELS_NO_TEMPERATURE": [
+    "gpt-5",
+    "gpt-5-mini",
+    "o3"
+  ],
+  "_comments": {
+    "reasoning_models": "Models in REASONING_MODELS_NO_TEMPERATURE automatically have temperature=1 forced in config updates",
+    "usage": "To add new reasoning model: (1) Add to STANDARD_LLM_MODEL_OPTIONS, (2) Add to REASONING_MODELS_NO_TEMPERATURE",
+    "backend_logic": "Auto-force implemented in: config-app/src/app/api/config/update/route.ts (line ~500)",
+    "python_fallback": "Runtime protection in: src/utils/llm_utils.py and src/executive-ai-assistant/eaia/llm_utils.py"
+  },
   "STANDARD_TIMEZONE_OPTIONS": [
     "America/Toronto",
     "America/New_York",
@@ -28,8 +40,45 @@
     "claude-3-5-haiku-20241022": "Fast, cost-effective for simple tasks",
     "gpt-4o": "Balanced performance, good reasoning and writing",
     "gpt-5": "Advanced capabilities, Balanced pricing",
+    "gpt-5-mini": "Fast, cost-efficient GPT-5 variant",
     "o3": "Specialized reasoning, Expensive",
     "claude-opus-4-1-20250805": "Most expensive - Great but sonnet-4.5 is better and cheaper"
+  },
+  "MODEL_CONSTRAINTS": {
+    "gpt-5": {
+      "supports_temperature": false,
+      "fixed_temperature": 1,
+      "reasoning_model": true,
+      "warning": "This reasoning model only supports temperature=1 (no customization allowed)"
+    },
+    "gpt-5-mini": {
+      "supports_temperature": false,
+      "fixed_temperature": 1,
+      "reasoning_model": true,
+      "warning": "This reasoning model only supports temperature=1 (no customization allowed)"
+    },
+    "o3": {
+      "supports_temperature": false,
+      "fixed_temperature": 1,
+      "reasoning_model": true,
+      "warning": "This reasoning model only supports temperature=1 (no customization allowed)"
+    },
+    "claude-sonnet-4-5-20250929": {
+      "supports_temperature": true,
+      "temperature_range": [0, 1]
+    },
+    "claude-3-5-haiku-20241022": {
+      "supports_temperature": true,
+      "temperature_range": [0, 1]
+    },
+    "claude-opus-4-1-20250805": {
+      "supports_temperature": true,
+      "temperature_range": [0, 1]
+    },
+    "gpt-4o": {
+      "supports_temperature": true,
+      "temperature_range": [0, 2]
+    }
   },
   "TEMPERATURE_DESCRIPTIONS": {
     "0": "Most focused - Deterministic, consistent responses",

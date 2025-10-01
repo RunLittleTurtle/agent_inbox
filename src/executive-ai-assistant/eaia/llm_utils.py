@@ -28,11 +28,25 @@ def get_llm(model_name: str, temperature: float = 0, **kwargs) -> BaseChatModel:
     Note:
         Provider-specific parameters like parallel_tool_calls should NOT be passed here.
         Use bind_tools_with_choice() instead for proper tool binding.
+
+        Reasoning models (gpt-5, gpt-5-mini, o3) do NOT support the temperature parameter.
+        Temperature will be automatically excluded for these models.
     """
+    # OpenAI reasoning models that don't support temperature parameter
+    # Synced with config/model_constants.json REASONING_MODELS_NO_TEMPERATURE
+    # To add new reasoning model: update the list in model_constants.json
+    reasoning_models = ['gpt-5', 'gpt-5-mini', 'o3']
+    is_reasoning_model = any(rm in model_name.lower() for rm in reasoning_models)
+
     if model_name.startswith('claude') or model_name.startswith('opus'):
         return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
     else:  # OpenAI models (gpt-*, o3)
-        return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
+        # Don't pass temperature for reasoning models
+        if is_reasoning_model:
+            print(f"⚠️ Model {model_name} is a reasoning model - excluding temperature parameter")
+            return ChatOpenAI(model=model_name, **kwargs)
+        else:
+            return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
 
 
 def get_tool_choice(model_name: str, tool_name: Optional[str] = None) -> Union[dict, str]:

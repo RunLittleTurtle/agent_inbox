@@ -113,6 +113,23 @@ export function LLMCard({
     return recommendations[context];
   };
 
+  // Get model constraints from JSON config
+  const getModelConstraints = (modelName: string) => {
+    const constraints = (modelConstants as any).MODEL_CONSTRAINTS;
+    return constraints?.[modelName] || null;
+  };
+
+  // Find the currently selected model from fields
+  const getSelectedModel = () => {
+    const modelField = fields.find(f => f.type === 'select' && !isTemperatureField(f));
+    if (!modelField) return null;
+    return getCurrentValue(modelField);
+  };
+
+  const selectedModel = getSelectedModel();
+  const modelConstraints = selectedModel ? getModelConstraints(selectedModel) : null;
+  const temperatureSupported = modelConstraints?.supports_temperature !== false;
+
   return (
     <Card className="bg-blue-50 border-blue-200">
       <CardHeader>
@@ -151,8 +168,9 @@ export function LLMCard({
                   <Select
                     value={currentValue}
                     onValueChange={(value) => handleFieldChange(field, value)}
+                    disabled={isTemperatureField(field) && !temperatureSupported}
                   >
-                    <SelectTrigger className="bg-white border-blue-300 focus:border-blue-400 focus:ring-blue-400">
+                    <SelectTrigger className="bg-white border-blue-300 focus:border-blue-400 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed">
                       <SelectValue placeholder={isTemperatureField(field) ? "Select temperature" : "Select a model"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -185,6 +203,7 @@ export function LLMCard({
                     max={field.validation?.max}
                     step={field.validation?.step}
                     className="bg-white border-blue-300 focus:border-blue-400 focus:ring-blue-400"
+                    disabled={isTemperatureField(field) && !temperatureSupported}
                   />
                 )}
               </div>

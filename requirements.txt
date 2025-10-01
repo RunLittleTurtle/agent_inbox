@@ -1,6 +1,6 @@
-# LangGraph & LangChain Core (v1-alpha)
-langgraph==1.0.0a1
-langchain==1.0.0a3
+# LangGraph & LangChain Core
+langgraph>=0.2.70
+langchain>=0.3.9
 langchain-core>=0.3.75
 langchain-openai>=0.2.0
 langchain-anthropic>=0.2.0

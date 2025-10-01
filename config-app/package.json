@@ -23,6 +23,7 @@
     "@blocknote/mantine": "^0.17.1",
     "@blocknote/react": "^0.17.1",
     "@blocknote/shadcn": "^0.17.1",
+    "@clerk/nextjs": "^6.33.1",
     "@codemirror/lang-cpp": "^6.0.2",
     "@codemirror/lang-html": "^6.4.9",
     "@codemirror/lang-java": "^6.0.1",

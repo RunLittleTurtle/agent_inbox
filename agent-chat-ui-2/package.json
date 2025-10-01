@@ -19,6 +19,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.33.1",
     "@huggingface/transformers": "^3.7.3",
     "@langchain/core": "^0.3.44",
     "@langchain/langgraph": "^0.2.63",

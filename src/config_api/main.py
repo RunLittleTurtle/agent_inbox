@@ -38,10 +38,19 @@ SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("ERROR: Missing Supabase credentials")
+    print("⚠️  WARNING: Missing Supabase credentials - database features disabled")
+    print("   Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY in .env")
     supabase = None
 else:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("✓ Supabase client initialized successfully")
+    except Exception as e:
+        print(f"⚠️  WARNING: Invalid Supabase credentials - database features disabled")
+        print(f"   Error: {e}")
+        print("   Get the correct anon/service_role key from Supabase dashboard:")
+        print("   https://supabase.com/dashboard/project/lcswsadubzhynscruzfn/settings/api")
+        supabase = None
 
 # Agent directories to scan
 AGENT_PATHS = [
@@ -69,6 +78,44 @@ class BulkUpdateRequest(BaseModel):
     config_data: Dict[str, Any]
 
 
+def get_agent_defaults(agent_id: str) -> Dict[str, Any]:
+    """
+    Load immutable defaults from agent's Python code
+    Returns defaults from prompt.py and config.py
+
+    Each agent has its OWN defaults - NOT shared!
+    calendar defaults ≠ email defaults ≠ executive defaults
+    """
+    defaults = {
+        "prompts": {},
+        "config": {}
+    }
+
+    try:
+        # Import prompt defaults (agent-specific)
+        prompt_module = import_module(f"{agent_id}.prompt")
+        if hasattr(prompt_module, "DEFAULTS"):
+            defaults["prompts"] = prompt_module.DEFAULTS
+            print(f"✅ Loaded {len(defaults['prompts'])} prompt defaults for {agent_id}")
+        else:
+            print(f"⚠️  No DEFAULTS export found in {agent_id}.prompt")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load {agent_id} prompt defaults: {e}")
+
+    try:
+        # Import config defaults (agent-specific)
+        config_module = import_module(f"{agent_id}.config")
+        if hasattr(config_module, "DEFAULTS"):
+            defaults["config"] = config_module.DEFAULTS
+            print(f"✅ Loaded {len(defaults['config'])} config defaults for {agent_id}")
+        else:
+            print(f"⚠️  No DEFAULTS export found in {agent_id}.config")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load {agent_id} config defaults: {e}")
+
+    return defaults
+
+
 @app.get("/")
 async def root():
     return {
@@ -78,6 +125,7 @@ async def root():
             "/api/config/schemas",
             "/api/config/values",
             "/api/config/update",
+            "/api/config/reset",
         ]
     }
 
@@ -140,28 +188,34 @@ async def get_all_schemas():
 @app.get("/api/config/values")
 async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[str] = None):
     """
-    Get configuration values for an agent from Supabase
+    Get merged configuration values: defaults from code + user overrides from Supabase
 
-    If agent_id is 'global', returns user_secrets
-    Otherwise returns agent_configs for the specified agent
+    Returns for EACH field:
+    - default: from Python code (immutable, agent-specific)
+    - user_override: from Supabase (can be null)
+    - current: what agent actually uses (override > default)
+    - is_overridden: bool
     """
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="agent_id required")
 
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id required")
 
     try:
         if agent_id == "global":
-            # Get user secrets (API keys, global preferences)
+            # Global config doesn't have code defaults yet
+            # Return old behavior for now (Phase 3 can enhance this later)
             result = supabase.table("user_secrets") \
                 .select("*") \
                 .eq("clerk_id", user_id) \
-                .single() \
+                .maybe_single() \
                 .execute()
 
             if result.data:
-                # Convert to config format
                 data = result.data
                 return {
                     "user_preferences": {
@@ -177,26 +231,70 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                     }
                 }
             else:
-                # Return empty config - user hasn't set up yet
                 return {}
-        else:
-            # Get agent-specific config
-            result = supabase.table("agent_configs") \
-                .select("config_data") \
-                .eq("clerk_id", user_id) \
-                .eq("agent_id", agent_id) \
-                .single() \
-                .execute()
 
-            if result.data:
-                return result.data.get("config_data", {})
-            else:
-                # Return empty config
-                return {}
+        # 1. Get defaults from Python code (IMMUTABLE, PER-AGENT)
+        defaults = get_agent_defaults(agent_id)
+
+        # 2. Get user overrides from Supabase
+        result = supabase.table("agent_configs") \
+            .select("config_data, prompts") \
+            .eq("clerk_id", user_id) \
+            .eq("agent_id", agent_id) \
+            .maybe_single() \
+            .execute()
+
+        user_overrides = {}
+        if result and result.data:
+            user_overrides = {
+                **(result.data.get("config_data", {})),
+                "prompts": result.data.get("prompts", {})
+            }
+
+        # 3. Merge: user override > default
+        merged = {}
+
+        # Merge config sections (llm, calendar_settings, etc.)
+        for section_key, section_defaults in defaults.get("config", {}).items():
+            if not isinstance(section_defaults, dict):
+                # Handle non-dict defaults (skip for now)
+                continue
+
+            merged[section_key] = {}
+
+            for field_key, default_value in section_defaults.items():
+                user_value = user_overrides.get(section_key, {}).get(field_key) if isinstance(user_overrides.get(section_key), dict) else None
+
+                merged[section_key][field_key] = {
+                    "default": default_value,
+                    "user_override": user_value,
+                    "current": user_value if user_value is not None else default_value,
+                    "is_overridden": user_value is not None
+                }
+
+        # Merge prompts
+        merged["prompts"] = {}
+        for prompt_key, default_prompt in defaults.get("prompts", {}).items():
+            user_prompt = user_overrides.get("prompts", {}).get(prompt_key) if isinstance(user_overrides.get("prompts"), dict) else None
+
+            merged["prompts"][prompt_key] = {
+                "default": default_prompt,
+                "user_override": user_prompt,
+                "current": user_prompt if user_prompt else default_prompt,
+                "is_overridden": bool(user_prompt)
+            }
+
+        return {
+            "agent_id": agent_id,
+            "user_id": user_id,
+            "values": merged
+        }
 
     except Exception as e:
         print(f"Error fetching config values: {e}")
-        return {}
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error fetching config: {str(e)}")
 
 
 @app.post("/api/config/update")
@@ -234,15 +332,21 @@ async def update_config(request: UpdateConfigRequest):
 
         else:
             # Update agent_configs table
-            # First, get existing config
-            existing = supabase.table("agent_configs") \
-                .select("config_data") \
-                .eq("clerk_id", request.user_id) \
-                .eq("agent_id", request.agent_id) \
-                .single() \
-                .execute()
+            # First, check if config exists
+            try:
+                existing = supabase.table("agent_configs") \
+                    .select("config_data") \
+                    .eq("clerk_id", request.user_id) \
+                    .eq("agent_id", request.agent_id) \
+                    .maybe_single() \
+                    .execute()
 
-            if existing.data:
+                has_existing = existing.data is not None
+            except Exception as e:
+                print(f"Error checking existing config: {e}")
+                has_existing = False
+
+            if has_existing:
                 # Update existing config
                 config_data = existing.data.get("config_data", {})
                 if request.section_key not in config_data:
@@ -317,6 +421,108 @@ async def bulk_update_config(request: BulkUpdateRequest):
 
     except Exception as e:
         print(f"Error bulk updating config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ResetConfigRequest(BaseModel):
+    agent_id: str
+    user_id: str
+    section_key: Optional[str] = None  # If provided, reset only this section
+    field_key: Optional[str] = None     # If provided, reset only this field
+
+
+@app.post("/api/config/reset")
+async def reset_config(request: ResetConfigRequest):
+    """
+    Reset configuration to defaults
+
+    Options:
+    1. Reset all: delete entire agent_configs row (reverts everything to code defaults)
+    2. Reset section: set section to null (reverts section to code defaults)
+    3. Reset field: set field to null (reverts field to code default)
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        if request.section_key is None and request.field_key is None:
+            # Reset ALL: Delete entire row
+            supabase.table("agent_configs") \
+                .delete() \
+                .eq("clerk_id", request.user_id) \
+                .eq("agent_id", request.agent_id) \
+                .execute()
+
+            return {
+                "success": True,
+                "action": "reset_all",
+                "message": f"All configs for {request.agent_id} reset to defaults"
+            }
+
+        # Partial reset: Need to update specific fields/sections
+        result = supabase.table("agent_configs") \
+            .select("config_data, prompts") \
+            .eq("clerk_id", request.user_id) \
+            .eq("agent_id", request.agent_id) \
+            .maybe_single() \
+            .execute()
+
+        if not result.data:
+            # No overrides exist, nothing to reset
+            return {
+                "success": True,
+                "action": "nothing_to_reset",
+                "message": "No overrides found, already using defaults"
+            }
+
+        config_data = result.data.get("config_data", {})
+        prompts = result.data.get("prompts", {})
+
+        if request.field_key:
+            # Reset specific field
+            if request.section_key == "prompts":
+                if request.field_key in prompts:
+                    del prompts[request.field_key]
+            else:
+                if request.section_key in config_data and request.field_key in config_data[request.section_key]:
+                    del config_data[request.section_key][request.field_key]
+                    # If section is now empty, remove it
+                    if not config_data[request.section_key]:
+                        del config_data[request.section_key]
+
+            action = "reset_field"
+            message = f"Field {request.section_key}.{request.field_key} reset to default"
+
+        elif request.section_key:
+            # Reset entire section
+            if request.section_key == "prompts":
+                prompts = {}
+            elif request.section_key in config_data:
+                del config_data[request.section_key]
+
+            action = "reset_section"
+            message = f"Section {request.section_key} reset to defaults"
+
+        # Update Supabase with modified config
+        supabase.table("agent_configs") \
+            .update({
+                "config_data": config_data,
+                "prompts": prompts
+            }) \
+            .eq("clerk_id", request.user_id) \
+            .eq("agent_id", request.agent_id) \
+            .execute()
+
+        return {
+            "success": True,
+            "action": action,
+            "message": message
+        }
+
+    except Exception as e:
+        print(f"Error resetting config: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

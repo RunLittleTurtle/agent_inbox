@@ -724,6 +724,7 @@ def _update_cli_commands_with_gmail():
 def start(
     langgraph_port: int = typer.Option(2024, "--langgraph-port", help="Port for LangGraph server"),
     executive_port: int = typer.Option(2025, "--executive-port", help="Port for Executive AI Assistant server"),
+    config_api_port: int = typer.Option(8000, "--config-api-port", help="Port for Config API (FastAPI)"),
     inbox_port: int = typer.Option(3000, "--inbox-port", help="Port for Agent Inbox UI"),
     inbox_2_port: int = typer.Option(3005, "--inbox-2-port", help="Port for Agent Inbox 2 UI"),
     chat_port: int = typer.Option(3001, "--chat-port", help="Port for Agent Chat UI 2"),
@@ -734,20 +735,20 @@ def start(
     """
     🚀 Start complete AI agent stack with essential UIs
 
-    Launches LangGraph server, Executive AI Assistant, Agent Inbox, Agent Inbox 2, Agent Chat UI 2, and Configuration UI.
+    Launches LangGraph server, Executive AI Assistant, Config API, Agent Inbox, Agent Inbox 2, Agent Chat UI 2, and Configuration UI.
     Includes automatic cache cleanup for agent-inbox to prevent webpack errors.
     This is the one-command solution to get everything running.
     """
     console.print(Panel.fit(
         "🚀 [bold green]Starting Complete AI Agent Stack[/bold green]",
-        subtitle="LangGraph + Executive Assistant + Agent Inbox + Agent Inbox 2 + Agent Chat + Agent Chat 2 + Config UI"
+        subtitle="LangGraph + Executive Assistant + Config API + Agent Inbox + Agent Inbox 2 + Agent Chat + Config UI"
     ))
 
     ensure_venv()
 
     # Kill all existing processes first to prevent conflicts
     console.print("[blue]🔄 Killing existing processes on all ports...[/blue]")
-    ports_to_clean = [langgraph_port, executive_port, inbox_port, inbox_2_port, chat_port, config_port]
+    ports_to_clean = [langgraph_port, executive_port, config_api_port, inbox_port, inbox_2_port, chat_port, config_port]
     for port in ports_to_clean:
         killed = kill_processes_on_port(port, f"Port {port}")
         if killed:
@@ -838,13 +839,30 @@ def start(
         console.print("[blue]💭 Waiting for Executive Assistant to initialize...[/blue]")
         time.sleep(5)  # Give Executive Assistant time to start
 
-        # Step 3: Start Agent Inbox UI
-        console.print("[blue]📋 Step 3: Starting Agent Inbox UI...[/blue]")
+        # Step 3: Start Config API (FastAPI)
+        console.print("[blue]📋 Step 3: Starting Config API (FastAPI)...[/blue]")
+
+        # Start Config API
+        config_api_env = os.environ.copy()
+        os.chdir(PROJECT_ROOT / "src")
+        config_api_cmd = str(VENV_PATH / "bin" / "uvicorn")
+        config_api_process = subprocess.Popen(
+            [config_api_cmd, "config_api.main:app", "--host", "0.0.0.0", "--port", str(config_api_port)],
+            env=config_api_env
+        )
+
+        console.print(f"[green]✅ Config API starting on port {config_api_port}[/green]")
+        console.print("[blue]💭 Waiting for Config API to initialize...[/blue]")
+        time.sleep(3)  # Give Config API time to start
+
+        # Step 4: Start Agent Inbox UI
+        console.print("[blue]📋 Step 4: Starting Agent Inbox UI...[/blue]")
 
         if not AGENT_INBOX_PATH.exists():
             console.print(f"[red]❌ Agent Inbox directory not found: {AGENT_INBOX_PATH}[/red]")
             langgraph_process.terminate()
             executive_process.terminate()
+            config_api_process.terminate()
             raise typer.Exit(1)
 
 
@@ -856,13 +874,14 @@ def start(
 
         console.print(f"[green]✅ Agent Inbox UI starting on port {inbox_port}[/green]")
 
-        # Step 4: Start Agent Inbox 2 UI
-        console.print("[blue]📋 Step 4: Starting Agent Inbox 2 UI...[/blue]")
+        # Step 5: Start Agent Inbox 2 UI
+        console.print("[blue]📋 Step 5: Starting Agent Inbox 2 UI...[/blue]")
 
         if not AGENT_INBOX_2_PATH.exists():
             console.print(f"[red]❌ Agent Inbox 2 directory not found: {AGENT_INBOX_2_PATH}[/red]")
             langgraph_process.terminate()
             executive_process.terminate()
+            config_api_process.terminate()
             inbox_process.terminate()
             raise typer.Exit(1)
 
@@ -874,13 +893,14 @@ def start(
 
         console.print(f"[green]✅ Agent Inbox 2 UI starting on port {inbox_2_port}[/green]")
 
-        # Step 5: Start Agent Chat UI 2
-        console.print("[blue]📋 Step 5: Starting Agent Chat UI 2...[/blue]")
+        # Step 6: Start Agent Chat UI 2
+        console.print("[blue]📋 Step 6: Starting Agent Chat UI 2...[/blue]")
 
         if not AGENT_CHAT_UI_2_PATH.exists():
             console.print(f"[red]❌ Agent Chat UI 2 directory not found: {AGENT_CHAT_UI_2_PATH}[/red]")
             langgraph_process.terminate()
             executive_process.terminate()
+            config_api_process.terminate()
             inbox_process.terminate()
             inbox_2_process.terminate()
             raise typer.Exit(1)
@@ -894,8 +914,8 @@ def start(
 
         console.print(f"[green]✅ Agent Chat UI 2 starting on port {chat_port}[/green]")
 
-        # Step 6: Start Configuration UI
-        console.print("[blue]📋 Step 6: Starting Configuration UI...[/blue]")
+        # Step 7: Start Configuration UI
+        console.print("[blue]📋 Step 7: Starting Configuration UI...[/blue]")
 
 
         # Start Configuration UI
@@ -911,11 +931,12 @@ def start(
         # Wait longer for Next.js to compile client components
         time.sleep(30)  # Increased wait time for client component compilation
 
-        # Step 7: Open all UIs in the correct order
-        console.print("[blue]📋 Step 7: Opening all UIs in correct order...[/blue]")
+        # Step 8: Open all UIs in the correct order
+        console.print("[blue]📋 Step 8: Opening all UIs in correct order...[/blue]")
 
         langgraph_url = f"http://127.0.0.1:{langgraph_port}"
         executive_url = f"http://127.0.0.1:{executive_port}"
+        config_api_url = f"http://localhost:{config_api_port}"
         chat_url = f"http://localhost:{chat_port}"
         inbox_url = f"http://localhost:{inbox_port}"
         inbox_2_url = f"http://localhost:{inbox_2_port}"
@@ -953,6 +974,7 @@ def start(
             f"[bold green]🎉 Complete AI Agent Stack Started Successfully![/bold green]\n\n"
             f"🤖 LangGraph Server: [link]{langgraph_url}[/link]\n"
             f"🤖 Executive AI Assistant: [link]{executive_url}[/link]\n"
+            f"🔧 Config API (FastAPI): [link]{config_api_url}[/link]\n"
             f"📧 Agent Inbox UI: [link]{inbox_url}[/link]\n"
             f"📧 Agent Inbox 2 UI: [link]{inbox_2_url}[/link]\n"
             f"💬 Agent Chat UI 2: [link]{chat_url}[/link]\n"
@@ -974,6 +996,9 @@ def start(
                 if executive_process.poll() is not None:
                     console.print("[red]❌ Executive AI Assistant stopped unexpectedly[/red]")
                     break
+                if config_api_process.poll() is not None:
+                    console.print("[red]❌ Config API stopped unexpectedly[/red]")
+                    break
                 if inbox_process.poll() is not None:
                     console.print("[red]❌ Agent Inbox stopped unexpectedly[/red]")
                     break
@@ -993,6 +1018,7 @@ def start(
             # Stop all processes gracefully
             langgraph_process.terminate()
             executive_process.terminate()
+            config_api_process.terminate()
             inbox_process.terminate()
             inbox_2_process.terminate()
             chat_process.terminate()
@@ -1002,6 +1028,7 @@ def start(
             try:
                 langgraph_process.wait(timeout=5)
                 executive_process.wait(timeout=5)
+                config_api_process.wait(timeout=5)
                 inbox_process.wait(timeout=5)
                 inbox_2_process.wait(timeout=5)
                 chat_process.wait(timeout=5)
@@ -1010,6 +1037,7 @@ def start(
                 console.print("[yellow]💀 Force killing remaining processes...[/yellow]")
                 langgraph_process.kill()
                 executive_process.kill()
+                config_api_process.kill()
                 inbox_process.kill()
                 inbox_2_process.kill()
                 chat_process.kill()
@@ -1065,6 +1093,73 @@ def setup_oauth():
 
     except Exception as e:
         console.print(f"[red]❌ Error during OAuth setup: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def config_api(
+    port: int = typer.Option(8000, "--port", "-p", help="Port to run Config API on"),
+    restart: bool = typer.Option(True, "--restart/--no-restart", help="Kill existing processes and restart")
+):
+    """
+    🔧 Launch the FastAPI Config Bridge
+
+    Starts the FastAPI service that bridges Python agent configs with the Config UI.
+    This service exposes agent schemas and handles configuration persistence to Supabase.
+    """
+    console.print(Panel.fit(
+        "🔧 [bold magenta]FastAPI Config Bridge[/bold magenta]",
+        subtitle="Python Config API → Supabase"
+    ))
+
+    ensure_venv()
+
+    # Verify config_api directory exists
+    config_api_path = PROJECT_ROOT / "src" / "config_api"
+    if not config_api_path.exists():
+        console.print(f"[red]❌ Config API directory not found: {config_api_path}[/red]")
+        raise typer.Exit(1)
+
+    # Kill existing processes on the port if restart is enabled
+    if restart:
+        if kill_processes_on_port(port, "Config API"):
+            console.print("[green]✅ Cleaned up existing processes[/green]")
+
+    # Start the FastAPI service
+    console.print(f"[green]🚀 Starting Config API on port {port}...[/green]")
+
+    uvicorn_cmd = [
+        str(VENV_PATH / "bin" / "uvicorn"),
+        "config_api.main:app",
+        "--host", "0.0.0.0",
+        "--port", str(port),
+        "--reload"
+    ]
+
+    try:
+        os.chdir(PROJECT_ROOT / "src")
+        process = subprocess.Popen(uvicorn_cmd)
+        time.sleep(3)  # Give it time to start
+
+        api_url = f"http://localhost:{port}"
+        console.print(f"[green]✅ Config API started successfully![/green]")
+        console.print(f"[blue]📡 API running at {api_url}[/blue]")
+        console.print(f"[blue]📋 API docs at {api_url}/docs[/blue]")
+        console.print(f"[dim]Endpoints: /api/config/schemas, /api/config/values, /api/config/update[/dim]")
+
+        console.print("[yellow]Press Ctrl+C to stop the server[/yellow]")
+        process.wait()
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]🛑 Stopping Config API...[/yellow]")
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        console.print("[green]✅ Config API stopped[/green]")
+    except Exception as e:
+        console.print(f"[red]❌ Failed to start Config API: {e}[/red]")
         raise typer.Exit(1)
 
 

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import fs from 'fs';
 import path from 'path';
 import { config } from 'dotenv';
 import yaml from 'js-yaml';
 import modelConstants from '../../../../../../config/model_constants.json';
+
+const CONFIG_API_URL = process.env.NEXT_PUBLIC_CONFIG_API_URL || 'http://localhost:8000';
 
 function getCurrentEnvValues(): Record<string, string> {
   try {
@@ -391,6 +394,16 @@ export async function GET(request: NextRequest) {
   const agentId = searchParams.get('agentId');
 
   try {
+    // Get authenticated user
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
+
     // Handle global environment configuration
     if (!agentId || agentId === 'global') {
       // Read all environment values for global config
@@ -453,27 +466,26 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get Python config values for agent-specific configs
-    const pythonValues = getPythonConfigValues(agentId);
+    // ✅ PHASE 4: Call FastAPI Bridge for agent-specific configs
+    // FastAPI reads Python defaults + merges with Supabase user overrides
+    console.log(`[Phase 4] Calling FastAPI bridge for agent: ${agentId}, user: ${userId}`);
 
-    // Only include essential global environment variables for agent configs
-    // Do NOT include MCP server URLs as they are agent-specific
-    const globalEnvValues = {
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? 'configured' : '',
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'configured' : '',
-      USER_TIMEZONE: process.env.USER_TIMEZONE || modelConstants.DEFAULT_TIMEZONE
-    };
+    const fastapiUrl = `${CONFIG_API_URL}/api/config/values?agent_id=${agentId}&user_id=${userId}`;
+    const fastapiResponse = await fetch(fastapiUrl);
 
-    // Merge only safe global values with agent-specific config
-    const mergedValues = {
-      ...globalEnvValues,
-      ...pythonValues
-    };
+    if (!fastapiResponse.ok) {
+      console.error(`FastAPI error: ${fastapiResponse.status} ${fastapiResponse.statusText}`);
+      throw new Error(`FastAPI returned status ${fastapiResponse.status}`);
+    }
+
+    const fastapiData = await fastapiResponse.json();
+    console.log(`[Phase 4] Received merged config from FastAPI for ${agentId}`);
 
     return NextResponse.json({
       success: true,
-      values: mergedValues,
+      values: fastapiData.values,
       agentId,
+      source: 'fastapi-bridge' // Mark that this came from the new bridge
     });
   } catch (error) {
     console.error('Error getting config values:', error);

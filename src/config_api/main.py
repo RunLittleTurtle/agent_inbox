@@ -81,30 +81,48 @@ class BulkUpdateRequest(BaseModel):
 def get_agent_defaults(agent_id: str) -> Dict[str, Any]:
     """
     Load immutable defaults from agent's Python code
-    Returns defaults from prompt.py and config.py
+    Returns defaults from prompt.py and config.py (if they exist)
 
     Each agent has its OWN defaults - NOT shared!
     calendar defaults ≠ email defaults ≠ executive defaults
+
+    Note: prompt.py is optional - Executive AI Assistant doesn't use it
     """
+    # Map agent_id to actual Python module name
+    # This handles cases where agent_id differs from folder name
+    # Example: "calendar" agent_id → "calendar_agent" module to avoid Python's built-in calendar
+    AGENT_MODULE_MAP = {
+        "calendar": "calendar_agent",
+        "email": "email_agent",
+        "executive": "executive_agent",
+        "executive-ai-assistant": "executive-ai-assistant",  # Folder uses dashes
+        "multi_tool_rube": "multi_tool_rube_agent",  # agent_id without _agent suffix
+    }
+
+    module_name = AGENT_MODULE_MAP.get(agent_id, agent_id)
+
     defaults = {
         "prompts": {},
         "config": {}
     }
 
+    # Try to load prompt.py (optional - gracefully skip if not found)
     try:
-        # Import prompt defaults (agent-specific)
-        prompt_module = import_module(f"{agent_id}.prompt")
+        prompt_module = import_module(f"{module_name}.prompt")
         if hasattr(prompt_module, "DEFAULTS"):
             defaults["prompts"] = prompt_module.DEFAULTS
             print(f"✅ Loaded {len(defaults['prompts'])} prompt defaults for {agent_id}")
         else:
-            print(f"⚠️  No DEFAULTS export found in {agent_id}.prompt")
+            print(f"ℹ️  No DEFAULTS export found in {agent_id}.prompt (this is fine for some agents)")
+    except ImportError:
+        # prompt.py doesn't exist - this is expected for Executive AI Assistant
+        print(f"ℹ️  No prompt.py for {agent_id} (triage prompts may be in config.py instead)")
     except Exception as e:
         print(f"⚠️  Warning: Could not load {agent_id} prompt defaults: {e}")
 
+    # Load config.py (required)
     try:
-        # Import config defaults (agent-specific)
-        config_module = import_module(f"{agent_id}.config")
+        config_module = import_module(f"{module_name}.config")
         if hasattr(config_module, "DEFAULTS"):
             defaults["config"] = config_module.DEFAULTS
             print(f"✅ Loaded {len(defaults['config'])} config defaults for {agent_id}")
@@ -207,34 +225,81 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
 
     try:
         if agent_id == "global":
-            # Global config doesn't have code defaults yet
-            # Return old behavior for now (Phase 3 can enhance this later)
-            result = supabase.table("user_secrets") \
-                .select("*") \
-                .eq("clerk_id", user_id) \
-                .maybe_single() \
-                .execute()
+            # Global config: read from Supabase user_secrets table
+            # Return empty defaults if no data exists yet
+            try:
+                result = supabase.table("user_secrets") \
+                    .select("*") \
+                    .eq("clerk_id", user_id) \
+                    .maybe_single() \
+                    .execute()
 
-            if result.data:
-                data = result.data
+                if result and result.data:
+                    data = result.data
+                    return {
+                        "user_preferences": {
+                            "user_timezone": data.get("timezone", "America/Toronto")
+                        },
+                        "ai_models": {
+                            "anthropic_api_key": data.get("anthropic_api_key", ""),
+                            "openai_api_key": data.get("openai_api_key", ""),
+                        },
+                        "langgraph_system": {
+                            "langsmith_api_key": data.get("langsmith_api_key", ""),
+                            "langchain_project": data.get("langchain_project", "ambient-email-agent"),
+                        },
+                        "google_workspace": {
+                            "google_client_id": data.get("google_client_id", ""),
+                            "google_client_secret": data.get("google_client_secret", ""),
+                            "google_refresh_token": data.get("google_refresh_token", ""),
+                        }
+                    }
+                else:
+                    # No data yet - return empty defaults
+                    print(f"[INFO] No user_secrets found for {user_id}, returning empty defaults")
+                    return {
+                        "user_preferences": {
+                            "user_timezone": "America/Toronto"
+                        },
+                        "ai_models": {
+                            "anthropic_api_key": "",
+                            "openai_api_key": "",
+                        },
+                        "langgraph_system": {
+                            "langsmith_api_key": "",
+                            "langchain_project": "ambient-email-agent",
+                        },
+                        "google_workspace": {
+                            "google_client_id": "",
+                            "google_client_secret": "",
+                            "google_refresh_token": "",
+                        }
+                    }
+            except Exception as e:
+                print(f"[ERROR] Supabase query failed for global config: {e}")
+                # Return empty defaults on error
                 return {
                     "user_preferences": {
-                        "user_timezone": data.get("timezone", "America/Toronto")
+                        "user_timezone": "America/Toronto"
                     },
                     "ai_models": {
-                        "anthropic_api_key": data.get("anthropic_api_key"),
-                        "openai_api_key": data.get("openai_api_key"),
+                        "anthropic_api_key": "",
+                        "openai_api_key": "",
                     },
                     "langgraph_system": {
-                        "langsmith_api_key": data.get("langsmith_api_key"),
+                        "langsmith_api_key": "",
                         "langchain_project": "ambient-email-agent",
+                    },
+                    "google_workspace": {
+                        "google_client_id": "",
+                        "google_client_secret": "",
+                        "google_refresh_token": "",
                     }
                 }
-            else:
-                return {}
 
         # 1. Get defaults from Python code (IMMUTABLE, PER-AGENT)
         defaults = get_agent_defaults(agent_id)
+        print(f"[DEBUG] Defaults structure for {agent_id}: config keys = {list(defaults.get('config', {}).keys())}")
 
         # 2. Get user overrides from Supabase
         result = supabase.table("agent_configs") \
@@ -272,17 +337,34 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                     "is_overridden": user_value is not None
                 }
 
-        # Merge prompts
-        merged["prompts"] = {}
-        for prompt_key, default_prompt in defaults.get("prompts", {}).items():
-            user_prompt = user_overrides.get("prompts", {}).get(prompt_key) if isinstance(user_overrides.get("prompts"), dict) else None
+        # Also include sections from user_overrides that don't have defaults
+        # (e.g., credentials saved in Supabase but not defined in config.py)
+        for section_key, section_values in user_overrides.items():
+            if section_key == "prompts":
+                continue  # Handle prompts separately below
 
-            merged["prompts"][prompt_key] = {
-                "default": default_prompt,
-                "user_override": user_prompt,
-                "current": user_prompt if user_prompt else default_prompt,
-                "is_overridden": bool(user_prompt)
-            }
+            if section_key not in merged and isinstance(section_values, dict):
+                merged[section_key] = {}
+                for field_key, user_value in section_values.items():
+                    merged[section_key][field_key] = {
+                        "default": None,  # No default defined in Python
+                        "user_override": user_value,
+                        "current": user_value,
+                        "is_overridden": True
+                    }
+
+        # Merge prompts (if agent has prompt.py - calendar/multi-tool do, executive doesn't)
+        if defaults.get("prompts"):
+            merged["prompt_templates"] = {}
+            for prompt_key, default_prompt in defaults.get("prompts", {}).items():
+                user_prompt = user_overrides.get("prompts", {}).get(prompt_key) if isinstance(user_overrides.get("prompts"), dict) else None
+
+                merged["prompt_templates"][prompt_key] = {
+                    "default": default_prompt,
+                    "user_override": user_prompt,
+                    "current": user_prompt if user_prompt else default_prompt,
+                    "is_overridden": bool(user_prompt)
+                }
 
         return {
             "agent_id": agent_id,
@@ -314,6 +396,9 @@ async def update_config(request: UpdateConfigRequest):
                 "anthropic_api_key": "anthropic_api_key",
                 "openai_api_key": "openai_api_key",
                 "langsmith_api_key": "langsmith_api_key",
+                "google_client_id": "google_client_id",
+                "google_client_secret": "google_client_secret",
+                "google_refresh_token": "google_refresh_token",
             }
 
             column_name = column_mapping.get(request.field_key)
@@ -335,7 +420,7 @@ async def update_config(request: UpdateConfigRequest):
             # First, check if config exists
             try:
                 existing = supabase.table("agent_configs") \
-                    .select("config_data") \
+                    .select("config_data, prompts") \
                     .eq("clerk_id", request.user_id) \
                     .eq("agent_id", request.agent_id) \
                     .maybe_single() \
@@ -348,24 +433,31 @@ async def update_config(request: UpdateConfigRequest):
 
             if has_existing:
                 # Update existing config
-                config_data = existing.data.get("config_data", {})
-                if request.section_key not in config_data:
-                    config_data[request.section_key] = {}
-                config_data[request.section_key][request.field_key] = request.value
+                # IMPORTANT: Prompts go in separate "prompts" column, not config_data
+                if request.section_key == "prompt_templates":
+                    # Update prompts column
+                    prompts = existing.data.get("prompts", {})
+                    prompts[request.field_key] = request.value
 
-                supabase.table("agent_configs") \
-                    .update({"config_data": config_data}) \
-                    .eq("clerk_id", request.user_id) \
-                    .eq("agent_id", request.agent_id) \
-                    .execute()
+                    supabase.table("agent_configs") \
+                        .update({"prompts": prompts}) \
+                        .eq("clerk_id", request.user_id) \
+                        .eq("agent_id", request.agent_id) \
+                        .execute()
+                else:
+                    # Update config_data column
+                    config_data = existing.data.get("config_data", {})
+                    if request.section_key not in config_data:
+                        config_data[request.section_key] = {}
+                    config_data[request.section_key][request.field_key] = request.value
+
+                    supabase.table("agent_configs") \
+                        .update({"config_data": config_data}) \
+                        .eq("clerk_id", request.user_id) \
+                        .eq("agent_id", request.agent_id) \
+                        .execute()
             else:
                 # Create new config
-                config_data = {
-                    request.section_key: {
-                        request.field_key: request.value
-                    }
-                }
-
                 # Get agent name from schemas
                 schemas_response = await get_all_schemas()
                 agent_name = request.agent_id
@@ -374,14 +466,32 @@ async def update_config(request: UpdateConfigRequest):
                         agent_name = agent["config"]["CONFIG_INFO"]["name"]
                         break
 
-                supabase.table("agent_configs") \
-                    .insert({
-                        "clerk_id": request.user_id,
-                        "agent_id": request.agent_id,
-                        "agent_name": agent_name,
-                        "config_data": config_data
-                    }) \
-                    .execute()
+                # IMPORTANT: Prompts go in separate "prompts" column, not config_data
+                if request.section_key == "prompt_templates":
+                    supabase.table("agent_configs") \
+                        .insert({
+                            "clerk_id": request.user_id,
+                            "agent_id": request.agent_id,
+                            "agent_name": agent_name,
+                            "config_data": {},
+                            "prompts": {request.field_key: request.value}
+                        }) \
+                        .execute()
+                else:
+                    config_data = {
+                        request.section_key: {
+                            request.field_key: request.value
+                        }
+                    }
+
+                    supabase.table("agent_configs") \
+                        .insert({
+                            "clerk_id": request.user_id,
+                            "agent_id": request.agent_id,
+                            "agent_name": agent_name,
+                            "config_data": config_data
+                        }) \
+                        .execute()
 
             return {"success": True, "agent_id": request.agent_id}
 
@@ -467,7 +577,7 @@ async def reset_config(request: ResetConfigRequest):
             .maybe_single() \
             .execute()
 
-        if not result.data:
+        if not result or not result.data:
             # No overrides exist, nothing to reset
             return {
                 "success": True,
@@ -480,7 +590,7 @@ async def reset_config(request: ResetConfigRequest):
 
         if request.field_key:
             # Reset specific field
-            if request.section_key == "prompts":
+            if request.section_key == "prompt_templates":
                 if request.field_key in prompts:
                     del prompts[request.field_key]
             else:
@@ -495,7 +605,7 @@ async def reset_config(request: ResetConfigRequest):
 
         elif request.section_key:
             # Reset entire section
-            if request.section_key == "prompts":
+            if request.section_key == "prompt_templates":
                 prompts = {}
             elif request.section_key in config_data:
                 del config_data[request.section_key]

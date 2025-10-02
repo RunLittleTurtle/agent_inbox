@@ -281,107 +281,8 @@ function getPythonConfigValues(agentId: string | null) {
       }
     }
 
-    if (agentId === 'executive-ai-assistant') {
-      const projectRoot = path.join(process.cwd(), '..');
-      const configYamlPath = path.join(projectRoot, 'src/executive-ai-assistant/eaia/main/config.yaml');
-
-      if (fs.existsSync(configYamlPath)) {
-        try {
-          const yamlContent = fs.readFileSync(configYamlPath, 'utf8');
-          const configData = yaml.load(yamlContent) as any;
-
-          // Read credentials from executive assistant's .env file
-          const envPath = path.join(projectRoot, 'src/executive-ai-assistant/.env');
-          let aiModelKeys = {};
-          let langsmithConfig = {};
-          let googleCredentials = {};
-          if (fs.existsSync(envPath)) {
-            const envContent = fs.readFileSync(envPath, 'utf8');
-
-            // AI Model API Keys - fix regex to not capture newlines
-            const anthropicApiKeyMatch = envContent.match(/ANTHROPIC_API_KEY=([^\r\n]+)/);
-            const openaiApiKeyMatch = envContent.match(/OPENAI_API_KEY=([^\r\n]+)/);
-
-            aiModelKeys = {
-              anthropic_api_key: anthropicApiKeyMatch?.[1]?.trim() || '',
-              openai_api_key: openaiApiKeyMatch?.[1]?.trim() || ''
-            };
-
-            // LangSmith Configuration
-            const langsmithApiKeyMatch = envContent.match(/LANGSMITH_API_KEY=([^\r\n]+)/);
-            const langchainProjectMatch = envContent.match(/LANGCHAIN_PROJECT=([^\r\n]+)/);
-
-            langsmithConfig = {
-              langsmith_api_key: langsmithApiKeyMatch?.[1]?.trim() || '',
-              langchain_project: langchainProjectMatch?.[1]?.trim() || 'ambient-email-agent'
-            };
-
-            // Google Workspace Credentials
-            const googleClientIdMatch = envContent.match(/GOOGLE_CLIENT_ID=([^\r\n]+)/);
-            const googleClientSecretMatch = envContent.match(/GOOGLE_CLIENT_SECRET=([^\r\n]+)/);
-            const gmailRefreshTokenMatch = envContent.match(/GMAIL_REFRESH_TOKEN=([^\r\n]+)/);
-            const emailAssociatedMatch = envContent.match(/EMAIL_ASSOCIATED=([^\r\n]+)/);
-
-            googleCredentials = {
-              google_client_id: googleClientIdMatch?.[1]?.trim() || '',
-              google_client_secret: googleClientSecretMatch?.[1]?.trim() || '',
-              gmail_refresh_token: gmailRefreshTokenMatch?.[1]?.trim() || '',
-              user_google_email: emailAssociatedMatch?.[1]?.trim() || ''
-            };
-          }
-
-          return {
-            user_preferences: {
-              name: configData.name || '',
-              full_name: configData.full_name || '',
-              email: configData.email || '',
-              background: configData.background || '',
-              timezone: configData.timezone || modelConstants.DEFAULT_TIMEZONE,
-              schedule_preferences: configData.schedule_preferences || ''
-            },
-            llm_triage: {
-              triage_model: configData.triage_model || modelConstants.DEFAULT_TRIAGE_MODEL,
-              triage_temperature: configData.triage_temperature || 0.1
-            },
-            llm_draft: {
-              draft_model: configData.draft_model || modelConstants.DEFAULT_DRAFT_MODEL,
-              draft_temperature: configData.draft_temperature || 0.2
-            },
-            llm_rewrite: {
-              rewrite_model: configData.rewrite_model || modelConstants.DEFAULT_REWRITE_MODEL,
-              rewrite_temperature: configData.rewrite_temperature || 0.3
-            },
-            llm_scheduling: {
-              scheduling_model: configData.scheduling_model || modelConstants.DEFAULT_SCHEDULING_MODEL,
-              scheduling_temperature: configData.scheduling_temperature || 0.1
-            },
-            llm_reflection: {
-              reflection_model: configData.reflection_model || modelConstants.DEFAULT_REFLECTION_MODEL,
-              reflection_temperature: configData.reflection_temperature || 0.1
-            },
-            email_preferences: {
-              rewrite_preferences: configData.rewrite_preferences || ''
-            },
-            triage_prompts: {
-              triage_no: configData.triage_no || '',
-              triage_notify: configData.triage_notify || '',
-              triage_email: configData.triage_email || ''
-            },
-            ai_models: aiModelKeys,
-            langgraph_system: langsmithConfig,
-            google_workspace: googleCredentials,
-            agent_identity: {
-              agent_name: 'executive-ai-assistant',
-              agent_display_name: 'Executive AI Assistant',
-              agent_description: 'AI-powered executive assistant for email management, scheduling, and task automation',
-              agent_status: configData.agent_status || 'active'
-            }
-          };
-        } catch (yamlError) {
-          console.error('Error parsing config.yaml:', yamlError);
-        }
-      }
-    }
+    // REMOVED: Old file-based Executive AI Assistant handling
+    // Now uses FastAPI bridge like all other agents (see line ~497)
   } catch (error) {
     console.error('Error reading Python config values:', error);
   }
@@ -406,29 +307,53 @@ export async function GET(request: NextRequest) {
 
     // Handle global environment configuration
     if (!agentId || agentId === 'global') {
-      // Read all environment values for global config
-      const envValues = getCurrentEnvValues();
+      // ✅ Read from Supabase via FastAPI (with .env fallback)
+      const CONFIG_API_URL = process.env.NEXT_PUBLIC_CONFIG_API_URL || 'http://localhost:8000';
+      const fastapiUrl = `${CONFIG_API_URL}/api/config/values?agent_id=global&user_id=${userId}`;
 
-      // Organize values by section as defined in ui_config.py
-      const globalConfigValues = {
-        user_preferences: {
-          user_timezone: envValues.USER_TIMEZONE || modelConstants.DEFAULT_TIMEZONE
-        },
-        ai_models: {
-          anthropic_api_key: envValues.ANTHROPIC_API_KEY || '',
-          openai_api_key: envValues.OPENAI_API_KEY || ''
-        },
-        langgraph_system: {
-          langsmith_api_key: envValues.LANGSMITH_API_KEY || '',
-          langchain_project: envValues.LANGCHAIN_PROJECT || 'ambient-email-agent'
+      try {
+        const fastapiResponse = await fetch(fastapiUrl);
+
+        if (fastapiResponse.ok) {
+          const fastapiData = await fastapiResponse.json();
+
+          // FastAPI returns values directly, wrap them properly
+          return NextResponse.json({
+            success: true,
+            values: fastapiData,
+            agentId: 'global',
+            source: 'supabase'
+          });
+        } else {
+          console.warn(`FastAPI returned ${fastapiResponse.status}, falling back to .env`);
+          throw new Error('FastAPI not available');
         }
-      };
+      } catch (error) {
+        // Fallback to .env if Supabase/FastAPI unavailable
+        console.warn('Falling back to .env for global config:', error);
+        const envValues = getCurrentEnvValues();
 
-      return NextResponse.json({
-        success: true,
-        values: globalConfigValues,
-        agentId: 'global',
-      });
+        const globalConfigValues = {
+          user_preferences: {
+            user_timezone: envValues.USER_TIMEZONE || modelConstants.DEFAULT_TIMEZONE
+          },
+          ai_models: {
+            anthropic_api_key: envValues.ANTHROPIC_API_KEY || '',
+            openai_api_key: envValues.OPENAI_API_KEY || ''
+          },
+          langgraph_system: {
+            langsmith_api_key: envValues.LANGSMITH_API_KEY || '',
+            langchain_project: envValues.LANGCHAIN_PROJECT || 'ambient-email-agent'
+          }
+        };
+
+        return NextResponse.json({
+          success: true,
+          values: globalConfigValues,
+          agentId: 'global',
+          source: 'env-fallback'
+        });
+      }
     }
 
     // Handle Interface UIs configuration

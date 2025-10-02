@@ -33,9 +33,14 @@ interface EnhancedConfigFormProps {
   sections: ConfigSection[];
   values: Record<string, any>;
   onValueChange: (sectionKey: string, fieldKey: string, value: any, envVar?: string) => void;
+  agentId?: string;
+  onReset?: (sectionKey: string, fieldKey: string) => Promise<void>;
+  onSaveSection: (sectionKey: string) => Promise<void>;
+  dirtySections: Set<string>;
+  savingSection: string | null;
 }
 
-export function EnhancedConfigForm({ sections, values, onValueChange }: EnhancedConfigFormProps) {
+export function EnhancedConfigForm({ sections, values, onValueChange, agentId, onReset, onSaveSection, dirtySections, savingSection }: EnhancedConfigFormProps) {
   // Define card order for consistent organization across all agents
   const getCardOrder = (sectionKey: string): number => {
     const key = sectionKey.toLowerCase();
@@ -128,6 +133,11 @@ export function EnhancedConfigForm({ sections, values, onValueChange }: Enhanced
                 section={section}
                 values={values}
                 onValueChange={onValueChange}
+                agentId={agentId}
+                onReset={onReset}
+                onSaveSection={onSaveSection}
+                isDirty={dirtySections.has(section.key)}
+                isSaving={savingSection === section.key}
               />
             ))}
           </div>

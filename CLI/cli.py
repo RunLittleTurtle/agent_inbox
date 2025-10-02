@@ -620,10 +620,16 @@ async def _send_email_to_workflow(email_data, executive=False):
                 await lg_client.threads.update(thread_id, metadata={"email_id": email_data["id"]})
 
                 # Start executive assistant workflow using SDK (matching run_ingest.py)
+                # Pass user_id in config so agent fetches customized prompts from Supabase
                 run_result = await lg_client.runs.create(
                     thread_id,
                     "main",
                     input={"email": executive_email},
+                    config={
+                        "configurable": {
+                            "user_id": "user_33TJRkCZdUVfXdlChxi1qbx5O6k"  # Test user ID
+                        }
+                    },
                     multitask_strategy="rollback",
                 )
 

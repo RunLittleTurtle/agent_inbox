@@ -340,10 +340,9 @@ def get_booking_extraction_prompt(
 # These are agent-specific defaults, not shared across agents
 
 DEFAULTS = {
-    "system_prompt": AGENT_SYSTEM_PROMPT,
-    "no_tools_prompt": AGENT_NO_TOOLS_PROMPT,
-    "routing_prompt": ROUTING_SYSTEM_PROMPT,
+    "agent_system_prompt": AGENT_SYSTEM_PROMPT,
+    "agent_role_prompt": AGENT_ROLE_PROMPT,
+    "agent_guidelines_prompt": AGENT_GUIDELINES_PROMPT,
+    "routing_system_prompt": ROUTING_SYSTEM_PROMPT,
     "booking_extraction_prompt": BOOKING_EXTRACTION_PROMPT_TEMPLATE,
-    "role_prompt": AGENT_ROLE_PROMPT,
-    "guidelines_prompt": AGENT_GUIDELINES_PROMPT,
 }

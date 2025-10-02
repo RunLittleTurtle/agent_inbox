@@ -555,44 +555,55 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as UpdateConfigRequest;
     const { agentId, sectionKey, fieldKey, value, envVar } = body;
 
-    // Auto-determine configPath for executive-ai-assistant
-    let configPath = body.configPath;
-    if (agentId === 'executive-ai-assistant' && !configPath) {
-      // Use relative path since updateConfigFile joins with projectRoot
-      configPath = 'src/executive-ai-assistant/eaia/main/config.yaml';
+    console.log('Update request:', { agentId, sectionKey, fieldKey, value, envVar });
+
+    // Get authenticated user
+    const { auth: getAuth } = await import('@clerk/nextjs/server');
+    const { userId } = await getAuth();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
     }
 
-    console.log('Update request:', { agentId, configPath, sectionKey, fieldKey, value, envVar });
+    // ✅ NEW: Call FastAPI to store in Supabase instead of modifying files
+    const CONFIG_API_URL = process.env.NEXT_PUBLIC_CONFIG_API_URL || 'http://localhost:8000';
+    const fastapiUrl = `${CONFIG_API_URL}/api/config/update`;
 
-    let success = true;
+    const fastapiResponse = await fetch(fastapiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        agent_id: agentId,
+        user_id: userId,
+        section_key: sectionKey,
+        field_key: fieldKey,
+        value: value,
+      }),
+    });
 
-    // If this field has an environment variable, update .env
-    if (envVar) {
-      console.log(`Updating env var: ${envVar} = ${value}`);
-      success = updateEnvVariable(envVar, value);
-    } else if (configPath) {
-      // Otherwise, update the config file directly
-      console.log(`Updating config file: ${configPath}, ${sectionKey}.${fieldKey} = ${value}`);
-      success = await updateConfigFile(configPath, sectionKey, fieldKey, value);
-    } else {
-      console.error(`No config path provided for agent: ${agentId}`);
-      success = false;
-    }
-
-    if (success) {
-      return NextResponse.json({
-        success: true,
-        message: `Updated ${fieldKey} for ${agentId}`,
-      });
-    } else {
+    if (!fastapiResponse.ok) {
+      const errorData = await fastapiResponse.json();
+      console.error('FastAPI update error:', errorData);
       return NextResponse.json(
         {
           success: false,
-          error: 'Failed to update configuration',
+          error: errorData.detail || 'Failed to update configuration',
         },
-        { status: 500 }
+        { status: fastapiResponse.status }
       );
     }
+
+    const result = await fastapiResponse.json();
+
+    return NextResponse.json({
+      success: true,
+      message: result.message || `Updated ${fieldKey} for ${agentId}`,
+    });
   } catch (error) {
     console.error('Update error:', error);
     return NextResponse.json(

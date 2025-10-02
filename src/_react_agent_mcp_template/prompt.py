@@ -64,7 +64,7 @@ def get_formatted_prompt(agent_display_name: str, agent_description: str) -> str
 # These are agent-specific defaults (template placeholders will be replaced)
 
 DEFAULTS = {
-    "system_prompt": AGENT_SYSTEM_PROMPT,
-    "role_prompt": AGENT_ROLE_PROMPT,
-    "guidelines_prompt": AGENT_GUIDELINES_PROMPT,
+    "agent_system_prompt": AGENT_SYSTEM_PROMPT,
+    "agent_role_prompt": AGENT_ROLE_PROMPT,
+    "agent_guidelines_prompt": AGENT_GUIDELINES_PROMPT,
 }

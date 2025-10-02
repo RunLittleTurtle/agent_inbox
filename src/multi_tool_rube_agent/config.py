@@ -22,7 +22,9 @@ load_dotenv()
 # Multi-tool Rube Agent Configuration
 AGENT_NAME = "multi_tool_rube"  # Internal identifier
 AGENT_DISPLAY_NAME = "Multi-Tool Rube Agent"  # Human-readable name
-AGENT_DESCRIPTION = "Universal agent with access to 500+ apps through Rube MCP server"  # Description
+AGENT_DESCRIPTION = (
+    "Universal agent with access to 500+ apps through Rube MCP server"  # Description
+)
 AGENT_STATUS = "active"  # active or disabled
 
 # Import prompts from prompt.py following LangGraph best practices
@@ -32,6 +34,7 @@ except ImportError:
     # Fallback for direct execution
     import sys
     import os
+
     sys.path.append(os.path.dirname(__file__))
     from prompt import AGENT_SYSTEM_PROMPT
 
@@ -49,28 +52,28 @@ MCP_ENV_VAR = "RUBE_MCP_SERVER"  # Environment variable for Rube MCP server URL
 
 # MCP Server URL - reads from the specified environment variable in main .env
 # Will be empty if the environment variable doesn't exist or template is unconfigured
-MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '') if MCP_ENV_VAR != "{MCP_ENV_VAR}" else ''
+MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, "") if MCP_ENV_VAR != "{MCP_ENV_VAR}" else ""
 
 # Rube Authentication Token - for Bearer token authentication
-RUBE_AUTH_TOKEN = os.getenv('RUBE_AUTH_TOKEN', '')
+RUBE_AUTH_TOKEN = os.getenv("RUBE_AUTH_TOKEN", "")
 
 # Timezone Configuration
 # 'global' means use the system-wide USER_TIMEZONE from main .env
-TEMPLATE_TIMEZONE = 'America/Toronto'  # This will be updated by config UI
+TEMPLATE_TIMEZONE = "America/Toronto"  # This will be updated by config UI
 
 # Effective timezone: Use agent-specific if set, otherwise fall back to global
-if TEMPLATE_TIMEZONE == 'global' or not TEMPLATE_TIMEZONE:
+if TEMPLATE_TIMEZONE == "global" or not TEMPLATE_TIMEZONE:
     # Use the global timezone from main .env
-    USER_TIMEZONE = os.getenv('USER_TIMEZONE', 'America/Toronto')
+    USER_TIMEZONE = os.getenv("USER_TIMEZONE", "America/Toronto")
 else:
     # Use the agent-specific timezone
     USER_TIMEZONE = TEMPLATE_TIMEZONE
 
 LLM_CONFIG = {
     "model": "gpt-5",
-    "temperature": 0.3,
+    "temperature": 1,
     "streaming": False,  # Disable streaming for LangGraph compatibility
-    "api_key": os.getenv("ANTHROPIC_API_KEY")
+    "api_key": os.getenv("ANTHROPIC_API_KEY"),
 }
 
 
@@ -90,7 +93,7 @@ def get_current_context() -> Dict[str, str]:
             "timezone_name": USER_TIMEZONE,
             "today": f"{current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})",
             "tomorrow": f"{tomorrow.strftime('%Y-%m-%d')} ({tomorrow.strftime('%A')})",
-            "time_str": current_time.strftime('%I:%M %p %Z')
+            "time_str": current_time.strftime("%I:%M %p %Z"),
         }
     except Exception as e:
         # Fallback to UTC if timezone fails
@@ -101,12 +104,14 @@ def get_current_context() -> Dict[str, str]:
             "timezone_name": "UTC",
             "today": f"{current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})",
             "tomorrow": f"{current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})",
-            "time_str": current_time.strftime('%I:%M %p UTC')
+            "time_str": current_time.strftime("%I:%M %p UTC"),
         }
+
 
 def is_agent_enabled():
     """Check if the agent is enabled"""
     return AGENT_STATUS == "active"
+
 
 # =============================================================================
 # DEFAULTS EXPORT FOR FASTAPI CONFIG BRIDGE

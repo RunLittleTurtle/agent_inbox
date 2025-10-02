@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Link, Server, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { Info, AlertTriangle, Link, Server, Eye, EyeOff, Copy, Check, Save, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { extractCurrentValue } from '@/lib/config-utils';
 
@@ -31,6 +31,9 @@ interface MCPConfigCardProps {
   values: Record<string, any>;
   onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
+  onSave: () => Promise<void>;
+  isDirty: boolean;
+  isSaving: boolean;
 }
 
 export function MCPConfigCard({
@@ -39,7 +42,10 @@ export function MCPConfigCard({
   fields,
   values,
   onValueChange,
-  sectionKey
+  sectionKey,
+  onSave,
+  isDirty,
+  isSaving
 }: MCPConfigCardProps) {
   const [showPasswords, setShowPasswords] = React.useState<Record<string, boolean>>({});
   const [copiedFields, setCopiedFields] = React.useState<Record<string, boolean>>({});
@@ -66,16 +72,18 @@ export function MCPConfigCard({
   const getCurrentValue = (field: MCPField) => {
     // Handle environment variable fields (flat structure from API)
     if (field.envVar && values[field.envVar] !== undefined) {
-      return extractCurrentValue(values[field.envVar]);
+      const extracted = extractCurrentValue(values[field.envVar]);
+      return extracted ?? field.default ?? '';
     }
 
     // Handle nested structure fields
     const rawValue = values[sectionKey]?.[field.key];
     if (rawValue !== undefined) {
-      return extractCurrentValue(rawValue);
+      const extracted = extractCurrentValue(rawValue);
+      return extracted ?? field.default ?? '';
     }
 
-    return field.default || '';
+    return field.default ?? '';
   };
 
   const handleFieldChange = (field: MCPField, value: string) => {
@@ -95,21 +103,37 @@ export function MCPConfigCard({
   return (
     <Card className="bg-green-50 border-green-200">
       <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Link className="h-5 w-5 text-green-600" />
-          {title}
-        </CardTitle>
-        {description && (
-          <CardDescription className="text-green-700">
-            {description}
-          </CardDescription>
-        )}
-        <Alert className="border-green-300 bg-green-100/50">
-          <Info className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">
-            <strong>MCP Integration:</strong> Configure external service connections through Model Context Protocol servers.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Link className="h-5 w-5 text-green-600" />
+              {title}
+            </CardTitle>
+            {description && (
+              <CardDescription className="text-green-700">
+                {description}
+              </CardDescription>
+            )}
+          </div>
+          <Button
+            onClick={onSave}
+            disabled={!isDirty || isSaving}
+            size="sm"
+            className="ml-4"
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {fields.map((field) => {
@@ -187,13 +211,6 @@ export function MCPConfigCard({
                   <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>{field.description}</span>
                 </div>
-              )}
-
-              {field.note && (
-                <Alert className="border-green-300 bg-green-100/30">
-                  <Info className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">{field.note}</AlertDescription>
-                </Alert>
               )}
 
               {field.warning && (

@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Key, Eye, EyeOff, Copy, Check, Shield } from "lucide-react";
+import { Info, AlertTriangle, Key, Eye, EyeOff, Copy, Check, Shield, Save, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { extractCurrentValue } from '@/lib/config-utils';
+import { extractCurrentValue, maskCredential } from '@/lib/config-utils';
 
 interface CredentialField {
   key: string;
@@ -31,6 +31,9 @@ interface CredentialsCardProps {
   values: Record<string, any>;
   onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
+  onSave: () => Promise<void>;
+  isDirty: boolean;
+  isSaving: boolean;
 }
 
 export function CredentialsCard({
@@ -39,10 +42,14 @@ export function CredentialsCard({
   fields,
   values,
   onValueChange,
-  sectionKey
+  sectionKey,
+  onSave,
+  isDirty,
+  isSaving
 }: CredentialsCardProps) {
   const [showPasswords, setShowPasswords] = React.useState<Record<string, boolean>>({});
   const [copiedFields, setCopiedFields] = React.useState<Record<string, boolean>>({});
+  const [focusedFields, setFocusedFields] = React.useState<Record<string, boolean>>({});
 
   const togglePasswordVisibility = (fieldKey: string) => {
     setShowPasswords(prev => ({
@@ -65,8 +72,10 @@ export function CredentialsCard({
 
   const getCurrentValue = (field: CredentialField) => {
     const rawValue = values[sectionKey]?.[field.key];
-    if (rawValue !== undefined) {
-      return extractCurrentValue(rawValue);
+    if (rawValue !== undefined && rawValue !== null) {
+      const extracted = extractCurrentValue(rawValue);
+      // Ensure we never return null - always return string
+      return extracted ?? '';
     }
     return field.default || '';
   };
@@ -82,29 +91,65 @@ export function CredentialsCard({
     return <Key className="h-4 w-4 text-yellow-600" />;
   };
 
+  const getDisplayValue = (field: CredentialField, fieldId: string) => {
+    const currentValue = getCurrentValue(field);
+
+    // Ensure we never return null - convert to empty string
+    const safeValue = currentValue ?? '';
+
+    // Show real value if:
+    // 1. Field is focused (user is editing)
+    // 2. Password visibility is toggled on
+    // 3. Field is not password type
+    // 4. Value is empty
+    if (focusedFields[fieldId] || showPasswords[fieldId] || field.type !== 'password' || !safeValue) {
+      return safeValue;
+    }
+
+    // Otherwise, show masked value for password fields
+    return maskCredential(safeValue);
+  };
+
   return (
     <Card className="bg-yellow-50 border-yellow-200">
       <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Key className="h-5 w-5 text-yellow-600" />
-          {title}
-        </CardTitle>
-        {description && (
-          <CardDescription className="text-yellow-700">
-            {description}
-          </CardDescription>
-        )}
-        <Alert className="border-yellow-300 bg-yellow-100/50">
-          <Shield className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-800">
-            <strong>Security:</strong> API keys and credentials are stored securely and never logged.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Key className="h-5 w-5 text-yellow-600" />
+              {title}
+            </CardTitle>
+            {description && (
+              <CardDescription className="text-yellow-700">
+                {description}
+              </CardDescription>
+            )}
+          </div>
+          <Button
+            onClick={onSave}
+            disabled={!isDirty || isSaving}
+            size="sm"
+            className="ml-4"
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {fields.map((field) => {
           const fieldId = `${sectionKey}-${field.key}`;
           const currentValue = getCurrentValue(field);
+          const displayValue = getDisplayValue(field, fieldId);
 
           return (
             <div key={field.key} className="space-y-3">
@@ -118,9 +163,11 @@ export function CredentialsCard({
                 <div className="relative">
                   <Input
                     id={fieldId}
-                    type={field.type === 'password' && !showPasswords[fieldId] ? "password" : "text"}
-                    value={currentValue}
+                    type={field.type === 'password' && !showPasswords[fieldId] && !focusedFields[fieldId] ? "password" : "text"}
+                    value={displayValue}
                     onChange={(e) => !field.readonly && handleFieldChange(field, e.target.value)}
+                    onFocus={() => setFocusedFields(prev => ({ ...prev, [fieldId]: true }))}
+                    onBlur={() => setFocusedFields(prev => ({ ...prev, [fieldId]: false }))}
                     placeholder={field.placeholder}
                     className={`${field.showCopyButton || field.type === 'password' ? 'pr-20' : 'pr-10'} ${
                       field.readonly
@@ -172,13 +219,6 @@ export function CredentialsCard({
                   <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>{field.description}</span>
                 </div>
-              )}
-
-              {field.note && (
-                <Alert className="border-yellow-300 bg-yellow-100/30">
-                  <Info className="h-4 w-4 text-yellow-600" />
-                  <AlertDescription className="text-yellow-800">{field.note}</AlertDescription>
-                </Alert>
               )}
 
               {field.warning && (

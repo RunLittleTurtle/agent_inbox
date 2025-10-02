@@ -71,7 +71,7 @@ def get_formatted_prompt(agent_display_name: str, agent_description: str) -> str
 # These are agent-specific defaults, not shared across agents
 
 DEFAULTS = {
-    "system_prompt": AGENT_SYSTEM_PROMPT,
-    "role_prompt": AGENT_ROLE_PROMPT,
-    "guidelines_prompt": AGENT_GUIDELINES_PROMPT,
+    "agent_system_prompt": AGENT_SYSTEM_PROMPT,
+    # Note: UI only displays agent_system_prompt field
+    # role_prompt and guidelines_prompt are kept as internal constants
 }

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Info, AlertTriangle, Cpu, Zap, Brain, DollarSign, Thermometer, RotateCcw } from "lucide-react";
+import { Info, AlertTriangle, Cpu, Zap, Brain, DollarSign, Thermometer, RotateCcw, Save, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import modelConstants from '../../../../../config/model_constants.json';
 import { extractCurrentValue, isFieldOverridden } from '@/lib/config-utils';
@@ -41,6 +41,9 @@ interface LLMCardProps {
   context?: 'triage' | 'draft' | 'rewrite' | 'scheduling' | 'reflection' | 'general';
   agentId?: string;
   onReset?: (sectionKey: string, fieldKey: string) => Promise<void>;
+  onSave: () => Promise<void>;
+  isDirty: boolean;
+  isSaving: boolean;
 }
 
 export function LLMCard({
@@ -52,16 +55,20 @@ export function LLMCard({
   sectionKey,
   context = 'general',
   agentId,
-  onReset
+  onReset,
+  onSave,
+  isDirty,
+  isSaving
 }: LLMCardProps) {
   const { toast } = useToast();
   const getCurrentValue = (field: LLMField) => {
     const rawValue = values[sectionKey]?.[field.key];
     if (rawValue !== undefined) {
       // Extract current value (handles both old and new FastAPI format)
-      return extractCurrentValue(rawValue);
+      const extracted = extractCurrentValue(rawValue);
+      return extracted ?? field.default ?? '';
     }
-    return field.default || '';
+    return field.default ?? '';
   };
 
   const isOverridden = (field: LLMField): boolean => {
@@ -167,23 +174,37 @@ export function LLMCard({
   return (
     <Card className="bg-blue-50 border-blue-200">
       <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Brain className="h-5 w-5 text-blue-600" />
-          {title}
-        </CardTitle>
-        {description && (
-          <CardDescription className="text-blue-700">
-            {description}
-          </CardDescription>
-        )}
-        {context !== 'general' && (
-          <Alert className="border-blue-300 bg-blue-100/50">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
-              <strong>Recommendation:</strong> {getContextRecommendation()}
-            </AlertDescription>
-          </Alert>
-        )}
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Brain className="h-5 w-5 text-blue-600" />
+              {title}
+            </CardTitle>
+            {description && (
+              <CardDescription className="text-blue-700">
+                {description}
+              </CardDescription>
+            )}
+          </div>
+          <Button
+            onClick={onSave}
+            disabled={!isDirty || isSaving}
+            size="sm"
+            className="ml-4"
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {fields.map((field) => {
@@ -204,7 +225,7 @@ export function LLMCard({
                       </Badge>
                     )}
                   </Label>
-                  {fieldOverridden && onReset && agentId && (
+                  {onReset && agentId && (
                     <Button
                       type="button"
                       variant="ghost"

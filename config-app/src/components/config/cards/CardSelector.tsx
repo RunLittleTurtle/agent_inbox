@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { Info, AlertTriangle, Eye, EyeOff, Copy, Check, Save, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { extractCurrentValue, isFieldOverridden } from '@/lib/config-utils';
 
@@ -43,13 +43,21 @@ interface CardSelectorProps {
   section: ConfigSection;
   values: Record<string, any>;
   onValueChange: (sectionKey: string, fieldKey: string, value: any, envVar?: string) => void;
+  agentId?: string;
+  onReset?: (sectionKey: string, fieldKey: string) => Promise<void>;
+  onSaveSection: (sectionKey: string) => Promise<void>;
+  isDirty: boolean;
+  isSaving: boolean;
 }
 
 // Generic card component for fields that don't match specialized patterns
-function GenericCard({ section, values, onValueChange }: {
+function GenericCard({ section, values, onValueChange, onSave, isDirty, isSaving }: {
   section: ConfigSection;
   values: Record<string, any>;
   onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
+  onSave: () => Promise<void>;
+  isDirty: boolean;
+  isSaving: boolean;
 }) {
   const [showPasswords, setShowPasswords] = React.useState<Record<string, boolean>>({});
   const [copiedFields, setCopiedFields] = React.useState<Record<string, boolean>>({});
@@ -113,10 +121,32 @@ function GenericCard({ section, values, onValueChange }: {
   return (
     <Card className={section.card_style === 'orange' ? 'bg-orange-50 border-orange-200' : ''}>
       <CardHeader>
-        <CardTitle className="text-lg">{section.label}</CardTitle>
-        {section.description && (
-          <CardDescription>{section.description}</CardDescription>
-        )}
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg">{section.label}</CardTitle>
+            {section.description && (
+              <CardDescription>{section.description}</CardDescription>
+            )}
+          </div>
+          <Button
+            onClick={onSave}
+            disabled={!isDirty || isSaving}
+            size="sm"
+            className="ml-4"
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {section.fields.map((field) => {
@@ -244,13 +274,6 @@ function GenericCard({ section, values, onValueChange }: {
                 </div>
               )}
 
-              {field.note && (
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>{field.note}</AlertDescription>
-                </Alert>
-              )}
-
               {field.warning && (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
@@ -265,11 +288,14 @@ function GenericCard({ section, values, onValueChange }: {
   );
 }
 
-export function CardSelector({ section, values, onValueChange }: CardSelectorProps) {
+export function CardSelector({ section, values, onValueChange, agentId, onReset, onSaveSection, isDirty, isSaving }: CardSelectorProps) {
   // Create a wrapper function that matches the expected signature for specialized cards
   const handleValueChange = (fieldKey: string, value: any, envVar?: string) => {
     onValueChange(section.key, fieldKey, value, envVar);
   };
+
+  // Create a wrapper function for save
+  const handleSave = () => onSaveSection(section.key);
 
   // Determine card type based on section characteristics (7-category system)
   const getCardType = (section: ConfigSection): 'identity' | 'user' | 'llm' | 'prompt' | 'credentials' | 'integration' | 'generic' => {
@@ -369,6 +395,9 @@ export function CardSelector({ section, values, onValueChange }: CardSelectorPro
           values={values}
           onValueChange={handleValueChange}
           sectionKey={section.key}
+          onSave={handleSave}
+          isDirty={isDirty}
+          isSaving={isSaving}
         />
       );
 
@@ -381,6 +410,9 @@ export function CardSelector({ section, values, onValueChange }: CardSelectorPro
           values={values}
           onValueChange={handleValueChange}
           sectionKey={section.key}
+          onSave={handleSave}
+          isDirty={isDirty}
+          isSaving={isSaving}
         />
       );
 
@@ -394,6 +426,11 @@ export function CardSelector({ section, values, onValueChange }: CardSelectorPro
           onValueChange={handleValueChange}
           sectionKey={section.key}
           context={getLLMContext(section.key)}
+          agentId={agentId}
+          onReset={onReset}
+          onSave={handleSave}
+          isDirty={isDirty}
+          isSaving={isSaving}
         />
       );
 
@@ -406,6 +443,11 @@ export function CardSelector({ section, values, onValueChange }: CardSelectorPro
           values={values}
           onValueChange={handleValueChange}
           sectionKey={section.key}
+          agentId={agentId}
+          onReset={onReset}
+          onSave={handleSave}
+          isDirty={isDirty}
+          isSaving={isSaving}
         />
       );
 
@@ -418,6 +460,11 @@ export function CardSelector({ section, values, onValueChange }: CardSelectorPro
           values={values}
           onValueChange={handleValueChange}
           sectionKey={section.key}
+          agentId={agentId}
+          onReset={onReset}
+          onSave={handleSave}
+          isDirty={isDirty}
+          isSaving={isSaving}
         />
       );
 
@@ -430,11 +477,14 @@ export function CardSelector({ section, values, onValueChange }: CardSelectorPro
           values={values}
           onValueChange={handleValueChange}
           sectionKey={section.key}
+          onSave={handleSave}
+          isDirty={isDirty}
+          isSaving={isSaving}
         />
       );
 
     default:
       // Fall back to the generic card implementation
-      return <GenericCard section={section} values={values} onValueChange={handleValueChange} />;
+      return <GenericCard section={section} values={values} onValueChange={handleValueChange} onSave={handleSave} isDirty={isDirty} isSaving={isSaving} />;
   }
 }

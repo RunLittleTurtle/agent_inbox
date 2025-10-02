@@ -49,6 +49,8 @@ export default function ConfigPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = React.useState<Record<string, any>>({});
+  const [dirtySections, setDirtySections] = React.useState<Set<string>>(new Set());
+  const [savingSection, setSavingSection] = React.useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -138,7 +140,7 @@ export default function ConfigPage() {
     }
   }, [selectedAgent, showMainMenu, loadAgentValues]);
 
-  const handleValueChange = async (sectionKey: string, fieldKey: string, value: any, envVar?: string) => {
+  const handleValueChange = (sectionKey: string, fieldKey: string, value: any, envVar?: string) => {
     const changeKey = `${sectionKey}.${fieldKey}`;
 
     // Update local state immediately for responsive UI
@@ -147,73 +149,168 @@ export default function ConfigPage() {
       [changeKey]: { sectionKey, fieldKey, value, envVar }
     }));
 
-    // Update nested structure for immediate UI feedback (always)
-    setConfigValues(prev => ({
-      ...prev,
-      [sectionKey]: {
-        ...(prev[sectionKey] || {}),
-        [fieldKey]: value
-      },
-      // Also update flat envVar structure if provided (for backward compatibility)
-      ...(envVar ? { [envVar]: value } : {})
-    }));
+    // Mark section as dirty
+    setDirtySections(prev => new Set(prev).add(sectionKey));
+
+    // Update nested structure for immediate UI feedback
+    // IMPORTANT: Maintain merged format structure for proper override detection
+    setConfigValues(prev => {
+      const currentFieldValue = prev[sectionKey]?.[fieldKey];
+
+      // If current value is in merged format, preserve the structure
+      let updatedFieldValue = value;
+      if (currentFieldValue && typeof currentFieldValue === 'object' && 'default' in currentFieldValue) {
+        // Maintain merged format with updated user_override
+        updatedFieldValue = {
+          default: currentFieldValue.default,
+          user_override: value,
+          current: value,
+          is_overridden: value !== currentFieldValue.default
+        };
+      }
+
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...(prev[sectionKey] || {}),
+          [fieldKey]: updatedFieldValue
+        },
+        // Also update flat envVar structure if provided (for backward compatibility)
+        ...(envVar ? { [envVar]: value } : {})
+      };
+    });
+  };
+
+  const handleSaveSection = async (sectionKey: string) => {
+    setSavingSection(sectionKey);
 
     try {
-      // Send update to server
-      const response = await fetch('/api/config/update', {
+      // Get all pending changes for this section
+      const sectionChanges = Object.entries(pendingChanges).filter(
+        ([key]) => key.startsWith(`${sectionKey}.`)
+      );
+
+      if (sectionChanges.length === 0) {
+        toast({
+          title: "No Changes",
+          description: "No changes to save for this section.",
+        });
+        setSavingSection(null);
+        return;
+      }
+
+      // Save all changes for this section
+      for (const [changeKey, change] of sectionChanges) {
+        const { sectionKey: sk, fieldKey, value, envVar } = change as any;
+
+        const response = await fetch('/api/config/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            agentId: selectedAgent || 'global',
+            configPath: selectedAgent ? agents.find(a => a.id === selectedAgent)?.path : 'ui_config.py',
+            sectionKey: sk,
+            fieldKey,
+            value,
+            envVar,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to update ${fieldKey}`);
+        }
+      }
+
+      // Clear pending changes for this section
+      setPendingChanges(prev => {
+        const updated = { ...prev };
+        sectionChanges.forEach(([key]) => delete updated[key]);
+        return updated;
+      });
+
+      // Remove from dirty sections
+      setDirtySections(prev => {
+        const updated = new Set(prev);
+        updated.delete(sectionKey);
+        return updated;
+      });
+
+      toast({
+        title: "Section Saved",
+        description: `${sectionChanges.length} change(s) saved successfully.`,
+      });
+
+    } catch (error) {
+      console.error('Error saving section:', error);
+
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: error instanceof Error ? error.message : "Failed to save changes. Please try again.",
+      });
+
+      // Reload from server on error
+      const agentId = showMainMenu ? null : selectedAgent;
+      await loadAgentValues(agentId);
+
+      // Clear dirty state
+      setDirtySections(prev => {
+        const updated = new Set(prev);
+        updated.delete(sectionKey);
+        return updated;
+      });
+    } finally {
+      setSavingSection(null);
+    }
+  };
+
+  const handleReset = async (sectionKey: string, fieldKey: string): Promise<void> => {
+    try {
+      console.log('[handleReset] Resetting field:', { sectionKey, fieldKey, selectedAgent });
+
+      const response = await fetch('/api/config/reset', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          agentId: selectedAgent || 'global',
-          configPath: selectedAgent ? agents.find(a => a.id === selectedAgent)?.path : 'ui_config.py',
-          sectionKey,
-          fieldKey,
-          value,
-          envVar,
+          agent_id: selectedAgent || 'global',
+          section_key: sectionKey,
+          field_key: fieldKey,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update configuration');
+        throw new Error('Failed to reset field');
       }
 
-      // Remove from pending changes on success
-      setPendingChanges(prev => {
-        const updated = { ...prev };
-        delete updated[changeKey];
-        return updated;
-      });
+      const result = await response.json();
+      console.log('[handleReset] Reset response:', result);
 
-      toast({
-        title: "Configuration Updated",
-        description: `${fieldKey} has been updated successfully.`,
-      });
-
-      // Don't reload values immediately after update to avoid race conditions
-      // The optimistic update (lines 145-164) already updated local state
-      // Values will be reloaded when user switches agents or explicitly refreshes
-
-    } catch (error) {
-      console.error('Error updating configuration:', error);
-
-      toast({
-        variant: "destructive",
-        title: "Update Failed",
-        description: `Failed to update ${fieldKey}. Please try again.`,
-      });
-
-      // Revert local change on error - reload from server is more reliable
+      // Reload values to reflect the reset - force refetch with cache bypass
       const agentId = showMainMenu ? null : selectedAgent;
-      await loadAgentValues(agentId);
+      console.log('[handleReset] Reloading values for agent:', agentId);
 
-      // Remove from pending changes
-      setPendingChanges(prev => {
-        const updated = { ...prev };
-        delete updated[changeKey];
-        return updated;
+      // Force a fresh fetch by adding timestamp to bypass cache
+      const url = agentId
+        ? `/api/config/values?agentId=${agentId}&t=${Date.now()}`
+        : `/api/config/values?t=${Date.now()}`;
+
+      const valuesResponse = await fetch(url, { cache: 'no-store' });
+      const data = await valuesResponse.json();
+      console.log('[handleReset] Received new values:', data.values);
+
+      setConfigValues(data.values);
+
+      toast({
+        title: "Reset Successful",
+        description: result.message || `${fieldKey} has been reset to default value.`,
       });
+    } catch (error) {
+      console.error('Error resetting field:', error);
+      throw error; // Let the card component handle error display
     }
   };
 
@@ -342,6 +439,11 @@ export default function ConfigPage() {
               sections={getCurrentConfig()}
               values={configValues}
               onValueChange={handleValueChange}
+              agentId={selectedAgent || undefined}
+              onReset={handleReset}
+              onSaveSection={handleSaveSection}
+              dirtySections={dirtySections}
+              savingSection={savingSection}
             />
           </div>
         </div>

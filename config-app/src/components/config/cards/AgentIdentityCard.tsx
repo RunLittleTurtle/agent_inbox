@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, User, Shield, CheckCircle, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Info, AlertTriangle, User, Shield, CheckCircle, XCircle, Save, RefreshCw } from "lucide-react";
 import { extractCurrentValue } from '@/lib/config-utils';
 
 interface IdentityField {
@@ -33,6 +34,9 @@ interface AgentIdentityCardProps {
   values: Record<string, any>;
   onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
+  onSave: () => Promise<void>;
+  isDirty: boolean;
+  isSaving: boolean;
 }
 
 export function AgentIdentityCard({
@@ -41,14 +45,19 @@ export function AgentIdentityCard({
   fields,
   values,
   onValueChange,
-  sectionKey
+  sectionKey,
+  onSave,
+  isDirty,
+  isSaving
 }: AgentIdentityCardProps) {
   const getCurrentValue = (field: IdentityField) => {
     const rawValue = values[sectionKey]?.[field.key];
     if (rawValue !== undefined) {
-      return extractCurrentValue(rawValue);
+      const extracted = extractCurrentValue(rawValue);
+      // Ensure we never return null for text inputs/textareas
+      return extracted ?? field.default ?? '';
     }
-    return field.default || '';
+    return field.default ?? '';
   };
 
   const handleFieldChange = (field: IdentityField, value: any) => {
@@ -84,21 +93,43 @@ export function AgentIdentityCard({
   return (
     <Card className="bg-gray-50 border-gray-200 transition-colors">
       <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <User className="h-5 w-5 text-gray-600" />
-          {title}
-          {currentStatus && (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(currentStatus)}`}>
-              {getStatusIcon(currentStatus)}
-              {currentStatus}
-            </div>
-          )}
-        </CardTitle>
-        {description && (
-          <CardDescription className="text-gray-700">
-            {description}
-          </CardDescription>
-        )}
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="h-5 w-5 text-gray-600" />
+              {title}
+              {currentStatus && (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(currentStatus)}`}>
+                  {getStatusIcon(currentStatus)}
+                  {currentStatus}
+                </div>
+              )}
+            </CardTitle>
+            {description && (
+              <CardDescription className="text-gray-700">
+                {description}
+              </CardDescription>
+            )}
+          </div>
+          <Button
+            onClick={onSave}
+            disabled={!isDirty || isSaving}
+            size="sm"
+            className="ml-4"
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {fields.map((field) => {
@@ -169,13 +200,6 @@ export function AgentIdentityCard({
                   <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>{field.description}</span>
                 </div>
-              )}
-
-              {field.note && (
-                <Alert className="border-gray-300 bg-gray-100/30">
-                  <Info className="h-4 w-4 text-gray-600" />
-                  <AlertDescription className="text-gray-800">{field.note}</AlertDescription>
-                </Alert>
               )}
 
               {field.warning && (

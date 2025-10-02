@@ -81,6 +81,40 @@ CONFIG_SECTIONS = [
                 'description': 'Project name for LangSmith organization (read-only - changing this can break things)'
             }
         ]
+    },
+    {
+        'key': 'google_workspace',
+        'label': 'Google Workspace Integration',
+        'description': 'OAuth credentials for Gmail, Calendar, and Google services (stored securely in user_secrets table)',
+        'fields': [
+            {
+                'key': 'google_client_id',
+                'label': 'Google Client ID',
+                'type': 'text',
+                'description': 'OAuth 2.0 client ID for Google services',
+                'placeholder': '443821363207-e017ea00dg7kt4g6tn3uqa54ctp18uf2.apps.googleusercontent.com',
+                'required': True,
+                'note': 'From Google Cloud Console OAuth 2.0 client credentials'
+            },
+            {
+                'key': 'google_client_secret',
+                'label': 'Google Client Secret',
+                'type': 'password',
+                'description': 'OAuth 2.0 client secret for Google services',
+                'placeholder': 'GOCSPX-...',
+                'required': True,
+                'note': 'Keep this secret secure - stored encrypted in database'
+            },
+            {
+                'key': 'google_refresh_token',
+                'label': 'Google Refresh Token',
+                'type': 'password',
+                'description': 'OAuth 2.0 refresh token for Gmail and Calendar access',
+                'placeholder': '1//05q29uIyfXcBKCgYIARA...',
+                'required': True,
+                'note': 'Generated during initial OAuth setup - allows persistent Google services access'
+            }
+        ]
     }
 ]
 

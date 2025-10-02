@@ -119,4 +119,8 @@ DEFAULTS = {
         "agent_description": AGENT_DESCRIPTION,
         "agent_status": AGENT_STATUS,
     },
+    "mcp_integration": {
+        "mcp_env_var": MCP_ENV_VAR,
+        "mcp_server_url": MCP_SERVER_URL,
+    },
 }

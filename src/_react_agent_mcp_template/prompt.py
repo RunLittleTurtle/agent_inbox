@@ -56,3 +56,15 @@ def get_formatted_prompt(agent_display_name: str, agent_description: str) -> str
     ).replace(
         "{AGENT_DESCRIPTION}", agent_description
     )
+
+# =============================================================================
+# DEFAULTS EXPORT FOR FASTAPI CONFIG BRIDGE
+# =============================================================================
+# This export allows FastAPI to read immutable prompt defaults from code
+# These are agent-specific defaults (template placeholders will be replaced)
+
+DEFAULTS = {
+    "system_prompt": AGENT_SYSTEM_PROMPT,
+    "role_prompt": AGENT_ROLE_PROMPT,
+    "guidelines_prompt": AGENT_GUIDELINES_PROMPT,
+}

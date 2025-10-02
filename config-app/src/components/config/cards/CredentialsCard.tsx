@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info, AlertTriangle, Key, Eye, EyeOff, Copy, Check, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { extractCurrentValue } from '@/lib/config-utils';
 
 interface CredentialField {
   key: string;
@@ -63,8 +64,9 @@ export function CredentialsCard({
   };
 
   const getCurrentValue = (field: CredentialField) => {
-    if (values[sectionKey]?.[field.key] !== undefined) {
-      return values[sectionKey][field.key];
+    const rawValue = values[sectionKey]?.[field.key];
+    if (rawValue !== undefined) {
+      return extractCurrentValue(rawValue);
     }
     return field.default || '';
   };

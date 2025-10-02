@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info, AlertTriangle, Link, Server, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { extractCurrentValue } from '@/lib/config-utils';
 
 interface MCPField {
   key: string;
@@ -65,12 +66,13 @@ export function MCPConfigCard({
   const getCurrentValue = (field: MCPField) => {
     // Handle environment variable fields (flat structure from API)
     if (field.envVar && values[field.envVar] !== undefined) {
-      return values[field.envVar];
+      return extractCurrentValue(values[field.envVar]);
     }
 
     // Handle nested structure fields
-    if (values[sectionKey]?.[field.key] !== undefined) {
-      return values[sectionKey][field.key];
+    const rawValue = values[sectionKey]?.[field.key];
+    if (rawValue !== undefined) {
+      return extractCurrentValue(rawValue);
     }
 
     return field.default || '';

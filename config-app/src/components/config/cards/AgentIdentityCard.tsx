@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info, AlertTriangle, User, Shield, CheckCircle, XCircle } from "lucide-react";
+import { extractCurrentValue } from '@/lib/config-utils';
 
 interface IdentityField {
   key: string;
@@ -43,8 +44,9 @@ export function AgentIdentityCard({
   sectionKey
 }: AgentIdentityCardProps) {
   const getCurrentValue = (field: IdentityField) => {
-    if (values[sectionKey]?.[field.key] !== undefined) {
-      return values[sectionKey][field.key];
+    const rawValue = values[sectionKey]?.[field.key];
+    if (rawValue !== undefined) {
+      return extractCurrentValue(rawValue);
     }
     return field.default || '';
   };

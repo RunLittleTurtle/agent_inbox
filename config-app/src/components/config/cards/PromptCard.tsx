@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Info, AlertTriangle, Maximize2 } from "lucide-react";
+import { extractCurrentValue } from '@/lib/config-utils';
 
 interface PromptField {
   key: string;
@@ -42,8 +43,9 @@ export function PromptCard({
   sectionKey
 }: PromptCardProps) {
   const getCurrentValue = (field: PromptField) => {
-    if (values[sectionKey]?.[field.key] !== undefined) {
-      return values[sectionKey][field.key];
+    const rawValue = values[sectionKey]?.[field.key];
+    if (rawValue !== undefined) {
+      return extractCurrentValue(rawValue);
     }
     return field.default || '';
   };

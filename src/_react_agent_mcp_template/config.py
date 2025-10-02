@@ -62,7 +62,7 @@ else:
 
 LLM_CONFIG = {
     "model": "gpt-5",
-    "temperature": 0.1,
+    "temperature": 0.2,
     "streaming": False,  # Disable streaming for LangGraph compatibility
     "api_key": os.getenv("ANTHROPIC_API_KEY")
 }

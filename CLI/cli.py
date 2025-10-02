@@ -248,7 +248,7 @@ def langgraph(
     try:
         os.chdir(PROJECT_ROOT)
         console.print("[green]🔄 Starting LangGraph development server...[/green]")
-        subprocess.run(["langgraph", "dev", "--port", str(port), "--allow-blocking"], check=True)
+        subprocess.run(["langgraph", "dev", "--port", str(port), "--allow-blocking", "--config", "src/langgraph.json"], check=True)
 
     except subprocess.CalledProcessError as e:
         console.print(f"[red]❌ Failed to start LangGraph: {e}[/red]")
@@ -798,7 +798,7 @@ def start(
         os.chdir(PROJECT_ROOT)
         langgraph_cmd = str(VENV_PATH / "bin" / "langgraph")
         langgraph_process = subprocess.Popen(
-            [langgraph_cmd, "dev", "--port", str(langgraph_port)],
+            [langgraph_cmd, "dev", "--port", str(langgraph_port), "--config", "src/langgraph.json"],
             env=langgraph_env
         )
 

@@ -31,7 +31,7 @@ MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER"
 # NOTE: These values are updated by the config UI. Use literal values here.
 # The DEFAULT constants are imported for fallback use in code (e.g., .get() calls)
 LLM_CONFIG = {
-    "model": "claude-sonnet-4-5-20250929",
+    "model": "gpt-5",
     "temperature": 0.3,
     "streaming": False
 }

@@ -453,3 +453,37 @@ def update_config_value(section_key: str, field_key: str, value):
     # TODO: Implement template config updating logic
     # This would modify the template variables in config.py
     pass
+
+
+# =============================================================================
+# DEFAULTS EXPORT FOR FASTAPI CONFIG BRIDGE
+# =============================================================================
+
+def get_defaults():
+    """
+    Get combined defaults from config.py and prompt.py
+    Used by FastAPI config bridge to serve immutable code defaults
+
+    Returns merged dictionary with config and prompt defaults
+    Falls back to empty dict if imports fail (graceful degradation)
+    """
+    try:
+        from .config import DEFAULTS as CONFIG_DEFAULTS
+        from .prompt import DEFAULTS as PROMPT_DEFAULTS
+
+        return {
+            "config": CONFIG_DEFAULTS,
+            "prompts": PROMPT_DEFAULTS,
+        }
+    except ImportError as e:
+        # Graceful fallback if config.py or prompt.py don't exist
+        print(f"⚠️  Warning: Could not load executive-ai-assistant defaults: {e}")
+        return {
+            "config": {},
+            "prompts": {},
+        }
+
+
+# Export DEFAULTS for FastAPI to import
+# FastAPI will call: from src.executive-ai-assistant.ui_config import DEFAULTS
+DEFAULTS = get_defaults()

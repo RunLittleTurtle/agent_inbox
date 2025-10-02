@@ -50,6 +50,15 @@ out/
 .DS_Store
 Thumbs.db
 
+# Documentation and planning files (project root)
+docs/
+*.md
+!README.md
+!CLAUDE.md
+
+# Vercel deployment configuration
+.vercel/
+
 # Logs
 *.log
 logs/

@@ -136,7 +136,7 @@ export function ThreadsProvider<
 >({ children }: { children: React.ReactNode }): React.ReactElement {
   const { getItem } = useLocalStorage();
   const { toast } = useToast();
-  const { getToken } = useAuth(); // Clerk JWT token for LangGraph custom auth
+  const { getToken, userId } = useAuth(); // Clerk JWT token + userId for config
 
   const { getSearchParam, searchParams } = useQueryParams();
   const [loading, setLoading] = React.useState(false);
@@ -478,11 +478,19 @@ export function ThreadsProvider<
       return undefined as any;
     }
     try {
+      // Pass user_id in config for Supabase config fetching
+      const runConfig = userId ? {
+        configurable: {
+          user_id: userId
+        }
+      } : undefined;
+
       if (options?.stream) {
         return client.runs.stream(threadId, graphId, {
           command: {
             resume: response,
           },
+          config: runConfig,
           streamMode: "events",
         }) as any; // Type assertion needed due to conditional return type
       }
@@ -490,6 +498,7 @@ export function ThreadsProvider<
         command: {
           resume: response,
         },
+        config: runConfig,
       }) as any; // Type assertion needed due to conditional return type
     } catch (e: any) {
       logger.error("Error sending human response", e);

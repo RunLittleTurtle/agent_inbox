@@ -72,7 +72,12 @@ async def find_meeting_time(state: State, config: RunnableConfig):
     prompt_config = await get_config(config)
     model = prompt_config.get("scheduling_model", "gpt-4o")  # Fallback default
     temperature = prompt_config.get("scheduling_temperature", 0.1)  # Fallback default
-    llm = get_llm(model, temperature=temperature)
+
+    # Load per-user API keys from config
+    anthropic_api_key = prompt_config.get("anthropic_api_key")
+    openai_api_key = prompt_config.get("openai_api_key")
+
+    llm = get_llm(model, temperature=temperature, anthropic_api_key=anthropic_api_key, openai_api_key=openai_api_key)
     agent = create_react_agent(llm, [get_events_for_days], name="meeting_time_finder")
 
     # Get timezone-aware current datetime from config.yaml

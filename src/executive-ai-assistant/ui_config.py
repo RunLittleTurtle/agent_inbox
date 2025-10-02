@@ -91,6 +91,24 @@ CONFIG_SECTIONS = [
                 'placeholder': 'By default, unless specified otherwise, you should make meetings 30 minutes long.',
                 'rows': 3,
                 'required': False
+            },
+            {
+                'key': 'background_preferences',
+                'label': 'Background & Context Preferences',
+                'type': 'textarea',
+                'description': 'How the assistant should use your background information in responses',
+                'placeholder': '{full_name} works on AI agent systems and automation. For technical questions about LangGraph, calendar management, or AI development, he is interested in engaging directly.',
+                'rows': 4,
+                'required': False
+            },
+            {
+                'key': 'response_preferences',
+                'label': 'Email Response Preferences',
+                'type': 'textarea',
+                'description': 'General preferences for how the assistant should draft email responses',
+                'placeholder': 'Be direct and professional in business communications. Match the sender\'s tone. Keep responses concise and actionable.',
+                'rows': 4,
+                'required': False
             }
         ]
     },
@@ -274,93 +292,6 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'ai_models',
-        'label': 'AI Model APIs',
-        'description': 'API keys for AI language models',
-        'fields': [
-            {
-                'key': 'anthropic_api_key',
-                'label': 'Anthropic API Key',
-                'type': 'password',
-                'description': 'API key for Claude models (primary)',
-                'required': True,
-                'placeholder': 'sk-ant-api03-...'
-            },
-            {
-                'key': 'openai_api_key',
-                'label': 'OpenAI API Key',
-                'type': 'password',
-                'description': 'API key for GPT models (backup)',
-                'placeholder': 'sk-proj-...'
-            }
-        ]
-    },
-    {
-        'key': 'langgraph_system',
-        'label': 'LangGraph System',
-        'description': 'Core LangGraph and monitoring configuration',
-        'fields': [
-            {
-                'key': 'langsmith_api_key',
-                'label': 'LangSmith API Key',
-                'type': 'password',
-                'description': 'API key for LangSmith monitoring and tracing',
-                'placeholder': 'lsv2_pt_...'
-            },
-            {
-                'key': 'langchain_project',
-                'label': 'LangChain Project Name',
-                'type': 'text',
-                'default': 'ambient-email-agent',
-                'readonly': True,
-                'description': 'Project name for LangSmith organization (read-only - changing this can break things)'
-            }
-        ]
-    },
-    {
-        'key': 'google_workspace',
-        'label': 'Google Workspace Integration',
-        'description': 'OAuth credentials for Gmail, Calendar, and Google services integration',
-        'fields': [
-            {
-                'key': 'google_client_id',
-                'label': 'Google Client ID',
-                'type': 'text',
-                'description': 'OAuth 2.0 client ID for Google services',
-                'placeholder': '443821363207-e017ea00dg7kt4g6tn3uqa54ctp18uf2.apps.googleusercontent.com',
-                'required': True,
-                'note': 'From Google Cloud Console OAuth 2.0 client credentials'
-            },
-            {
-                'key': 'google_client_secret',
-                'label': 'Google Client Secret',
-                'type': 'password',
-                'description': 'OAuth 2.0 client secret for Google services',
-                'placeholder': 'GOCSPX-...',
-                'required': True,
-                'note': 'Keep this secret secure'
-            },
-            {
-                'key': 'gmail_refresh_token',
-                'label': 'Gmail Refresh Token',
-                'type': 'password',
-                'description': 'OAuth 2.0 refresh token for Gmail access',
-                'placeholder': '1//05q29uIyfXcBKCgYIARA...',
-                'required': True,
-                'note': 'Generated during initial OAuth setup - allows persistent Gmail access'
-            },
-            {
-                'key': 'user_google_email',
-                'label': 'User Google Email',
-                'type': 'text',
-                'description': 'Google account email address for this assistant',
-                'placeholder': 'info@800m.ca',
-                'required': True,
-                'note': 'Must match the Gmail account used for OAuth setup'
-            }
-        ]
-    },
-    {
         'key': 'agent_identity',
         'label': 'Agent Identity',
         'description': 'Agent identification and operational status',
@@ -403,6 +334,21 @@ CONFIG_SECTIONS = [
                 'required': True
             }
         ]
+    },
+    {
+        'key': 'agent_settings',
+        'label': 'Agent Settings',
+        'description': 'Feature flags and operational settings',
+        'fields': [
+            {
+                'key': 'memory',
+                'label': 'Enable Memory',
+                'type': 'boolean',
+                'default': True,
+                'description': 'Enable the agent to remember context from previous emails and interactions',
+                'required': False
+            }
+        ]
     }
 ]
 
@@ -411,7 +357,6 @@ def get_current_config():
     """Get current configuration values from config.py template"""
     try:
         from .config import LLM_CONFIG, AGENT_NAME, AGENT_DISPLAY_NAME, AGENT_DESCRIPTION, MCP_SERVICE
-        from .prompt import AGENT_SYSTEM_PROMPT, AGENT_ROLE_PROMPT, AGENT_GUIDELINES_PROMPT
 
         return {
             'agent_identity': {
@@ -422,11 +367,6 @@ def get_current_config():
             'llm': LLM_CONFIG,
             'mcp_integration': {
                 # MCP server URL comes from environment variable
-            },
-            'prompt_templates': {
-                'agent_system_prompt': AGENT_SYSTEM_PROMPT,
-                'agent_role_prompt': AGENT_ROLE_PROMPT,
-                'agent_guidelines_prompt': AGENT_GUIDELINES_PROMPT
             }
         }
     except ImportError:
@@ -461,22 +401,21 @@ def update_config_value(section_key: str, field_key: str, value):
 
 def get_defaults():
     """
-    Get combined defaults from config.py and prompt.py
+    Get defaults from config.py only
     Used by FastAPI config bridge to serve immutable code defaults
 
-    Returns merged dictionary with config and prompt defaults
+    Returns config defaults (no prompts - those are node implementation details)
     Falls back to empty dict if imports fail (graceful degradation)
     """
     try:
         from .config import DEFAULTS as CONFIG_DEFAULTS
-        from .prompt import DEFAULTS as PROMPT_DEFAULTS
 
         return {
             "config": CONFIG_DEFAULTS,
-            "prompts": PROMPT_DEFAULTS,
+            "prompts": {},  # No prompts exported - they're node implementation details
         }
     except ImportError as e:
-        # Graceful fallback if config.py or prompt.py don't exist
+        # Graceful fallback if config.py doesn't exist
         print(f"⚠️  Warning: Could not load executive-ai-assistant defaults: {e}")
         return {
             "config": {},

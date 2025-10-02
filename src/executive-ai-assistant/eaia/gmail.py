@@ -34,26 +34,71 @@ _SCOPES = [
 
 async def get_credentials(
     user_email: str,
+    config: dict | None = None,
     langsmith_api_key: str | None = None
 ) -> Credentials:
     """Get Google API credentials using existing OAuth setup.
 
     Args:
         user_email: User's Gmail email address
+        config: LangGraph config dict for loading credentials from Supabase user_secrets
         langsmith_api_key: Not used (kept for compatibility)
 
     Returns:
         Google OAuth2 credentials
     """
-    # Use existing OAuth credentials from environment
-    client_id = os.getenv("GOOGLE_CLIENT_ID")
-    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-    refresh_token = os.getenv("GMAIL_REFRESH_TOKEN")
+    # Try to load from user_secrets table (via global config API)
+    client_id = None
+    client_secret = None
+    refresh_token = None
+
+    if config:
+        try:
+            import httpx
+
+            # Extract user_id from LangGraph config
+            user_id = config.get("configurable", {}).get("user_id")
+            if not user_id:
+                metadata = config.get("metadata", {})
+                user_id = metadata.get("user_id") or metadata.get("clerk_user_id")
+
+            if user_id:
+                # Fetch global config (which includes user_secrets)
+                config_api_url = os.getenv("CONFIG_API_URL", "http://localhost:8000")
+
+                async with httpx.AsyncClient(timeout=5.0) as client_http:
+                    response = await client_http.get(
+                        f"{config_api_url}/api/config/values",
+                        params={"agent_id": "global", "user_id": user_id}
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        google_workspace = data.get("google_workspace", {})
+                        client_id = google_workspace.get("google_client_id")
+                        client_secret = google_workspace.get("google_client_secret")
+                        refresh_token = google_workspace.get("google_refresh_token")
+
+                        if all([client_id, client_secret, refresh_token]):
+                            logger.info("✅ Loaded Google credentials from user_secrets (Supabase)")
+            else:
+                logger.warning("⚠️  No user_id found in config - skipping Supabase fetch")
+        except Exception as e:
+            logger.warning(f"⚠️  Could not load credentials from user_secrets: {e}")
+
+    # Fallback to environment variables (.env file)
+    if not all([client_id, client_secret, refresh_token]):
+        client_id = client_id or os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = client_secret or os.getenv("GOOGLE_CLIENT_SECRET")
+        refresh_token = refresh_token or os.getenv("GMAIL_REFRESH_TOKEN")
+
+        if all([client_id, client_secret, refresh_token]):
+            logger.info("✅ Loaded Google credentials from environment variables (.env)")
 
     if not all([client_id, client_secret, refresh_token]):
         raise ValueError(
-            "Missing Gmail OAuth credentials in environment. "
-            "Please set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN"
+            "Missing Gmail OAuth credentials. "
+            "Please set Google Workspace credentials in Supabase user_secrets table or .env file"
         )
 
     # Create credentials with refresh token
@@ -141,11 +186,12 @@ async def send_email(
     email_id,
     response_text,
     email_address,
+    config: dict | None = None,
     gmail_token: str | None = None,
     gmail_secret: str | None = None,
     addn_receipients=None,
 ):
-    creds = await get_credentials(email_address)
+    creds = await get_credentials(email_address, config=config)
 
     service = await asyncio.to_thread(build, "gmail", "v1", credentials=creds)
     message = await asyncio.to_thread(
@@ -176,10 +222,11 @@ async def send_email(
 async def fetch_group_emails(
     to_email,
     minutes_since: int = 30,
+    config: dict | None = None,
     gmail_token: str | None = None,
     gmail_secret: str | None = None,
 ) -> Iterable[EmailData]:
-    creds = await get_credentials(to_email)
+    creds = await get_credentials(to_email, config=config)
 
     service = await asyncio.to_thread(build, "gmail", "v1", credentials=creds)
     after = int((datetime.now() - timedelta(minutes=minutes_since)).timestamp())
@@ -279,10 +326,11 @@ async def fetch_group_emails(
 async def mark_as_read(
     message_id,
     user_email: str,
+    config: dict | None = None,
     gmail_token: str | None = None,
     gmail_secret: str | None = None,
 ):
-    creds = await get_credentials(user_email)
+    creds = await get_credentials(user_email, config=config)
 
     service = await asyncio.to_thread(build, "gmail", "v1", credentials=creds)
     await asyncio.to_thread(
@@ -319,7 +367,7 @@ async def get_events_for_days(date_strs: list[str]):
     user_config = await get_config(config)
     user_email = user_config["email"]
 
-    creds = await get_credentials(user_email)
+    creds = await get_credentials(user_email, config=config)
     service = await asyncio.to_thread(build, "calendar", "v3", credentials=creds)
     results = ""
     for date_str in date_strs:
@@ -392,9 +440,9 @@ def print_events(events):
 
 
 async def send_calendar_invite(
-    emails, title, start_time, end_time, email_address, timezone="America/Toronto"
+    emails, title, start_time, end_time, email_address, config: dict | None = None, timezone="America/Toronto"
 ):
-    creds = await get_credentials(email_address)
+    creds = await get_credentials(email_address, config=config)
     service = await asyncio.to_thread(build, "calendar", "v3", credentials=creds)
 
     # Parse the start and end times

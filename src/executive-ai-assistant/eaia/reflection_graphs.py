@@ -69,7 +69,11 @@ async def update_general(state: ReflectionState, config: RunnableConfig, store: 
     model_name = prompt_config.get("reflection_model", "claude-sonnet-4-20250514")  # Fallback default
     temperature = prompt_config.get("reflection_temperature", 0.1)  # Fallback default
 
-    reflection_model = get_llm(model_name, temperature=temperature)
+    # Load per-user API keys from config
+    anthropic_api_key = prompt_config.get("anthropic_api_key")
+    openai_api_key = prompt_config.get("openai_api_key")
+
+    reflection_model = get_llm(model_name, temperature=temperature, anthropic_api_key=anthropic_api_key, openai_api_key=openai_api_key)
     namespace = (state["assistant_key"],)
     key = state["prompt_key"]
     result = await store.aget(namespace, key)
@@ -159,7 +163,11 @@ async def determine_what_to_update(state: MultiMemoryInput, config: RunnableConf
     model_name = prompt_config.get("reflection_model", "claude-sonnet-4-20250514")  # Fallback default
     temperature = prompt_config.get("reflection_temperature", 0.1)  # Fallback default
 
-    reflection_model = get_llm(model_name, temperature=temperature)
+    # Load per-user API keys from config
+    anthropic_api_key = prompt_config.get("anthropic_api_key")
+    openai_api_key = prompt_config.get("openai_api_key")
+
+    reflection_model = get_llm(model_name, temperature=temperature, anthropic_api_key=anthropic_api_key, openai_api_key=openai_api_key)
     trajectory = get_trajectory_clean(state["messages"])
     types_of_prompts = "\n".join(
         [f"`{p_type}`: {MEMORY_TO_UPDATE[p_type]}" for p_type in state["prompt_types"]]

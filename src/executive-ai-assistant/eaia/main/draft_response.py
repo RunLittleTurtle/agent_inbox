@@ -100,7 +100,11 @@ async def draft_response(state: State, config: RunnableConfig, store: BaseStore)
     model_name = prompt_config.get("draft_model", "claude-sonnet-4-20250514")  # Fallback default
     temperature = prompt_config.get("draft_temperature", 0.2)  # Fallback default
 
-    llm = get_llm(model_name, temperature=temperature)
+    # Load per-user API keys from config
+    anthropic_api_key = prompt_config.get("anthropic_api_key")
+    openai_api_key = prompt_config.get("openai_api_key")
+
+    llm = get_llm(model_name, temperature=temperature, anthropic_api_key=anthropic_api_key, openai_api_key=openai_api_key)
     tools = [
         NewEmailDraft,
         ResponseEmailDraft,

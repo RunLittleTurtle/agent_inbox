@@ -54,7 +54,12 @@ async def triage_input(state: State, config: RunnableConfig, store: BaseStore):
     prompt_config = await get_config(config)
     model_name = prompt_config.get("triage_model", "claude-3-5-haiku-20241022")  # Fallback default
     temperature = prompt_config.get("triage_temperature", 0.1)  # Fallback default
-    llm = get_llm(model_name, temperature=temperature)
+
+    # Load per-user API keys from config
+    anthropic_api_key = prompt_config.get("anthropic_api_key")
+    openai_api_key = prompt_config.get("openai_api_key")
+
+    llm = get_llm(model_name, temperature=temperature, anthropic_api_key=anthropic_api_key, openai_api_key=openai_api_key)
     examples = await get_few_shot_examples(state["email"], store, config)
 
     # Get timezone-aware current datetime from config.yaml

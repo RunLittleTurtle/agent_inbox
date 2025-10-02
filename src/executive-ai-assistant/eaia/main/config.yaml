@@ -125,10 +125,10 @@ triage_email: >
 memory: true
 triage_model: claude-sonnet-4-5-20250929
 triage_temperature: 1
-draft_model: claude-sonnet-4-5-20250929
-draft_temperature: 0.2
+draft_model: gpt-5
+draft_temperature: 1
 rewrite_model: gpt-4o
-rewrite_temperature: 0.2
+rewrite_temperature: 0.9
 scheduling_model: gpt-4o
 scheduling_temperature: 0
 reflection_model: claude-sonnet-4-5-20250929

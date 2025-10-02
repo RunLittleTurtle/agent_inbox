@@ -13,13 +13,15 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
 
 
-def get_llm(model_name: str, temperature: float = 0, **kwargs) -> BaseChatModel:
+def get_llm(model_name: str, temperature: float = 0, anthropic_api_key: str = None, openai_api_key: str = None, **kwargs) -> BaseChatModel:
     """
     Get the appropriate LLM instance based on model name.
 
     Args:
         model_name: Name of the model (e.g., 'claude-3-5-sonnet', 'gpt-4o')
         temperature: Model temperature (0-1)
+        anthropic_api_key: Anthropic API key (per-user). If None, uses ANTHROPIC_API_KEY env var
+        openai_api_key: OpenAI API key (per-user). If None, uses OPENAI_API_KEY env var
         **kwargs: Additional provider-specific parameters
 
     Returns:
@@ -31,6 +33,11 @@ def get_llm(model_name: str, temperature: float = 0, **kwargs) -> BaseChatModel:
 
         Reasoning models (gpt-5, gpt-5-mini, o3) do NOT support the temperature parameter.
         Temperature will be automatically excluded for these models.
+
+        Per-User API Keys (Multi-Tenant):
+        - API keys are loaded from user_secrets table via get_config()
+        - Each user has their own keys, never shared between users
+        - If not provided, falls back to environment variables (single-tenant mode)
     """
     # OpenAI reasoning models that don't support temperature parameter
     # Synced with config/model_constants.json REASONING_MODELS_NO_TEMPERATURE
@@ -39,14 +46,22 @@ def get_llm(model_name: str, temperature: float = 0, **kwargs) -> BaseChatModel:
     is_reasoning_model = any(rm in model_name.lower() for rm in reasoning_models)
 
     if model_name.startswith('claude') or model_name.startswith('opus'):
-        return ChatAnthropic(model=model_name, temperature=temperature, **kwargs)
+        llm_kwargs = {"model": model_name, "temperature": temperature, **kwargs}
+        if anthropic_api_key:
+            llm_kwargs["api_key"] = anthropic_api_key
+        return ChatAnthropic(**llm_kwargs)
     else:  # OpenAI models (gpt-*, o3)
+        llm_kwargs = {"model": model_name, **kwargs}
+        if openai_api_key:
+            llm_kwargs["api_key"] = openai_api_key
+
         # Don't pass temperature for reasoning models
-        if is_reasoning_model:
-            print(f"⚠️ Model {model_name} is a reasoning model - excluding temperature parameter")
-            return ChatOpenAI(model=model_name, **kwargs)
+        if not is_reasoning_model:
+            llm_kwargs["temperature"] = temperature
         else:
-            return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)
+            print(f"⚠️ Model {model_name} is a reasoning model - excluding temperature parameter")
+
+        return ChatOpenAI(**llm_kwargs)
 
 
 def get_tool_choice(model_name: str, tool_name: Optional[str] = None) -> Union[dict, str]:

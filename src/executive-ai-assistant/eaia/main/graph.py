@@ -150,7 +150,8 @@ async def send_cal_invite_node(state, config):
             _args["start_time"],
             _args["end_time"],
             email,
-            timezone,  # Pass the user's timezone from config
+            config=config,
+            timezone=timezone,
         )
         message = "Sent calendar invite!"
     except Exception as e:
@@ -170,6 +171,7 @@ async def send_email_node(state, config):
         state["email"]["id"],
         _args["content"],
         email,
+        config=config,
         addn_receipients=new_receipients,
     )
 
@@ -177,7 +179,7 @@ async def send_email_node(state, config):
 async def mark_as_read_node(state, config):
     config_data = await get_config(config)
     email = config_data["email"]
-    await mark_as_read(state["email"]["id"], email)
+    await mark_as_read(state["email"]["id"], email, config=config)
 
 
 def human_node(state: State):

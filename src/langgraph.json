@@ -1,0 +1,22 @@
+{
+  "dependencies": [".", "./executive-ai-assistant"],
+  "graphs": {
+    "agent": "./graph.py:graph",
+    "executive_main": "./executive-ai-assistant/eaia/main/graph.py:app",
+    "executive_cron": "./executive-ai-assistant/eaia/cron_graph.py:graph",
+    "executive_general_reflection": "./executive-ai-assistant/eaia/reflection_graphs.py:general_reflection_graph",
+    "executive_multi_reflection": "./executive-ai-assistant/eaia/reflection_graphs.py:multi_reflection_graph"
+  },
+  "env": "../.env",
+  "python_version": "3.11",
+  "store": {
+    "index": {
+      "embed": "openai:text-embedding-3-small",
+      "dims": 1536,
+      "fields": ["$"]
+    }
+  },
+  "auth": {
+    "path": "./auth.py:auth"
+  }
+}

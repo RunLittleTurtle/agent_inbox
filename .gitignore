@@ -57,6 +57,7 @@ logs/
 # Git submodules (we'll include the code directly)
 agent-chat-ui/.git/
 agent-inbox/.git/
+agent-inbox-2/.git/
 src/supervisor-py/.git/
 
 # Personal documents and sensitive files

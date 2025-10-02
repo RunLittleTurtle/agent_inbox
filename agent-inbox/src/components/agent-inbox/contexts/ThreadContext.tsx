@@ -49,17 +49,16 @@ type ThreadContentType<
     response: HumanResponse[],
     options?: {
       stream?: TStream;
+      clerkToken?: string | null;
     }
-  ) => Promise<
-    TStream extends true
-      ?
-          | AsyncGenerator<{
-              event: Record<string, any>;
-              data: any;
-            }>
-          | undefined
-      : Run | undefined
-  >;
+  ) => TStream extends true
+    ?
+        | AsyncGenerator<{
+            event: Record<string, any>;
+            data: any;
+          }>
+        | undefined
+    : Promise<Run> | undefined;
   fetchSingleThread: (
     threadId: string
   ) => Promise<ThreadData<ThreadValues> | undefined>;
@@ -101,7 +100,7 @@ const getClient = ({ agentInboxes, getItem, toast, clerkToken }: GetClientArgs) 
   // Validate that deploymentUrl is a valid URL
   try {
     new URL(deploymentUrl);
-  } catch (error) {
+  } catch (_error) {
     toast({
       title: "Error",
       description: `Invalid deployment URL: ${deploymentUrl}. Please check your inbox configuration.`,
@@ -443,22 +442,21 @@ export function ThreadsProvider<
     }
   };
 
-  const sendHumanResponse = async <TStream extends boolean = false>(
+  const sendHumanResponse = <TStream extends boolean = false>(
     threadId: string,
     response: HumanResponse[],
     options?: {
       stream?: TStream;
+      clerkToken?: string | null;
     }
-  ): Promise<
-    TStream extends true
-      ?
-          | AsyncGenerator<{
-              event: Record<string, any>;
-              data: any;
-            }>
-          | undefined
-      : Run | undefined
-  > => {
+  ): TStream extends true
+    ?
+        | AsyncGenerator<{
+            event: Record<string, any>;
+            data: any;
+          }>
+        | undefined
+    : Promise<Run> | undefined => {
     const graphId = agentInboxes.find((i) => i.selected)?.graphId;
     if (!graphId) {
       toast({
@@ -470,14 +468,11 @@ export function ThreadsProvider<
       return undefined as any;
     }
 
-    // Get Clerk JWT token for LangGraph custom auth (2025)
-    const clerkToken = await getToken();
-
     const client = getClient({
       agentInboxes,
       getItem,
       toast,
-      clerkToken,
+      clerkToken: options?.clerkToken,
     });
     if (!client) {
       return undefined as any;

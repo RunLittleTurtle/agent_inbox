@@ -138,7 +138,7 @@ export function processInterrupts(interrupts: any[]): HumanInterrupt[] {
  */
 export function convertResponseToLegacy(
   response: any,
-  originalInterruptType?: string
+  _originalInterruptType?: string
 ): any {
   // For now, just return the response as-is
   // This can be enhanced if agents need specific response formats

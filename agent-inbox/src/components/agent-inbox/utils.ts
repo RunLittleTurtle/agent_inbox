@@ -9,10 +9,7 @@ import {
 } from "./types";
 import { logger } from "./utils/logger";
 import { validate } from "uuid";
-import {
-  processInterrupts,
-  isLegacyInterrupt,
-} from "./adapters/interrupt-adapter";
+import { processInterrupts } from "./adapters/interrupt-adapter";
 
 export function prettifyText(action: string) {
   return startCase(action.replace(/_/g, " "));

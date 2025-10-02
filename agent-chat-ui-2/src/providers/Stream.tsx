@@ -85,6 +85,13 @@ const StreamSession = ({
     assistantId,
     threadId: threadId ?? null,
     fetchStateHistory: true,
+    // ✅ Add metadata for thread organization and searchability
+    metadata: {
+      graph_id: assistantId,
+      created_at: new Date().toISOString(),
+    },
+    // ✅ Cancel old runs when new message arrives (double-texting strategy)
+    multitaskStrategy: "interrupt",
     onCustomEvent: (event, options) => {
       if (isUIMessage(event) || isRemoveUIMessage(event)) {
         options.mutate((prev) => {

@@ -13,6 +13,7 @@ import { createDefaultHumanResponse } from "../utils";
 import { INBOX_PARAM, VIEW_STATE_THREAD_QUERY_PARAM } from "../constants";
 import { useQueryParams } from "./use-query-params";
 import { logger } from "../utils/logger";
+import { useAuth } from "@clerk/nextjs";
 
 interface UseInterruptedActionsInput<
   ThreadValues extends Record<string, any> = Record<string, any>,
@@ -75,6 +76,7 @@ export default function useInterruptedActions<
   const { updateQueryParams, getSearchParam } = useQueryParams();
   const { fetchSingleThread, fetchThreads, sendHumanResponse, ignoreThread } =
     useThreadsContext<ThreadValues>();
+  const { getToken } = useAuth();
 
   const [humanResponse, setHumanResponse] = React.useState<
     HumanResponseWithEdits[]
@@ -205,11 +207,16 @@ export default function useInterruptedActions<
 
         setLoading(true);
         setStreaming(true);
+
+        // Get Clerk token for auth
+        const clerkToken = await getToken();
+
         const response = sendHumanResponse(
           threadData.thread.thread_id,
           [input],
           {
             stream: true,
+            clerkToken,
           }
         );
         if (!response) {
@@ -301,7 +308,13 @@ export default function useInterruptedActions<
       }
     } else {
       setLoading(true);
-      await sendHumanResponse(threadData.thread.thread_id, humanResponse);
+
+      // Get Clerk token for auth
+      const clerkToken = await getToken();
+
+      await sendHumanResponse(threadData.thread.thread_id, humanResponse, {
+        clerkToken,
+      });
 
       toast({
         title: "Success",
@@ -348,7 +361,12 @@ export default function useInterruptedActions<
     setLoading(true);
     initialHumanInterruptEditValue.current = {};
 
-    await sendHumanResponse(threadData.thread.thread_id, [ignoreResponse]);
+    // Get Clerk token for auth
+    const clerkToken = await getToken();
+
+    await sendHumanResponse(threadData.thread.thread_id, [ignoreResponse], {
+      clerkToken,
+    });
     await fetchThreads(currentInbox);
 
     setLoading(false);

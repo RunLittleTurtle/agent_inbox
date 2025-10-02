@@ -14,7 +14,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { AgentInbox } from "../types";
 import { useRouter } from "next/navigation";
 import { logger } from "../utils/logger";
-import { runInboxBackfill } from "../utils/backfill";
 
 /**
  * Hook for managing agent inboxes

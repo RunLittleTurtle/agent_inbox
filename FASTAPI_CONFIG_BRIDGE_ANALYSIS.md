@@ -1,6 +1,53 @@
 # FastAPI Config Bridge - Implementation Analysis & Action Plan
 
-**Date:** October 2, 2025 | **Status:** ✅ Phase 0 Complete (35% Total) | **Estimated Time:** 16-24 hours
+**Date:** October 2, 2025 | **Status:** ⏳ Phase 4 Ready to Start (70% Total) | **Estimated Time:** 16-24 hours
+
+---
+
+## 🎯 Two-Way Sync Architecture Overview
+
+This FastAPI service enables **bidirectional configuration sync** between TypeScript Config App and Python LangGraph agents:
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                    TWO-WAY SYNC FLOW                            │
+├────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  TypeScript Config App (Next.js)                                │
+│         ↓ READ                      ↓ WRITE                     │
+│         ↓                           ↓                           │
+│    ┌────────────────────────────────────────┐                  │
+│    │        FastAPI Bridge (Port 8000)      │                  │
+│    │  - GET /api/config/schemas             │                  │
+│    │  - GET /api/config/values              │                  │
+│    │  - POST /api/config/update             │                  │
+│    │  - POST /api/config/reset              │                  │
+│    └────────┬───────────────────────┬───────┘                  │
+│             ↓ READ                  ↓ WRITE                     │
+│             ↓                       ↓                           │
+│  ┌──────────────────┐    ┌─────────────────────┐              │
+│  │  Python Code     │    │  Supabase           │              │
+│  │  (Defaults)      │    │  (User Overrides)   │              │
+│  │  - prompt.py     │    │  - agent_configs    │              │
+│  │  - config.py     │    │    table            │              │
+│  │  IMMUTABLE ✅    │    │  - config_data JSON │              │
+│  └──────────┬───────┘    │  - prompts JSONB    │              │
+│             │             └─────────┬───────────┘              │
+│             │ READ (defaults)       │ READ (overrides)         │
+│             └───────────────────────┘                          │
+│                         ↓                                       │
+│              Python LangGraph Agents                           │
+│              (Merge: override > default)                       │
+│                                                                  │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Key Points:**
+- **TypeScript Config App**: Edits configs via FastAPI endpoints (never touches Python code)
+- **FastAPI Bridge**: Reads schemas from Python code, reads/writes overrides to Supabase
+- **Python Agents**: Read defaults from code + overrides from Supabase at runtime
+- **Immutability**: Python code defaults NEVER auto-modified, always safe fallback
+- **Per-Agent**: Each agent has its own specific defaults (calendar ≠ email ≠ executive)
 
 ---
 
@@ -22,43 +69,100 @@
 - [x] **0.5** Consolidate SQL: `/supabase/migrations/002_agent_configs.sql` ✅
 - [x] **0.6** Create verification test: `test_phase_0_defaults.py` ✅
 
-### Phase 1: Database Setup & Verification ⏳
-- [ ] **1.1** Execute Supabase SQL migration (`/supabase/migrations/002_agent_configs.sql`)
-- [ ] **1.2** Verify `agent_configs` table exists (with `prompts` JSONB column)
-- [ ] **1.3** Verify RLS policies are enabled
-- [ ] **1.4** Test FastAPI service manually (`python src/config_api/main.py`)
-- [ ] **1.5** Test endpoints with curl/Postman
+### ⚠️ SQL Files Consolidation Status
+**Three SQL files exist - consolidation needed:**
+1. ✅ `/supabase_setup.sql` - `user_secrets` table (KEEP - already in Supabase)
+2. ⚠️ `/config-app/supabase_agent_configs.sql` - OLD `agent_configs` (missing `prompts` column)
+3. ✅ `/supabase/migrations/002_agent_configs.sql` - NEW `agent_configs` (has `prompts` column)
 
-### Phase 2: CLI Integration ⏳
-- [ ] **2.1** Add `config_api()` command to `/CLI/CLI.py`
-- [ ] **2.2** Integrate config-api into `start()` command
-- [ ] **2.3** Test: `python cli.py config-api`
-- [ ] **2.4** Test: `python cli.py start` (should launch config-api)
+**Action Required**: Use file #3 (`/supabase/migrations/002_agent_configs.sql`) as source of truth.
+- If `agent_configs` table exists without `prompts` column → Add column via ALTER TABLE
+- If table doesn't exist → Run full migration
 
-### Phase 3: FastAPI Merge Logic (Defaults + Overrides) ⏳
-- [ ] **3.1** Create `get_agent_defaults()` function (reads from code)
-- [ ] **3.2** Update GET `/api/config/values` (return default + override + current)
-- [ ] **3.3** Update POST `/api/config/update` (support remove_field for reset)
-- [ ] **3.4** Add POST `/api/config/reset` (reset all to defaults)
-- [ ] **3.5** Test merge logic with curl
+### Phase 1: Database Setup & Verification ✅ COMPLETE
+- [x] **1.1** Create SQL migration files and verification scripts ✅
+  - [x] `/supabase/migrations/001_check_schema.sql` - Diagnostic queries
+  - [x] `/supabase/migrations/002a_add_prompts_column.sql` - Add prompts column
+  - [x] `PHASE_1_MIGRATION_GUIDE.md` - Step-by-step instructions
+- [x] **1.2** Run Supabase migration ✅ (`agent_configs` table created with `prompts` column)
+- [x] **1.3** Verify RLS policies are enabled ✅ (4 policies: SELECT, INSERT, UPDATE, DELETE)
+- [x] **1.4** Upgrade supabase-py for 2025 API keys ✅ (v2.7.4 → v2.20.0)
+- [x] **1.5** Fix FastAPI `.single()` → `.maybe_single()` for create logic ✅
+- [x] **1.6** Test FastAPI service locally ✅ (all endpoints working)
+- [x] **1.7** Test endpoints with automated test suite ✅ (`test_fastapi_endpoints.py`)
 
-### Phase 4: Config-App UI (Show Defaults + Overrides) ⏳
+**Achievements**:
+- ✅ Discovered and fixed Supabase 2025 key format compatibility (upgraded supabase-py to v2.20.0)
+- ✅ Database schema verified: `agent_configs` table with `config_data` + `prompts` JSONB columns
+- ✅ All FastAPI endpoints tested and working: `/`, `/api/config/schemas`, `/api/config/values`, `/api/config/update`
+- ✅ End-to-end test: Create config → Store in Supabase → Retrieve config → Delete config
+- ✅ Supabase client initialized successfully with new `sb_secret_xxx` key format
+
+### Phase 2: CLI Integration ✅ COMPLETE
+- [x] **2.1** Add `config_api()` command to `/CLI/cli.py` ✅
+- [x] **2.2** Integrate config-api into `start()` command ✅
+- [x] **2.3** Test: `python cli.py config-api` ✅ (all endpoints working)
+- [x] **2.4** Test: `python cli.py start` ✅ (config-api included in stack)
+
+**Achievements**:
+- ✅ Created standalone `config_api()` CLI command (CLI/cli.py:1072-1136)
+- ✅ Command kills existing processes on port 8000 and starts uvicorn with --reload
+- ✅ Integrated config-api into `start()` as Step 3 (after Executive Assistant, before UIs)
+- ✅ Added config_api_process to port cleanup, monitoring loop, and graceful shutdown
+- ✅ All tests passing: root endpoint, schemas (4 agents), values, update, cleanup
+- ✅ Service starts on port 8000 and responds to all API endpoints correctly
+
+### Phase 3: FastAPI Merge Logic (Defaults + Overrides) ✅ COMPLETE
+- [x] **3.1** Create `get_agent_defaults()` function ✅ (reads from prompt.py + config.py)
+- [x] **3.2** Update GET `/api/config/values` ✅ (returns default + user_override + current + is_overridden)
+- [x] **3.3** POST `/api/config/reset` endpoint ✅ (reset field, section, or all)
+- [x] **3.4** Test merge logic ✅ (10/10 tests passed)
+- [x] **3.5** Fix `.maybe_single()` null handling ✅
+
+**Achievements**:
+- ✅ `get_agent_defaults()` dynamically loads defaults from Python code per agent
+- ✅ Each field returns: `default` (immutable code), `user_override` (Supabase), `current` (merged), `is_overridden` (bool)
+- ✅ Reset API supports 3 modes: reset_all (delete row), reset_section (remove section), reset_field (remove field)
+- ✅ Comprehensive test suite: test_phase3_merge_logic.py (10 tests, all passing)
+- ✅ Tested: create overrides, merge priority (override > default), resets at all levels
+- ✅ Verified: defaults preserved after override, multi-user isolation working
+
+### Phase 4: Config-App UI Integration (Call FastAPI Bridge) ⏳
+**Goal:** Replace TypeScript config logic with FastAPI calls for two-way sync
+
 - [ ] **4.1** Add `CONFIG_API_URL` env var to `config-app/.env.local`
-- [ ] **4.2** Update `/api/config/agents/route.ts` → call FastAPI
-- [ ] **4.3** Update `/api/config/values/route.ts` → call FastAPI
-- [ ] **4.4** Update `/api/config/update/route.ts` → call FastAPI
-- [ ] **4.5** Create `ConfigField` component (shows default + override)
-- [ ] **4.6** Add "Reset to default" button per field
-- [ ] **4.7** Add "Reset all" button per agent
-- [ ] **4.8** Test UI shows defaults collapsed, overrides highlighted
+  - Local: `http://localhost:8000`
+  - Production: Railway URL (Phase 6)
+- [ ] **4.2** Update Next.js API routes to proxy to FastAPI:
+  - `app/api/config/agents/route.ts` → `GET {API_URL}/api/config/schemas`
+  - `app/api/config/values/route.ts` → `GET {API_URL}/api/config/values?agent_id=X&user_id=Y`
+  - `app/api/config/update/route.ts` → `POST {API_URL}/api/config/update`
+  - `app/api/config/reset/route.ts` → `POST {API_URL}/api/config/reset`
+- [ ] **4.3** Update `ConfigField` component to display merged values:
+  - Show `default` (from Python code, collapsed)
+  - Show `user_override` (editable, highlighted if present)
+  - Show `current` (what agent actually uses)
+  - Show "Custom" badge if `is_overridden === true`
+- [ ] **4.4** Add "Reset to default" button per field
+- [ ] **4.5** Add "Reset all" button per agent section
+- [ ] **4.6** Test full flow: UI reads from FastAPI → displays merged → user edits → writes to FastAPI → Supabase updated
 
-### Phase 5: Python Agent Integration (Runtime Override Logic) ⏳
-- [ ] **5.1** Create `/src/shared_utils/supabase_config.py`
-- [ ] **5.2** Add `get_agent_config()`, `update_agent_config()`, `reset_agent_config()`
-- [ ] **5.3** Update calendar agent graph: merge user override + defaults
-- [ ] **5.4** Update other agents (email, multi_tool_rube, etc.)
-- [ ] **5.5** Update UI SDK calls to pass `user_id` in RunnableConfig
-- [ ] **5.6** Test agent uses override > default fallback
+### Phase 5: Python Agent Runtime Integration (Read Overrides from Supabase) ⏳
+**Goal:** Make agents read user overrides from Supabase at runtime and merge with code defaults
+
+- [ ] **5.1** Create `/src/shared_utils/supabase_config.py` helper module
+  - `get_agent_config(agent_id, user_id)` → returns user overrides from Supabase
+  - `update_agent_config(agent_id, user_id, config)` → writes to Supabase (for direct agent use)
+  - `reset_agent_config(agent_id, user_id)` → deletes overrides (reverts to defaults)
+- [ ] **5.2** Update calendar_agent graph nodes to read from Supabase
+  - Extract `user_id` from RunnableConfig
+  - Call `get_agent_config("calendar", user_id)`
+  - Merge: `user_override or CODE_DEFAULT`
+- [ ] **5.3** Update multi_tool_rube_agent graph nodes
+- [ ] **5.4** Update executive-ai-assistant graph nodes
+- [ ] **5.5** Update _react_agent_mcp_template (for future agents)
+- [ ] **5.6** Update UI SDK calls (agent-inbox, agent-chat-ui) to pass `user_id` in RunnableConfig
+- [ ] **5.7** Test: Change config in UI → Verify agent uses override → Reset → Verify agent uses default
 
 ### Phase 6: FastAPI Deployment (Railway) ⏳
 - [ ] **6.1** Install Railway CLI
@@ -613,97 +717,6 @@ export function ConfigField({ field, values, onUpdate, onReset }: ConfigFieldPro
 
 ---
 
-## 📊 Updated Action Plan
-
-### Phase 0: Architecture Setup (2-3 hours)
-
-**Create consolidated config structure:**
-
-```bash
-# 1. Create shared constants
-mkdir -p /src/shared_config
-touch /src/shared_config/constants.py
-touch /src/shared_config/__init__.py
-
-# 2. Update each agent to export DEFAULTS
-# In each agent's prompt.py:
-DEFAULTS = {
-    "system_prompt": AGENT_SYSTEM_PROMPT,
-    # ... other prompts
-}
-
-# In each agent's config.py:
-DEFAULTS = {
-    "llm": LLM_CONFIG_DEFAULTS,
-    "settings": SETTINGS_DEFAULTS,
-    # ...
-}
-
-# 3. Consolidate SQL
-mkdir -p /supabase/migrations
-# Combine into /supabase/migrations/002_agent_configs.sql
-```
-
-### Phase 1: Database Setup (1-2 hours)
-
-```bash
-# 1. Execute SQL migration
-# Visit Supabase dashboard, run /supabase/migrations/002_agent_configs.sql
-
-# 2. Verify schema
-SELECT tablename FROM pg_tables WHERE tablename = 'agent_configs';
-SELECT column_name, data_type FROM information_schema.columns
-WHERE table_name = 'agent_configs';
-# Should see: config_data JSONB, prompts JSONB
-
-# 3. Test FastAPI
-source .venv/bin/activate
-pip install -r src/config_api/requirements.txt
-cd src/config_api && python main.py
-
-# 4. Test merge logic
-curl http://localhost:8000/api/config/values?agent_id=calendar&user_id=test | jq
-# Should return: default, user_override, current, is_overridden
-```
-
-### Phase 2: CLI Integration (1-2 hours)
-
-Add to `/CLI/CLI.py`:
-
-```python
-@app.command()
-def config_api(
-    port: int = typer.Option(8000, "--port", "-p"),
-    restart: bool = typer.Option(True, "--restart/--no-restart")
-):
-    """🚀 Launch FastAPI Config Bridge"""
-    console.print(Panel.fit(
-        "🚀 [bold blue]FastAPI Config Bridge[/bold blue]",
-        subtitle="Defaults (Code) + Overrides (Supabase)"
-    ))
-
-    ensure_venv()
-
-    if restart:
-        kill_processes_on_port(port, "Config API")
-
-    config_api_path = PROJECT_ROOT / "src" / "config_api"
-    os.chdir(config_api_path)
-
-    console.print("[green]🔄 Starting FastAPI...[/green]")
-    console.print("   📘 Reads defaults from: src/*/prompt.py, config.py")
-    console.print("   📝 Reads overrides from: Supabase")
-    console.print("   🔀 Returns merged: default + override + current")
-
-    subprocess.run([sys.executable, "main.py"], check=True)
-```
-
-Update `start()` command to include config-api.
-
-### Phase 3-7: See checklist above
-
----
-
 ## ✅ Benefits of This Architecture
 
 | Feature | Status |
@@ -749,20 +762,20 @@ NODE_DEFAULTS = {
 
 ## 📊 Progress Tracking
 
-**Current Status:** ✅ Phase 0 Complete (35% Total)
+**Current Status:** ⏳ Phase 4 Ready to Start (70% Total)
 
 | Phase | Estimated Time | Status |
 |-------|---------------|--------|
 | Phase 0: Architecture | 2-3 hours | ✅ **COMPLETE** |
-| Phase 1: DB Setup | 1-2 hours | ⏳ Ready to Start |
-| Phase 2: CLI | 1-2 hours | ⏳ Not Started |
-| Phase 3: FastAPI | 2-3 hours | ⏳ Not Started |
-| Phase 4: Config-App | 3-4 hours | ⏳ Not Started |
-| Phase 5: Agents | 3-4 hours | ⏳ Not Started |
+| Phase 1: DB Setup | 1-2 hours | ✅ **COMPLETE** |
+| Phase 2: CLI Integration | 1-2 hours | ✅ **COMPLETE** |
+| Phase 3: FastAPI Merge Logic | 2-3 hours | ✅ **COMPLETE** |
+| Phase 4: Config-App UI | 3-4 hours | ⏳ Ready to Start |
+| Phase 5: Agents Runtime | 3-4 hours | ⏳ Not Started |
 | Phase 6: Deployment | 2-3 hours | ⏳ Not Started |
 | Phase 7: Testing | 2-3 hours | ⏳ Not Started |
 
-**Total:** 16-24 hours | **Completed:** 3 hours | **Remaining:** 13-21 hours
+**Total:** 16-24 hours | **Completed:** 10 hours | **Next:** Phase 4 | **Remaining:** 6-14 hours
 
 ---
 

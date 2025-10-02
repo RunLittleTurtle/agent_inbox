@@ -6,8 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Cpu, Zap, Brain, DollarSign, Thermometer } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Info, AlertTriangle, Cpu, Zap, Brain, DollarSign, Thermometer, RotateCcw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import modelConstants from '../../../../../config/model_constants.json';
+import { extractCurrentValue, isFieldOverridden } from '@/lib/config-utils';
 
 interface LLMField {
   key: string;
@@ -35,6 +39,8 @@ interface LLMCardProps {
   onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
   context?: 'triage' | 'draft' | 'rewrite' | 'scheduling' | 'reflection' | 'general';
+  agentId?: string;
+  onReset?: (sectionKey: string, fieldKey: string) => Promise<void>;
 }
 
 export function LLMCard({
@@ -44,13 +50,23 @@ export function LLMCard({
   values,
   onValueChange,
   sectionKey,
-  context = 'general'
+  context = 'general',
+  agentId,
+  onReset
 }: LLMCardProps) {
+  const { toast } = useToast();
   const getCurrentValue = (field: LLMField) => {
-    if (values[sectionKey]?.[field.key] !== undefined) {
-      return values[sectionKey][field.key];
+    const rawValue = values[sectionKey]?.[field.key];
+    if (rawValue !== undefined) {
+      // Extract current value (handles both old and new FastAPI format)
+      return extractCurrentValue(rawValue);
     }
     return field.default || '';
+  };
+
+  const isOverridden = (field: LLMField): boolean => {
+    const rawValue = values[sectionKey]?.[field.key];
+    return isFieldOverridden(rawValue);
   };
 
   const handleFieldChange = (field: LLMField, value: any) => {
@@ -61,6 +77,24 @@ export function LLMCard({
     }
 
     onValueChange(field.key, processedValue, field.envVar);
+  };
+
+  const handleReset = async (field: LLMField) => {
+    if (onReset && agentId) {
+      try {
+        await onReset(sectionKey, field.key);
+        toast({
+          title: "Reset successful",
+          description: `${field.label} has been reset to default value.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Reset failed",
+          description: error instanceof Error ? error.message : "Failed to reset field",
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   const getModelIcon = (model: unknown) => {
@@ -155,14 +189,34 @@ export function LLMCard({
         {fields.map((field) => {
           const fieldId = `${sectionKey}-${field.key}`;
           const currentValue = getCurrentValue(field);
+          const fieldOverridden = isOverridden(field);
 
           return (
             <div key={field.key} className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor={fieldId} className="flex items-center gap-2 text-blue-900 font-medium">
-                  {field.label}
-                  {field.required && <span className="text-red-500">*</span>}
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={fieldId} className="flex items-center gap-2 text-blue-900 font-medium">
+                    {field.label}
+                    {field.required && <span className="text-red-500">*</span>}
+                    {fieldOverridden && (
+                      <Badge variant="secondary" className="ml-2 text-xs bg-amber-100 text-amber-800">
+                        Overridden
+                      </Badge>
+                    )}
+                  </Label>
+                  {fieldOverridden && onReset && agentId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                      onClick={() => handleReset(field)}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Reset
+                    </Button>
+                  )}
+                </div>
 
                 {field.type === 'select' ? (
                   <Select

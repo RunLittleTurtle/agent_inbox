@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info, AlertTriangle, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { extractCurrentValue, isFieldOverridden } from '@/lib/config-utils';
 
 interface ConfigField {
   key: string;
@@ -71,14 +72,27 @@ function GenericCard({ section, values, onValueChange }: {
 
   const getCurrentValue = (field: ConfigField) => {
     // First check the nested section structure (e.g., values.ai_models.openai_api_key)
-    if (values[section.key]?.[field.key] !== undefined) {
-      return values[section.key][field.key];
+    let rawValue = values[section.key]?.[field.key];
+    if (rawValue !== undefined) {
+      // Extract current value (handles both old and new FastAPI format)
+      return extractCurrentValue(rawValue);
     }
     // Fallback to flat envVar structure (e.g., values.OPENAI_API_KEY)
     if (field.envVar && values[field.envVar] !== undefined) {
-      return values[field.envVar];
+      return extractCurrentValue(values[field.envVar]);
     }
     return field.default || '';
+  };
+
+  const isOverridden = (field: ConfigField): boolean => {
+    const rawValue = values[section.key]?.[field.key];
+    if (rawValue !== undefined) {
+      return isFieldOverridden(rawValue);
+    }
+    if (field.envVar && values[field.envVar] !== undefined) {
+      return isFieldOverridden(values[field.envVar]);
+    }
+    return false;
   };
 
   const handleFieldChange = (field: ConfigField, value: any) => {

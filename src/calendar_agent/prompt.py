@@ -332,3 +332,18 @@ def get_booking_extraction_prompt(
         tomorrow_date=tomorrow_date,
         next_week_date=next_week_date
     )
+
+# =============================================================================
+# DEFAULTS EXPORT FOR FASTAPI CONFIG BRIDGE
+# =============================================================================
+# This export allows FastAPI to read immutable prompt defaults from code
+# These are agent-specific defaults, not shared across agents
+
+DEFAULTS = {
+    "system_prompt": AGENT_SYSTEM_PROMPT,
+    "no_tools_prompt": AGENT_NO_TOOLS_PROMPT,
+    "routing_prompt": ROUTING_SYSTEM_PROMPT,
+    "booking_extraction_prompt": BOOKING_EXTRACTION_PROMPT_TEMPLATE,
+    "role_prompt": AGENT_ROLE_PROMPT,
+    "guidelines_prompt": AGENT_GUIDELINES_PROMPT,
+}

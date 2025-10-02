@@ -98,3 +98,25 @@ def get_current_context() -> Dict[str, str]:
             "tomorrow": f"{current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})",
             "time_str": current_time.strftime('%I:%M %p UTC')
         }
+
+# =============================================================================
+# DEFAULTS EXPORT FOR FASTAPI CONFIG BRIDGE
+# =============================================================================
+# This export allows FastAPI to read immutable config defaults from code
+# These are agent-specific defaults, not shared across agents
+
+DEFAULTS = {
+    "llm": LLM_CONFIG,
+    "calendar_settings": {
+        "work_hours_start": WORK_HOURS_START,
+        "work_hours_end": WORK_HOURS_END,
+        "default_meeting_duration": DEFAULT_MEETING_DURATION,
+        "timezone": CALENDAR_TIMEZONE,
+    },
+    "agent_identity": {
+        "agent_name": AGENT_NAME,
+        "agent_display_name": AGENT_DISPLAY_NAME,
+        "agent_description": AGENT_DESCRIPTION,
+        "agent_status": AGENT_STATUS,
+    },
+}

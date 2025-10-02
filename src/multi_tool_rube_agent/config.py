@@ -107,3 +107,23 @@ def get_current_context() -> Dict[str, str]:
 def is_agent_enabled():
     """Check if the agent is enabled"""
     return AGENT_STATUS == "active"
+
+# =============================================================================
+# DEFAULTS EXPORT FOR FASTAPI CONFIG BRIDGE
+# =============================================================================
+# This export allows FastAPI to read immutable config defaults from code
+# These are agent-specific defaults, not shared across agents
+
+DEFAULTS = {
+    "llm": LLM_CONFIG,
+    "agent_identity": {
+        "agent_name": AGENT_NAME,
+        "agent_display_name": AGENT_DISPLAY_NAME,
+        "agent_description": AGENT_DESCRIPTION,
+        "agent_status": AGENT_STATUS,
+    },
+    "timezone": {
+        "agent_timezone": TEMPLATE_TIMEZONE,
+        "effective_timezone": USER_TIMEZONE,
+    },
+}

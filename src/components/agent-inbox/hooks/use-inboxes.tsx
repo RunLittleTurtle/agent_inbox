@@ -14,7 +14,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { AgentInbox } from "../types";
 import { useRouter } from "next/navigation";
 import { logger } from "../utils/logger";
-import { runInboxBackfill } from "../utils/backfill";
 
 /**
  * Hook for managing agent inboxes
@@ -37,7 +36,7 @@ export function useInboxes() {
   const initialLoadComplete = useRef(false);
 
   /**
-   * Run backfill and load initial inboxes on mount
+   * Load initial inboxes on mount (auto-configuration disabled)
    */
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -45,25 +44,12 @@ export function useInboxes() {
     }
     const initializeInboxes = async () => {
       try {
-        // Run the backfill process first
-        const backfillResult = await runInboxBackfill();
-        if (backfillResult.success) {
-          // Set the state with potentially updated inboxes from backfill
-          setAgentInboxes(backfillResult.updatedInboxes);
-          logger.log(
-            "Initialized inboxes state after backfill:",
-            backfillResult.updatedInboxes
-          );
-          // Now trigger the selection logic based on current URL param
-          // This reuses the logic to select based on param or default
-          getAgentInboxes(backfillResult.updatedInboxes);
-        } else {
-          // If backfill failed, try a normal load
-          logger.error("Backfill failed, attempting normal inbox load");
-          getAgentInboxes();
-        }
+        // Skip auto-backfill process to prevent auto-configured inboxes
+        // Users can manually add inboxes as needed
+        logger.log("Loading existing inboxes without auto-configuration");
+        getAgentInboxes();
       } catch (e) {
-        logger.error("Error during initial inbox loading and backfill", e);
+        logger.error("Error during initial inbox loading", e);
         // Attempt normal load as fallback
         getAgentInboxes();
       }

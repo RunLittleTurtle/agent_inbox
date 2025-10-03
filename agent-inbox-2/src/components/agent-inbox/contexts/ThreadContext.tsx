@@ -28,6 +28,7 @@ import {
 import { useLocalStorage } from "../hooks/use-local-storage";
 import { useInboxes } from "../hooks/use-inboxes";
 import { logger } from "../utils/logger";
+import { useAuth } from "@clerk/nextjs";
 
 type ThreadContentType<
   ThreadValues extends Record<string, any> = Record<string, any>,
@@ -70,9 +71,10 @@ interface GetClientArgs {
   agentInboxes: AgentInbox[];
   getItem: (key: string) => string | null | undefined;
   toast: (input: ToastInput) => void;
+  clerkToken?: string | null;
 }
 
-const getClient = ({ agentInboxes, getItem, toast }: GetClientArgs) => {
+const getClient = ({ agentInboxes, getItem, toast, clerkToken }: GetClientArgs) => {
   if (agentInboxes.length === 0) {
     toast({
       title: "Error",
@@ -108,7 +110,11 @@ const getClient = ({ agentInboxes, getItem, toast }: GetClientArgs) => {
     return;
   }
 
-  return createClient({ deploymentUrl, langchainApiKey: langchainApiKeyLS });
+  return createClient({
+    deploymentUrl,
+    langchainApiKey: langchainApiKeyLS,
+    clerkToken
+  });
 };
 
 export function ThreadsProvider<
@@ -116,6 +122,7 @@ export function ThreadsProvider<
 >({ children }: { children: React.ReactNode }): React.ReactElement {
   const { getItem } = useLocalStorage();
   const { toast } = useToast();
+  const { getToken } = useAuth();
 
   const { getSearchParam, searchParams } = useQueryParams();
   const [loading, setLoading] = React.useState(false);
@@ -158,10 +165,12 @@ export function ThreadsProvider<
     async (inbox: ThreadStatusWithAll) => {
       setLoading(true);
 
+      const clerkToken = await getToken();
       const client = getClient({
         agentInboxes,
         getItem,
         toast,
+        clerkToken,
       });
       if (!client) {
         setLoading(false);
@@ -303,15 +312,17 @@ export function ThreadsProvider<
       }
       setLoading(false);
     },
-    [agentInboxes, getItem, getSearchParam, toast]
+    [agentInboxes, getItem, getSearchParam, toast, getToken]
   );
 
   const fetchSingleThread = React.useCallback(
     async (threadId: string): Promise<ThreadData<ThreadValues> | undefined> => {
+      const clerkToken = await getToken();
       const client = getClient({
         agentInboxes,
         getItem,
         toast,
+        clerkToken,
       });
       if (!client) {
         return;
@@ -372,14 +383,16 @@ export function ThreadsProvider<
         invalidSchema: undefined,
       };
     },
-    [agentInboxes, getItem, getSearchParam]
+    [agentInboxes, getItem, getSearchParam, getToken]
   );
 
   const ignoreThread = async (threadId: string) => {
+    const clerkToken = await getToken();
     const client = getClient({
       agentInboxes,
       getItem,
       toast,
+      clerkToken,
     });
     if (!client) {
       return;
@@ -434,10 +447,12 @@ export function ThreadsProvider<
       return undefined;
     }
 
+    const clerkToken = await getToken();
     const client = getClient({
       agentInboxes,
       getItem,
       toast,
+      clerkToken,
     });
     if (!client) {
       return;

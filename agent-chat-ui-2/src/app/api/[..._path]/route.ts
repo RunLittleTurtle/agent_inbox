@@ -1,11 +1,70 @@
-import { initApiPassthrough } from "langgraph-nextjs-api-passthrough";
+import { auth } from "@clerk/nextjs/server";
+import { NextRequest, NextResponse } from "next/server";
 
-// This file acts as a proxy for requests to your LangGraph server.
-// Read the [Going to Production](https://github.com/langchain-ai/agent-chat-ui?tab=readme-ov-file#going-to-production) section for more information.
+export const runtime = "edge";
 
-export const { GET, POST, PUT, PATCH, DELETE, OPTIONS, runtime } =
-  initApiPassthrough({
-    apiUrl: process.env.LANGGRAPH_API_URL ?? "remove-me", // default, if not defined it will attempt to read process.env.LANGGRAPH_API_URL
-    apiKey: process.env.LANGSMITH_API_KEY ?? "remove-me", // default, if not defined it will attempt to read process.env.LANGSMITH_API_KEY
-    runtime: "edge", // default
-  });
+const LANGGRAPH_API_URL = process.env.LANGGRAPH_API_URL ?? "remove-me";
+const LANGSMITH_API_KEY = process.env.LANGSMITH_API_KEY ?? "remove-me";
+
+async function handleRequest(request: NextRequest) {
+  try {
+    // Get Clerk token
+    const { getToken } = await auth();
+    const clerkToken = await getToken();
+
+    // Extract path from URL
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.replace("/api/", "");
+    const targetUrl = `${LANGGRAPH_API_URL}/${pathSegments}${url.search}`;
+
+    // Build headers
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    // Add LangSmith API key if available
+    if (LANGSMITH_API_KEY && LANGSMITH_API_KEY !== "remove-me") {
+      headers["x-api-key"] = LANGSMITH_API_KEY;
+    }
+
+    // Add Clerk JWT token for custom auth
+    if (clerkToken) {
+      headers["Authorization"] = `Bearer ${clerkToken}`;
+    }
+
+    // Get request body if present
+    let body: string | undefined;
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      body = await request.text();
+    }
+
+    // Forward request to LangGraph Platform
+    const response = await fetch(targetUrl, {
+      method: request.method,
+      headers,
+      body,
+    });
+
+    // Return response
+    const data = await response.text();
+    return new NextResponse(data, {
+      status: response.status,
+      headers: {
+        "Content-Type": response.headers.get("Content-Type") || "application/json",
+      },
+    });
+  } catch (error) {
+    console.error("Error in API passthrough:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export const GET = handleRequest;
+export const POST = handleRequest;
+export const PUT = handleRequest;
+export const PATCH = handleRequest;
+export const DELETE = handleRequest;
+export const OPTIONS = handleRequest;

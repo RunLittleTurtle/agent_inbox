@@ -22,13 +22,19 @@ load_dotenv()
 app = FastAPI(title="Agent Config API", version="1.0.0")
 
 # CORS - Allow config-app to call this API
+# Use regex pattern to allow all Vercel deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3004",  # Local config-app
-        "https://config-*.vercel.app",  # Production config-app
-        "https://*.vercel.app",
-    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # All Vercel deployments
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Also allow localhost for development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3004"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

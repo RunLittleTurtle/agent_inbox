@@ -2,7 +2,7 @@
 FastAPI Config Bridge
 Exposes Python agent configs to Next.js config-app
 """
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
@@ -12,6 +12,7 @@ from pathlib import Path
 from importlib import import_module
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import time
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -62,6 +63,15 @@ AGENT_PATHS = [
 
 # Global environment config
 GLOBAL_CONFIG_PATH = "ui_config"
+
+
+class HealthCheck(BaseModel):
+    """Response model for health check endpoint"""
+    status: str = "healthy"
+    timestamp: float
+    service: str = "Agent Config API"
+    version: str = "1.0.0"
+    supabase_connected: bool
 
 
 class UpdateConfigRequest(BaseModel):
@@ -140,12 +150,47 @@ async def root():
         "service": "Agent Config API",
         "status": "running",
         "endpoints": [
+            "/health",
             "/api/config/schemas",
             "/api/config/values",
             "/api/config/update",
             "/api/config/reset",
         ]
     }
+
+
+@app.get(
+    "/health",
+    tags=["healthcheck"],
+    summary="Perform a Health Check",
+    response_description="Return HTTP Status Code 200 (OK)",
+    status_code=status.HTTP_200_OK,
+    response_model=HealthCheck,
+)
+async def health_check() -> HealthCheck:
+    """
+    Health check endpoint for Railway and monitoring services.
+
+    Returns:
+        HealthCheck: Service health status including:
+            - status: "healthy" if service is running
+            - timestamp: Current Unix timestamp
+            - service: Service name
+            - version: API version
+            - supabase_connected: True if Supabase client is initialized
+
+    This endpoint is used by:
+    - Railway for deployment health checks
+    - Container orchestration systems
+    - Monitoring and alerting services
+    """
+    return HealthCheck(
+        status="healthy",
+        timestamp=time.time(),
+        service="Agent Config API",
+        version="1.0.0",
+        supabase_connected=supabase is not None
+    )
 
 
 @app.get("/api/config/schemas")

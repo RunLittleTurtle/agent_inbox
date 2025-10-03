@@ -85,13 +85,6 @@ const StreamSession = ({
     assistantId,
     threadId: threadId ?? null,
     fetchStateHistory: true,
-    // ✅ Add metadata for thread organization and searchability
-    metadata: {
-      graph_id: assistantId,
-      created_at: new Date().toISOString(),
-    },
-    // ✅ Cancel old runs when new message arrives (double-texting strategy)
-    multitaskStrategy: "interrupt",
     onCustomEvent: (event, options) => {
       if (isUIMessage(event) || isRemoveUIMessage(event)) {
         options.mutate((prev) => {
@@ -103,7 +96,6 @@ const StreamSession = ({
     onThreadId: (id) => {
       setThreadId(id);
       // Refetch threads list when thread ID changes.
-      // Wait for some seconds before fetching so we're able to get the new thread that was created.
       sleep().then(() => getThreads().then(setThreads).catch(console.error));
     },
   });

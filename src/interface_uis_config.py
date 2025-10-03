@@ -36,41 +36,6 @@ CONFIG_INFO = {
 
 CONFIG_SECTIONS = [
     {
-        'key': 'agent_chat_ui_1',
-        'label': 'Agent Chat UI 1 - Multi-Agent System',
-        'description': 'Configuration for your first Agent Chat UI instance',
-        'fields': [
-            {
-                'key': 'chat1_deployment_url',
-                'label': 'Deployment URL',
-                'type': 'text',
-                'default': MULTI_AGENT_DEPLOYMENT_URL,
-                'readonly': True,
-                'showCopyButton': True,
-                'description': f'Multi-agent deployment URL ({DEPLOYMENT_ENV})'
-            },
-            {
-                'key': 'chat1_graph_id',
-                'label': 'Assistant / Graph ID',
-                'type': 'text',
-                'default': 'agent',
-                'readonly': True,
-                'showCopyButton': True,
-                'description': 'Multi-agent graph ID'
-            },
-            {
-                'key': 'chat1_langsmith_key',
-                'label': 'Your LangSmith API Key',
-                'type': 'password',
-                'default': '',
-                'readonly': False,
-                'showCopyButton': False,
-                'description': 'Your personal LangSmith API key for tracing (optional)',
-                'placeholder': 'lsv2_pt_...'
-            }
-        ]
-    },
-    {
         'key': 'agent_chat_ui_2',
         'label': 'Agent Chat UI 2 - Multi-Agent System',
         'description': 'Configuration for your second Agent Chat UI instance (parallel conversations)',

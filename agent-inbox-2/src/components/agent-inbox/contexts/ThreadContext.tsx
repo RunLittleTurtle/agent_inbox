@@ -29,6 +29,7 @@ import { useLocalStorage } from "../hooks/use-local-storage";
 import { useInboxes } from "../hooks/use-inboxes";
 import { logger } from "../utils/logger";
 import { useAuth } from "@clerk/nextjs";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 type ThreadContentType<
   ThreadValues extends Record<string, any> = Record<string, any>,
@@ -122,7 +123,7 @@ export function ThreadsProvider<
 >({ children }: { children: React.ReactNode }): React.ReactElement {
   const { getItem } = useLocalStorage();
   const { toast } = useToast();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
 
   const { getSearchParam, searchParams } = useQueryParams();
   const [loading, setLoading] = React.useState(false);
@@ -457,24 +458,76 @@ export function ThreadsProvider<
     if (!client) {
       return undefined as any;
     }
-    try {
-      if (options?.stream) {
-        return client.runs.stream(threadId, graphId, {
+
+    // Async wrapper to handle API key fetching
+    const executeRun = async () => {
+      try {
+        // Fetch user-specific API keys from Supabase
+        let runConfig: any = userId ? { configurable: { user_id: userId } } : undefined;
+
+        if (userId) {
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+          if (supabaseUrl && supabaseKey) {
+            const supabase = createSupabaseClient(supabaseUrl, supabaseKey);
+            const { data: userSecrets, error } = await supabase
+              .from("user_secrets")
+              .select("*")
+              .eq("clerk_id", userId)
+              .maybeSingle();
+
+            if (error) {
+              logger.error("Failed to fetch user API keys from Supabase", error);
+              toast({
+                title: "Error",
+                description: "Failed to fetch your API keys. Please try again.",
+                variant: "destructive",
+                duration: 5000,
+              });
+              return undefined;
+            }
+
+            if (!userSecrets) {
+              toast({
+                title: "No API keys found",
+                description: "Please add your OpenAI or Anthropic API keys in the config page.",
+                variant: "destructive",
+                duration: 5000,
+              });
+              return undefined;
+            }
+
+            // Inject user-specific API keys into config
+            runConfig.configurable.openai_api_key = userSecrets.openai_api_key;
+            runConfig.configurable.anthropic_api_key = userSecrets.anthropic_api_key;
+
+            logger.info("Using user-specific API keys for agent execution");
+          }
+        }
+
+        if (options?.stream) {
+          return client.runs.stream(threadId, graphId, {
+            command: {
+              resume: response,
+            },
+            config: runConfig,
+            streamMode: "events",
+          });
+        }
+        return client.runs.create(threadId, graphId, {
           command: {
             resume: response,
           },
-          streamMode: "events",
-        }) as any; // Type assertion needed due to conditional return type
+          config: runConfig,
+        });
+      } catch (e: any) {
+        logger.error("Error sending human response", e);
+        throw e;
       }
-      return client.runs.create(threadId, graphId, {
-        command: {
-          resume: response,
-        },
-      }) as any; // Type assertion needed due to conditional return type
-    } catch (e: any) {
-      logger.error("Error sending human response", e);
-      throw e;
-    }
+    };
+
+    return executeRun() as any;
   };
 
   const clearThreadData = React.useCallback(() => {

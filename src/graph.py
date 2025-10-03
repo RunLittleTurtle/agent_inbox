@@ -156,7 +156,11 @@ async def create_calendar_agent(config: Optional[RunnableConfig] = None):
     )
 
     # Create calendar agent instance with MCP integration
-    calendar_agent_instance = CalendarAgentWithMCP(model=calendar_model)
+    # Pass user_id so agent can load user-specific MCP config from Supabase
+    calendar_agent_instance = CalendarAgentWithMCP(
+        model=calendar_model,
+        user_id=api_keys["user_id"]  # ✅ NEW: Load user-specific MCP URL from Supabase
+    )
     await calendar_agent_instance.initialize()
 
     logger.info(f"Calendar agent initialized for user: {api_keys['user_id']}")

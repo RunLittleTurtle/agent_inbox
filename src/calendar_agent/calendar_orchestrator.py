@@ -51,9 +51,14 @@ class CalendarAgentWithMCP:
     def __init__(
         self,
         model: Optional[ChatAnthropic] = None,
-        mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None
+        mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None,
+        user_id: Optional[str] = None
     ):
-        from .config import LLM_CONFIG, MCP_SERVER_URL, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
+        from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
+
+        # Setup logging first
+        self.logger = logging.getLogger(__name__)
+        self.user_id = user_id
 
         # Use centralized get_llm for cross-provider support
         if model:
@@ -63,8 +68,20 @@ class CalendarAgentWithMCP:
             temperature = LLM_CONFIG.get("temperature", 0.1)
             self.model = get_llm(model_name, temperature=temperature)
 
-        # MCP server configuration - connect to configured Pipedream Google Calendar MCP server
-        pipedream_url = MCP_SERVER_URL
+        # MCP server configuration - Load from Supabase per-user config
+        pipedream_url = None
+
+        if user_id:
+            # Production: Load user-specific config from Supabase
+            user_config = self._load_user_config(user_id)
+            pipedream_url = user_config.get("mcp_server_url")
+            self.logger.info(f"Loaded user config for {user_id}: MCP URL = {pipedream_url[:50] if pipedream_url else 'None'}...")
+        else:
+            # Local dev fallback: Load from .env
+            from .config import MCP_SERVER_URL
+            pipedream_url = MCP_SERVER_URL
+            self.logger.info(f"No user_id provided, using .env MCP_SERVER_URL: {pipedream_url[:50] if pipedream_url else 'None'}...")
+
         if pipedream_url:
             self.mcp_servers = mcp_servers or {
                 "pipedream_calendar": {
@@ -73,8 +90,9 @@ class CalendarAgentWithMCP:
                 }
             }
         else:
-            # Fallback to no MCP servers if not configured
+            # No MCP server configured
             self.mcp_servers = mcp_servers or {}
+            self.logger.warning("No MCP server URL configured - calendar agent will have no tools")
 
         # MCP client and tools (initialized async) with caching
         self._mcp_client: Optional[MultiServerMCPClient] = None
@@ -83,8 +101,41 @@ class CalendarAgentWithMCP:
         self.tools: List[BaseTool] = []
         self.graph = None
 
-        # Setup logging
-        self.logger = logging.getLogger(__name__)
+    def _load_user_config(self, user_id: str) -> Dict[str, Any]:
+        """
+        Load user-specific configuration from Supabase agent_configs table.
+
+        Args:
+            user_id: Clerk user ID
+
+        Returns:
+            Dict with mcp_server_url or empty dict if not found
+        """
+        try:
+            # Import here to avoid circular dependencies
+            import sys
+            import os
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+            from utils.config_utils import get_agent_config_from_supabase
+
+            # Load agent-specific config from Supabase
+            agent_config = get_agent_config_from_supabase(user_id, "calendar_agent")
+
+            # Extract MCP URL from config
+            mcp_integration = agent_config.get("mcp_integration", {})
+            mcp_url = mcp_integration.get("mcp_server_url")
+
+            if mcp_url:
+                self.logger.info(f"✅ Found MCP URL in Supabase for user {user_id}")
+                return {"mcp_server_url": mcp_url}
+            else:
+                self.logger.info(f"ℹ️  No MCP URL configured in Supabase for user {user_id}")
+                return {}
+
+        except Exception as e:
+            self.logger.error(f"❌ Error loading user config from Supabase: {e}")
+            self.logger.info("ℹ️  Falling back to .env configuration")
+            return {}
 
     async def _get_mcp_tools(self):
         """Get MCP tools with aggressive connection reuse and caching to prevent memory leaks"""

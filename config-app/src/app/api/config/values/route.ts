@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { config } from 'dotenv';
 import yaml from 'js-yaml';
-import modelConstants from '../../../../../../config/model_constants.json';
+import modelConstants from '../../../../../config/model_constants.json';
 
 const CONFIG_API_URL = process.env.NEXT_PUBLIC_CONFIG_API_URL || 'http://localhost:8000';
 

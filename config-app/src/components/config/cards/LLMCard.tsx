@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Info, AlertTriangle, Cpu, Zap, Brain, DollarSign, Thermometer, RotateCcw, Save, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import modelConstants from '../../../../../config/model_constants.json';
+import modelConstants from '../../../../config/model_constants.json';
 import { extractCurrentValue, isFieldOverridden } from '@/lib/config-utils';
 
 interface LLMField {

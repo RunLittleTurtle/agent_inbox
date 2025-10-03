@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import modelConstants from '../../../../../../config/model_constants.json';
+import modelConstants from '../../../../../config/model_constants.json';
 
 interface AgentConfig {
   name: string;

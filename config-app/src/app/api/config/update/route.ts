@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import modelConstants from '../../../../../../config/model_constants.json';
+import modelConstants from '../../../../../config/model_constants.json';
 
 interface UpdateConfigRequest {
   agentId: string;

@@ -2,27 +2,62 @@
 
 ALWAYS use LangGraph v.1, follow these principles and patterns.
 
-ALWAYS activate virtual environment  : source .venv/bin/activate
+ALWAYS activate virtual environment: `source .venv/bin/activate`
 
-For a complete launch of everyhting and for testing -> ALWAYS use this commands : python cli.py start
+For complete local testing: `python cli.py start`
 
-For more extensive information check : src/CLAUDE-large.md
+For testing -> use your tool : MCP server chrome dev tool
 
-You have access to the LangGraph MCP server, ALWAYS use it : src/mcp.json
+For documentation -> Use your tools :Langgraph MCP server AND Next.js MCP server
 
-Always follow the KISS principle, and work by iterations.
+For Langgraph Cloud Plateform read this : https://langchain-ai.github.io/langgraphjs/how-tos/#langgraph-platform
 
-When you code, do not add graceful fallback, ALWAYS insert clear error and log so we can debug easily and know when something is not working.
+For deployement information use their platform CLI : Vercel CLI , Railway CLI, LangGraph Platform Cloud CLI
 
-If you have question about agent_inbox READ this : https://github.com/langchain-ai/agent-inbox
+You have access to the LangGraph MCP server: `src/mcp.json`
+
+Always follow KISS principle and work iteratively.
+
+When coding, use clear errors and logs—no graceful fallbacks. We need to know when things break.
+
+For agent_inbox questions: https://github.com/langchain-ai/agent-inbox
+
+## Production Deployment Architecture (2025)
+
+### Vercel Deployments (4 UIs)
+- **agent-chat-ui-2**: Live chat interface for real-time agent interaction
+- **agent-inbox-2**: Main inbox UI for async jobs and human-in-the-loop workflows
+- **agent-inbox**: Legacy inbox (maintained for compatibility)
+- **config-app**: Agent configuration management UI
+
+All UIs protected by Clerk authentication with Supabase third-party integration.
+
+### Railway (Backend API)
+- **Config API**: FastAPI server at `agentinbox-production.up.railway.app`
+- Bridges Python agent configs to Next.js UIs
+- Endpoints: `/health`, `/api/config/schemas`, `/api/config/values`, `/api/config/update`, `/api/config/reset`
+- Supabase integration for config persistence
+
+### LangGraph Agents (src/)
+- **executive-ai-assistant**: Main agent with 4 graphs (main, cron, general_reflection, multi_reflection)
+- **calendar_agent**: Calendar management
+- **multi_tool_rube_agent**: Multi-tool orchestration
+- **_react_agent_mcp_template**: A template to duplicate for creating new React agent MCPs.
+- Deployed via LangGraph Cloud / local dev server
+
+### Authentication & Data
+- **Clerk**: User authentication and session management
+- **Supabase**: Database and auth third-party integration with Clerk
+- **Config storage**: Supabase tables managed via config API
 
 ## Critical Structure Requirements
 
 ### MANDATORY FIRST STEP
 Before creating any files, **always search the codebase** for existing LangGraph-related files:
-- Files with names like: `graph.py`, `main.py`, `app.py`, `agent.py`, `workflow.py`
+- Files with names like: `graph.py`,`orchestrator.py`, `main.py`, `app.py`, `agent.py`, `workflow.py`
 - Files containing: `.compile()`, `StateGraph`, `create_react_agent`, `app =`, graph exports
 - Any existing LangGraph imports or patterns
+- For config and Fast API and variables : `config.py`, `config.yaml`, `ui_config.py`, /Users/samuelaudette/Documents/code_projects/agent_inbox_1.18/src/config_api
 
 **If any LangGraph files exist**: Follow the existing structure exactly. Do not create new agent.py files.
 
@@ -56,38 +91,83 @@ graph = create_react_agent(model, tools, checkpointer=MemorySaver())
 - Work within the established structure rather than imposing new patterns
 - Do not create `agent.py` if graphs are already exported elsewhere
 
-### Standard Structure for New Projects:
+### Agent Inbox Project Structure:
 ```
-./agent.py          # Main agent file, exports: app
-./langgraph.json    # LangGraph configuration
-
 src/
-├── agents/
-│   ├── research_agent/
-│   │   ├── __init__.py
-│   │   ├── state.py          # Agent-specific state schema
-│   │   ├── tools.py          # Agent-specific tools
-│   │   ├── graph.py          # Graph construction
-│   │   └── prompts.py        # Agent prompts
-│   └── analysis_agent/
-│       ├── __init__.py
-│       ├── state.py
-│       ├── tools.py
-│       ├── graph.py
-│       └── prompts.py
-├── shared/
-│   ├── state.py              # Shared state schemas
-│   ├── tools.py              # Common tools
-│   └── utils.py              # Utilities
-└── supervisor/
-    ├── __init__.py
-    ├── supervisor.py         # Multi-agent coordination
-    └── routing.py            # Agent routing logic
+├── calendar_agent/             # Calendar booking & management
+│   ├── __init__.py
+│   ├── config.py              # Agent configuration
+│   ├── ui_config.py           # UI config for config-app
+│   ├── calendar_orchestrator.py  # Main orchestrator
+│   ├── prompt.py              # Agent prompts
+│   ├── state.py               # State schemas
+│   ├── booking_node.py        # Booking logic
+│   ├── mcp_executor.py        # MCP tool execution
+│   ├── execution_result.py    # Result handling
+│   └── GUIDE_HOW_TO/          # Documentation
+│
+├── multi_tool_rube_agent/      # Multi-tool orchestration via Rube
+│   ├── __init__.py
+│   ├── config.py
+│   ├── ui_config.py
+│   ├── x_agent_orchestrator.py  # Main orchestrator
+│   ├── prompt.py
+│   ├── schemas.py             # State & tool schemas
+│   ├── tools.py               # Rube tools
+│   ├── human_inbox.py         # Human-in-the-loop
+│   └── GUIDE_HOW_TO/
+│
+├── _react_agent_mcp_template/  # Template for new MCP agents
+│   ├── __init__.py
+│   ├── config.py
+│   ├── ui_config.py
+│   ├── x_agent_orchestrator.py
+│   ├── prompt.py
+│   ├── schemas.py
+│   ├── discover_tools.py      # MCP tool discovery
+│   ├── tools.py
+│   └── GUIDE_HOW_TO/
+│
+├── executive-ai-assistant/     # Main executive assistant
+│   ├── config.py
+│   ├── ui_config.py
+│   ├── langgraph.json         # LangGraph deployment config
+│   ├── eaia/                  # Agent module
+│   │   ├── main/
+│   │   │   └── graph.py       # Main graph
+│   │   ├── cron_graph.py      # Scheduled tasks
+│   │   └── reflection_graphs.py  # Reflection workflows
+│   └── scripts/
+│
+├── config_api/                 # FastAPI bridge (deployed on Railway)
+│   ├── main.py                # API endpoints
+│   └── Procfile               # Railway deployment
+│
+├── shared_utils/               # Shared utilities
+│   ├── __init__.py
+│   ├── model_constants.py     # LLM model configs
+│   └── timezone_utils.py      # Timezone helpers
+│
+├── shared_config/              # Shared configuration (empty placeholder)
+│
+└── config/                     # Global environment config
+    └── ui_config.py           # Global UI config
+
+# UIs (deployed on Vercel)
+agent-chat-ui-2/                # Real-time chat interface
+agent-inbox-2/                  # Async job inbox UI
+agent-inbox/                    # Legacy inbox UI
+config-app/                     # Config management UI
 ```
-## This is our UI for interacting with LangGraph agents
-The user use those components for interacting, there is the chat interface that is the main interface for live interaction and the agent inbox for managing agents and jobs that are assynchronous and required human-in-the-loop interrupt.
-src/agent-chat-ui
-src/agent-inbox
+
+### Key Agent Structure Patterns:
+Every agent **must have**:
+- `config.py` - Agent-specific configuration and environment variables
+- `ui_config.py` - UI configuration schema for config-app integration
+- Orchestrator file - `*_orchestrator.py` or `graph.py` (main workflow)
+- `prompt.py` - Agent system prompts and instructions
+- `state.py` or `schemas.py` - State schemas and Pydantic models
+- `GUIDE_HOW_TO/` - Documentation directory
 
 ### Export Pattern:
 ```python

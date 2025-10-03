@@ -233,6 +233,25 @@ async def get_all_schemas():
     except Exception as e:
         print(f"Error loading global config: {e}")
 
+    # Add interface UIs config (read-only reference page)
+    try:
+        mod = import_module("interface_uis_config")
+        schemas["interface_uis"] = {
+            "id": "interface_uis",
+            "path": "src/interface_uis_config.py",
+            "config": {
+                "CONFIG_INFO": {
+                    "name": getattr(mod, "CONFIG_INFO", {}).get("name", "Interface UIs"),
+                    "description": getattr(mod, "CONFIG_INFO", {}).get("description", ""),
+                    "config_type": getattr(mod, "CONFIG_INFO", {}).get("config_type", "interface_uis"),
+                    "config_path": getattr(mod, "CONFIG_INFO", {}).get("config_path", "interface_uis_config.py"),
+                },
+                "CONFIG_SECTIONS": getattr(mod, "CONFIG_SECTIONS", [])
+            }
+        }
+    except Exception as e:
+        print(f"Error loading interface_uis config: {e}")
+
     # Add agent-specific configs
     for agent_path in AGENT_PATHS:
         try:

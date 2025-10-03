@@ -4,7 +4,7 @@ Defines all global environment variables for the config UI
 """
 
 # Import centralized configuration constants
-from src.shared_utils import (
+from shared_utils import (
     STANDARD_TIMEZONE_OPTIONS,
     DEFAULT_TIMEZONE
 )
@@ -13,7 +13,7 @@ CONFIG_INFO = {
     'name': 'Global Environment',
     'description': 'Core system-wide configuration and API keys',
     'config_type': 'env_file',
-    'config_path': '.env'
+    'config_path': 'src/ui_config.py'
 }
 
 CONFIG_SECTIONS = [

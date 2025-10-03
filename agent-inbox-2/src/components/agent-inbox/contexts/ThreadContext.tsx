@@ -427,6 +427,7 @@ export function ThreadsProvider<
     response: HumanResponse[],
     options?: {
       stream?: TStream;
+      clerkToken?: string | null;
     }
   ): TStream extends true
     ?
@@ -444,18 +445,17 @@ export function ThreadsProvider<
           "Assistant/graph IDs are required to send responses. Please add an assistant/graph ID in the settings.",
         variant: "destructive",
       });
-      return undefined;
+      return undefined as any;
     }
 
-    const clerkToken = await getToken();
     const client = getClient({
       agentInboxes,
       getItem,
       toast,
-      clerkToken,
+      clerkToken: options?.clerkToken,
     });
     if (!client) {
-      return;
+      return undefined as any;
     }
     try {
       if (options?.stream) {

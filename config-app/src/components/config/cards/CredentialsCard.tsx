@@ -31,6 +31,8 @@ interface CredentialsCardProps {
   values: Record<string, any>;
   onValueChange: (fieldKey: string, value: any, envVar?: string) => void;
   sectionKey: string;
+  agentId?: string;
+  onReset?: (sectionKey: string, fieldKey: string) => Promise<void>;
   onSave: () => Promise<void>;
   isDirty: boolean;
   isSaving: boolean;

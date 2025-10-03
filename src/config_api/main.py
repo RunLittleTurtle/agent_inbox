@@ -117,6 +117,7 @@ def get_agent_defaults(agent_id: str) -> Dict[str, Any]:
         "calendar": "calendar_agent",
         "email": "email_agent",
         "executive": "executive_agent",
+        "executive_ai_assistant": "executive-ai-assistant",  # Normalized agent_id (underscores) → folder (dashes)
         "executive-ai-assistant": "executive-ai-assistant",  # Folder uses dashes
         "multi_tool_rube": "multi_tool_rube_agent",  # agent_id without _agent suffix
     }

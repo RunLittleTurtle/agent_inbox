@@ -186,11 +186,10 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> A
 
     # Add 'owner' metadata to resources being created
     # This tags the resource with the user's identity
-    if "metadata" in value:
-        if value["metadata"] is None:
-            value["metadata"] = {}
-        value["metadata"]["owner"] = user.identity
-        logger.info(f"📝 Tagged resource with owner: {user.identity}")
+    # Use setdefault to ensure metadata dict always exists
+    metadata = value.setdefault("metadata", {})
+    metadata["owner"] = user.identity
+    logger.info(f"📝 Tagged resource with owner: {user.identity}")
 
     # Return filter: only show resources owned by this user
     # This is applied to all queries (search, read, list, etc.)

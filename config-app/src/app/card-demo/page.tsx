@@ -138,6 +138,9 @@ export default function CardDemoPage() {
     }
   });
 
+  const [dirtySections, setDirtySections] = useState<Set<string>>(new Set());
+  const [savingSection, setSavingSection] = useState<string | null>(null);
+
   const handleValueChange = (sectionKey: string, fieldKey: string, value: any, envVar?: string) => {
     console.log('Value changed:', { sectionKey, fieldKey, value, envVar });
 
@@ -148,6 +151,27 @@ export default function CardDemoPage() {
         [fieldKey]: value
       }
     }));
+
+    // Mark section as dirty
+    setDirtySections(prev => new Set(prev).add(sectionKey));
+  };
+
+  const handleSaveSection = async (sectionKey: string) => {
+    setSavingSection(sectionKey);
+    try {
+      // Simulate save operation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Saved section:', sectionKey, values[sectionKey]);
+
+      // Clear dirty flag
+      setDirtySections(prev => {
+        const next = new Set(prev);
+        next.delete(sectionKey);
+        return next;
+      });
+    } finally {
+      setSavingSection(null);
+    }
   };
 
   return (
@@ -178,6 +202,9 @@ export default function CardDemoPage() {
           sections={SAMPLE_CONFIGS}
           values={values}
           onValueChange={handleValueChange}
+          onSaveSection={handleSaveSection}
+          dirtySections={dirtySections}
+          savingSection={savingSection}
         />
 
         <div className="mt-8 p-4 bg-white rounded-lg border">

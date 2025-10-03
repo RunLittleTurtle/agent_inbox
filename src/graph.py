@@ -369,10 +369,12 @@ async def create_supervisor_graph(config: Optional[RunnableConfig] = None):
     # Get user-specific API keys (or fallback to .env for local dev)
     api_keys = get_api_keys_from_config(config)
 
-    # Validate environment only in local dev mode (no config provided)
+    # Skip environment validation in production (multi-tenant mode)
+    # API keys are provided per-request via config.configurable
+    # Only validate in local dev when explicitly requested
     if not config or not config.get("configurable"):
-        logger.info("Local development mode: Validating environment variables")
-        validate_environment()
+        logger.info("Local development mode: Using API keys from .env")
+        # validate_environment()  # Disabled for multi-tenant deployment
 
     # Create agents with user-specific config
     logger.info(f"Creating agents for user: {api_keys['user_id']}...")

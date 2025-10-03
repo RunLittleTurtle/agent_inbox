@@ -109,6 +109,17 @@ CONFIG_SECTIONS = [
                 'placeholder': 'Be direct and professional in business communications. Match the sender\'s tone. Keep responses concise and actionable.',
                 'rows': 4,
                 'required': False
+            },
+            {
+                'key': 'rewrite_preferences',
+                'label': 'Email Rewriting Style',
+                'type': 'textarea',
+                'description': 'Specify how the assistant should rewrite and improve your draft emails. These preferences ensure your writing style is consistent and professional.',
+                'placeholder': '{name} has preferences for how his emails should be written:\n- Match the recipient\'s communication style and formality\n- Be concise and actionable in all communications\n- Use clear subject lines that reflect the email content\n- End emails with clear next steps or expectations\n- Maintain a professional yet approachable tone\n- Keep responses focused and avoid unnecessary details',
+                'rows': 12,
+                'required': False,
+                'note': 'Applied when the assistant reviews and improves your draft emails before sending.',
+                'card_style': 'orange'
             }
         ]
     },
@@ -229,24 +240,6 @@ CONFIG_SECTIONS = [
                 'options': STANDARD_TEMPERATURE_OPTIONS,
                 'description': 'Model creativity (lower = more focused and consistent)',
                 'required': True
-            }
-        ]
-    },
-    {
-        'key': 'email_preferences',
-        'label': 'Email Communication Preferences',
-        'description': 'Configure how the assistant rewrites your draft emails to match your personal style',
-        'card_style': 'orange',
-        'fields': [
-            {
-                'key': 'rewrite_preferences',
-                'label': 'Email Rewriting Style',
-                'type': 'textarea',
-                'description': 'Specify how the assistant should rewrite and improve your draft emails. These preferences ensure your writing style is consistent and professional.',
-                'placeholder': '{name} has preferences for how his emails should be written:\n- Match the recipient\'s communication style and formality\n- Be concise and actionable in all communications\n- Use clear subject lines that reflect the email content\n- End emails with clear next steps or expectations\n- Maintain a professional yet approachable tone\n- Keep responses focused and avoid unnecessary details',
-                'rows': 12,
-                'required': False,
-                'note': 'Applied when the assistant reviews and improves your draft emails before sending.'
             }
         ]
     },

@@ -1,0 +1,22 @@
+# Exclude UI apps (deployed separately to Vercel)
+config-app/
+agent-inbox/
+agent-inbox-2/
+agent-chat-ui-2/
+
+# Exclude development files
+.git/
+.github/
+*.md
+.venv/
+__pycache__/
+*.pyc
+.env*
+!.env.example
+
+# Exclude other non-essential files
+node_modules/
+.next/
+CLI/
+docker-compose.yml
+railway.toml

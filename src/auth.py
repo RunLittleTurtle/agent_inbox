@@ -6,21 +6,21 @@ This module implements custom authentication for LangGraph Platform using Clerk 
 It enables multi-tenant isolation by automatically filtering threads by user_id.
 
 Architecture:
-- Validates Clerk JWT tokens on every LangGraph API call
-- Adds user_id to thread metadata automatically
-- Filters thread queries by owner
+- Validates Clerk JWT tokens using JWKS (proper 2025 method)
+- Adds owner metadata to all resources automatically
+- Filters queries by owner to ensure user isolation
 - Ensures complete isolation between users
 
 References:
-- https://blog.langchain.com/custom-authentication-and-access-control-in-langgraph/
-- https://langchain-ai.github.io/langgraph/concepts/auth/
+- https://docs.langchain.com/langgraph-platform/custom-auth
+- https://langchain-ai.github.io/langgraph/tutorials/auth/getting_started/
 - https://clerk.com/docs/backend-requests/handling/manual-jwt
 """
 
 from langgraph_sdk import Auth
 import os
-import httpx
-from typing import Optional
+import jwt
+from jwt import PyJWKClient
 import logging
 
 # Configure logging
@@ -30,13 +30,34 @@ logger = logging.getLogger(__name__)
 # Initialize auth object
 auth = Auth()
 
+# Clerk JWKS URL for JWT verification
+CLERK_PUBLISHABLE_KEY = os.getenv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
+
+if not CLERK_PUBLISHABLE_KEY:
+    logger.warning("⚠️  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not set - auth will fail in production")
+    CLERK_JWKS_URL = None
+else:
+    # Extract instance ID from publishable key
+    # Format: pk_test_<instance>_<random> or pk_live_<instance>_<random>
+    parts = CLERK_PUBLISHABLE_KEY.split("_")
+    if len(parts) >= 3:
+        instance_id = parts[2]
+        CLERK_JWKS_URL = f"https://{instance_id}.clerk.accounts.dev/.well-known/jwks.json"
+        logger.info(f"🔐 Clerk JWKS URL: {CLERK_JWKS_URL}")
+    else:
+        logger.error(f"❌ Invalid CLERK_PUBLISHABLE_KEY format: {CLERK_PUBLISHABLE_KEY}")
+        CLERK_JWKS_URL = None
+
+# Initialize JWT verifier client (only if JWKS URL is available)
+jwks_client = PyJWKClient(CLERK_JWKS_URL) if CLERK_JWKS_URL else None
+
 @auth.authenticate
 async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserDict:
     """
-    Authenticate user via Clerk JWT token (2025 method).
+    Authenticate user via Clerk JWT token using JWKS verification (2025 method).
 
     This function is called on EVERY request to LangGraph Platform API.
-    It validates the Clerk JWT token and extracts user identity.
+    It validates the Clerk JWT token using public key cryptography (JWKS).
 
     Args:
         authorization: HTTP Authorization header (format: "Bearer <token>")
@@ -44,142 +65,129 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
     Returns:
         MinimalUserDict with:
         - identity: Clerk user ID (used for filtering)
-        - email: User email (optional)
         - is_authenticated: Boolean flag
+
+    Raises:
+        Auth.exceptions.HTTPException: If authentication fails
 
     Flow:
         1. Extract Bearer token from header
-        2. Validate with Clerk API
-        3. Return user identity for LangGraph to use
+        2. Verify JWT signature using Clerk's JWKS
+        3. Extract user ID from 'sub' claim
+        4. Return user identity for LangGraph to use
 
-    Note: This uses Clerk's session verification endpoint (2025 best practice).
+    Note: Uses JWKS for cryptographic verification (no API calls needed).
     """
-    # No authorization header = anonymous user (local dev)
+    # Check if JWKS client is available
+    if not jwks_client:
+        logger.error("❌ JWKS client not initialized - check NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
+        raise Auth.exceptions.HTTPException(
+            status_code=500,
+            detail="Authentication not configured"
+        )
+
+    # Check authorization header
     if not authorization or not authorization.startswith("Bearer "):
-        logger.info("No authorization header - allowing anonymous (local dev)")
-        return {
-            "identity": "local_dev_user",
-            "is_authenticated": False
-        }
+        logger.error("❌ No authorization header provided")
+        raise Auth.exceptions.HTTPException(
+            status_code=401,
+            detail="Authentication required"
+        )
 
     # Extract token
     token = authorization.replace("Bearer ", "").strip()
 
-    # Get Clerk secret key
-    clerk_secret_key = os.getenv("CLERK_SECRET_KEY")
-    if not clerk_secret_key:
-        logger.warning("CLERK_SECRET_KEY not found - allowing anonymous (local dev)")
+    try:
+        # Get signing key from Clerk's JWKS
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+
+        # Verify JWT signature and decode payload
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_exp": True}
+        )
+
+        # Extract user ID from 'sub' claim
+        user_id = payload.get("sub")
+        if not user_id:
+            raise ValueError("Token missing 'sub' claim")
+
+        logger.info(f"✅ Authenticated user: {user_id}")
+
         return {
-            "identity": "local_dev_user",
-            "is_authenticated": False
+            "identity": user_id,
+            "is_authenticated": True,
         }
 
-    try:
-        # Validate token with Clerk API (2025 method)
-        # Reference: https://clerk.com/docs/backend-requests/handling/manual-jwt
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://api.clerk.com/v1/sessions/verify",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "X-Clerk-Secret-Key": clerk_secret_key
-                },
-                timeout=5.0
-            )
-
-            if response.status_code == 200:
-                session_data = response.json()
-                user_id = session_data.get("user_id")
-
-                if user_id:
-                    logger.info(f"User authenticated successfully: {user_id}")
-                    return {
-                        "identity": user_id,
-                        "email": session_data.get("email"),
-                        "is_authenticated": True
-                    }
-            else:
-                logger.warning(f"Clerk auth failed: {response.status_code}")
-
-    except httpx.TimeoutException:
-        logger.error("Clerk API timeout")
+    except jwt.ExpiredSignatureError:
+        logger.error("❌ JWT token has expired")
+        raise Auth.exceptions.HTTPException(
+            status_code=401,
+            detail="Token expired"
+        )
+    except jwt.InvalidTokenError as e:
+        logger.error(f"❌ Invalid JWT token: {e}")
+        raise Auth.exceptions.HTTPException(
+            status_code=401,
+            detail="Invalid token"
+        )
     except Exception as e:
-        logger.error(f"Auth error: {e}")
-
-    # Authentication failed
-    return {
-        "identity": "anonymous",
-        "is_authenticated": False
-    }
+        logger.error(f"❌ Authentication error: {e}")
+        raise Auth.exceptions.HTTPException(
+            status_code=401,
+            detail="Authentication failed"
+        )
 
 @auth.on
-async def add_owner(ctx: Auth.types.AuthContext, value: dict):
+async def authorize_all_resources(ctx: Auth.types.AuthContext) -> Auth.types.FilterType:
     """
-    Add user_id to thread metadata automatically (2025 method).
+    AUTHORIZATION LAYER - Single-Owner Resources Pattern (2025).
 
-    This function is called when:
-    - Creating a new thread
-    - Querying threads
-    - Creating runs
+    This function is called for EVERY resource access (threads, runs, assistants, crons).
+    It enforces that users can only access resources they own.
 
-    It ensures:
-    - All threads are tagged with owner (user_id)
-    - Searches automatically filter by owner
-    - Users can ONLY see their own threads
+    Pattern: "Single-Owner Resources"
+    - Adds 'owner' metadata to all created resources
+    - Filters queries to only return user's own resources
 
     Args:
-        ctx: Auth context with user identity
-        value: Thread/run metadata dictionary
+        ctx: Authorization context with user and resource value
 
     Returns:
-        Filter dictionary applied to ALL queries
+        Filter dict to restrict access to user's resources
 
     Security:
-        - Enforces authentication (raises error if not authenticated)
-        - Automatically adds user_id to metadata
-        - Returns filter that LangGraph Platform applies to queries
+        - Enforces authentication (user must be authenticated)
+        - Automatically adds owner to metadata
+        - Returns filter applied to ALL queries
 
     Example:
-        User A creates thread → metadata = {"user_id": "user_abc123"}
-        User A queries threads → filter = {"user_id": "user_abc123"}
+        User A creates thread → metadata = {"owner": "user_abc123"}
+        User A queries threads → filter = {"owner": "user_abc123"}
         User B cannot see User A's threads (filtered out automatically)
+
+    References:
+        - https://docs.langchain.com/langgraph-platform/custom-auth
     """
-    # Allow anonymous access for local development (LangGraph Studio UI)
-    # In production with actual JWT tokens, authentication is enforced
-    if not ctx.user.is_authenticated:
-        logger.warning("Anonymous access allowed (local development mode)")
-        # Return empty dict to allow access without filtering
-        return {}
+    value = ctx.value
+    user = ctx.user
 
-    user_id = ctx.user.identity
+    # Add 'owner' metadata to resources being created
+    # This tags the resource with the user's identity
+    if "metadata" in value:
+        if value["metadata"] is None:
+            value["metadata"] = {}
+        value["metadata"]["owner"] = user.identity
+        logger.info(f"📝 Tagged resource with owner: {user.identity}")
 
-    # Add user_id to metadata (for creation operations)
-    metadata = value.setdefault("metadata", {})
-    metadata["user_id"] = user_id
+    # Return filter: only show resources owned by this user
+    # This is applied to all queries (search, read, list, etc.)
+    return {"owner": user.identity}
 
-    logger.info(f"Added user_id filter for user: {user_id}")
 
-    # Return filter (for query operations)
-    # LangGraph Platform automatically applies this to ALL thread queries
-    return {"user_id": user_id}
-
-# Optional: Add resource-specific authorization handlers
-# These can be uncommented for fine-grained control
-
-# @auth.on("threads.create")
-# async def authorize_thread_creation(ctx: Auth.types.AuthContext, value: dict):
-#     """Custom logic for thread creation"""
-#     return await add_owner(ctx, value)
-
-# @auth.on("threads.search")
-# async def authorize_thread_search(ctx: Auth.types.AuthContext, value: dict):
-#     """Custom logic for thread search"""
-#     return await add_owner(ctx, value)
-
-# @auth.on("runs.create")
-# async def authorize_run_creation(ctx: Auth.types.AuthContext, value: dict):
-#     """Custom logic for run creation"""
-#     return await add_owner(ctx, value)
+logger.info("✅ Auth handler initialized - Clerk JWT with single-owner resource isolation")
 
 # Export auth object for langgraph.json
 __all__ = ["auth"]

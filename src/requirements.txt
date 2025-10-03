@@ -41,6 +41,10 @@ httpx>=0.28.0
 aiohttp>=3.11.0
 requests>=2.32.0
 
+# Authentication & JWT
+pyjwt[crypto]>=2.8.0
+cryptography>=42.0.5
+
 # Utilities
 python-dotenv>=1.0.0
 click>=8.1.0

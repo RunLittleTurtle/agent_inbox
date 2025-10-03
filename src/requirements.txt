@@ -25,6 +25,7 @@ aiosqlite>=0.20.0
 redis>=5.2.0
 langgraph-checkpoint-sqlite>=2.0.0
 langgraph-checkpoint-postgres>=2.0.0
+supabase>=2.10.0
 
 # MCP (Model Context Protocol) with LangChain adapters
 mcp>=1.9.2

@@ -108,8 +108,8 @@ def get_api_keys_from_config(config: Optional[RunnableConfig] = None) -> Dict[st
         logger.info(f"Multi-tenant mode: Using API keys from config for user: {user_id}")
 
         return {
-            "openai_api_key": openai_key or os.getenv("OPENAI_API_KEY"),
-            "anthropic_api_key": anthropic_key or os.getenv("ANTHROPIC_API_KEY"),
+            "openai_api_key": openai_key,
+            "anthropic_api_key": anthropic_key,
             "user_id": user_id,
         }
 

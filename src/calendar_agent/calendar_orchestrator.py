@@ -60,6 +60,10 @@ class CalendarAgentWithMCP:
         self.logger = logging.getLogger(__name__)
         self.user_id = user_id
 
+        # 🔍 DIAGNOSTIC: Log initialization
+        self.logger.info(f"🚀 CalendarAgentWithMCP initializing...")
+        self.logger.info(f"   user_id received: {user_id if user_id else '❌ None'}")
+
         # Use centralized get_llm for cross-provider support
         if model:
             self.model = model
@@ -73,14 +77,19 @@ class CalendarAgentWithMCP:
 
         if user_id:
             # Production: Load user-specific config from Supabase
+            self.logger.info(f"🔍 Loading user-specific config from Supabase for user: {user_id}")
             user_config = self._load_user_config(user_id)
             pipedream_url = user_config.get("mcp_server_url")
-            self.logger.info(f"Loaded user config for {user_id}: MCP URL = {pipedream_url[:50] if pipedream_url else 'None'}...")
+            if pipedream_url:
+                self.logger.info(f"✅ MCP URL found: {pipedream_url[:50]}...")
+            else:
+                self.logger.error(f"❌ No MCP URL found in Supabase for user {user_id}")
         else:
             # Local dev fallback: Load from .env
+            self.logger.warning(f"⚠️  No user_id provided - using fallback .env")
             from .config import MCP_SERVER_URL
             pipedream_url = MCP_SERVER_URL
-            self.logger.info(f"No user_id provided, using .env MCP_SERVER_URL: {pipedream_url[:50] if pipedream_url else 'None'}...")
+            self.logger.info(f"📝 Fallback MCP URL: {pipedream_url[:50] if pipedream_url else '❌ None'}...")
 
         if pipedream_url:
             self.mcp_servers = mcp_servers or {
@@ -112,14 +121,25 @@ class CalendarAgentWithMCP:
             Dict with mcp_server_url or empty dict if not found
         """
         try:
-            # Import here to avoid circular dependencies
+            # 🔍 DIAGNOSTIC: Check Supabase credentials
             import sys
             import os
             sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+            supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_SECRET_KEY")
+
+            self.logger.info(f"🔍 Checking Supabase credentials...")
+            self.logger.info(f"   NEXT_PUBLIC_SUPABASE_URL: {'✅ Set' if supabase_url else '❌ Missing'}")
+            self.logger.info(f"   SUPABASE_SECRET_KEY: {'✅ Set' if supabase_key else '❌ Missing'}")
+
             from utils.config_utils import get_agent_config_from_supabase
 
             # Load agent-specific config from Supabase
+            self.logger.info(f"🔍 Querying Supabase agent_configs table...")
             agent_config = get_agent_config_from_supabase(user_id, "calendar_agent")
+            self.logger.info(f"   Config returned: {bool(agent_config)}")
+            self.logger.info(f"   Config keys: {list(agent_config.keys()) if agent_config else 'empty'}")
 
             # Extract MCP URL from config
             mcp_integration = agent_config.get("mcp_integration", {})
@@ -129,11 +149,13 @@ class CalendarAgentWithMCP:
                 self.logger.info(f"✅ Found MCP URL in Supabase for user {user_id}")
                 return {"mcp_server_url": mcp_url}
             else:
-                self.logger.info(f"ℹ️  No MCP URL configured in Supabase for user {user_id}")
+                self.logger.warning(f"⚠️  No MCP URL configured in Supabase for user {user_id}")
                 return {}
 
         except Exception as e:
             self.logger.error(f"❌ Error loading user config from Supabase: {e}")
+            import traceback
+            self.logger.error(f"   Traceback: {traceback.format_exc()}")
             self.logger.info("ℹ️  Falling back to .env configuration")
             return {}
 
@@ -144,30 +166,42 @@ class CalendarAgentWithMCP:
         # This reduces load on the external MCP server and improves performance
         if (self._mcp_tools and self._tools_cache_time and
             datetime.now() - self._tools_cache_time < timedelta(minutes=5)):
+            self.logger.info(f"📦 Using cached MCP tools ({len(self._mcp_tools)} tools)")
             return self._mcp_tools
 
         # Use the configured MCP server URL
         mcp_url = self.mcp_servers.get("pipedream_calendar", {}).get("url")
         if not mcp_url:
+            self.logger.error("❌ Pipedream MCP server URL not configured")
+            self.logger.error(f"   mcp_servers config: {self.mcp_servers}")
             raise ValueError("Pipedream MCP server URL not configured")
 
-        self.logger.info(f"Connecting to Pipedream MCP server: {mcp_url}")
+        self.logger.info(f"🔗 Connecting to Pipedream MCP server: {mcp_url}")
 
         # Reuse MCP client instance to prevent memory leaks
         # Creating new clients for each request can cause resource exhaustion
         if self._mcp_client is None:
+            self.logger.info(f"🆕 Creating new MCP client")
             self._mcp_client = MultiServerMCPClient(self.mcp_servers)
+        else:
+            self.logger.info(f"♻️  Reusing existing MCP client")
 
         # Add timeout to prevent hanging connections
         try:
+            self.logger.info(f"⏳ Fetching tools from MCP server (30s timeout)...")
             tools = await asyncio.wait_for(
                 self._mcp_client.get_tools(),
                 timeout=30.0  # 30 second timeout
             )
-            self.logger.info(f"Loaded {len(tools)} MCP tools: {[t.name for t in tools]}")
+            self.logger.info(f"✅ Loaded {len(tools)} MCP tools: {[t.name for t in tools]}")
         except asyncio.TimeoutError:
-            self.logger.error("MCP tools loading timed out")
+            self.logger.error("❌ MCP tools loading timed out after 30s")
             raise Exception("MCP server connection timed out")
+        except Exception as e:
+            self.logger.error(f"❌ Error fetching MCP tools: {e}")
+            import traceback
+            self.logger.error(f"   Traceback: {traceback.format_exc()}")
+            raise
 
         # Cache results
         self._mcp_tools = tools
@@ -177,8 +211,13 @@ class CalendarAgentWithMCP:
     async def initialize(self):
         """Initialize MCP client and load tools using official patterns"""
         try:
+            # 🔍 DIAGNOSTIC: Log MCP initialization
+            self.logger.info(f"🔧 Initializing MCP tools...")
+
             # Use improved MCP connection with caching and timeout
             all_tools = await self._get_mcp_tools()
+
+            self.logger.info(f"✅ MCP tools loaded: {len(all_tools)} total tools")
 
             # Filter tools: separate booking tools from read-only tools
             self.booking_tools = []
@@ -199,29 +238,33 @@ class CalendarAgentWithMCP:
 
             for tool in all_tools:
                 if tool.name in excluded_tool_names:
-                    print(f"   EXCLUDED: {tool.name} (doesn't work properly)")
+                    self.logger.info(f"   ⛔ EXCLUDED: {tool.name} (doesn't work properly)")
                     continue
                 elif tool.name in booking_tool_names:
                     self.booking_tools.append(tool)
                 else:
                     self.tools.append(tool)
 
-            print(f"Loaded {len(self.tools)} read-only calendar tools")
+            self.logger.info(f"📋 Loaded {len(self.tools)} read-only calendar tools")
             for tool in self.tools:
-                print(f"   {tool.name}: {tool.description}")
+                self.logger.info(f"   ✓ {tool.name}")
 
-            print(f"Separated {len(self.booking_tools)} booking tools for approval workflow")
+            self.logger.info(f"🔐 Separated {len(self.booking_tools)} booking tools for approval workflow")
             for tool in self.booking_tools:
-                print(f"   {tool.name}: [REQUIRES APPROVAL]")
+                self.logger.info(f"   ✓ {tool.name} [REQUIRES APPROVAL]")
 
             # Create the graph
             self.graph = await self._create_calendar_graph()
+            self.logger.info(f"✅ Calendar agent graph created successfully")
 
         except Exception as e:
-            print(f"Failed to initialize MCP client: {e}")
+            self.logger.error(f"❌ Failed to initialize MCP client: {e}")
+            import traceback
+            self.logger.error(f"   Traceback: {traceback.format_exc()}")
             # Fallback to no tools if MCP connection fails
             self.tools = []
             self.booking_tools = []
+            self.logger.warning(f"⚠️  Falling back to no-tools mode")
             self.graph = await self._create_calendar_graph()
 
     async def _create_calendar_graph(self):

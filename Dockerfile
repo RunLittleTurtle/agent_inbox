@@ -10,10 +10,7 @@ COPY src/config_api/requirements.txt ./requirements.txt
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy ui_config.py from root (needed for global config)
-COPY ui_config.py ./ui_config.py
-
-# Copy entire src directory (agents + config_api)
+# Copy entire src directory (agents + config_api + interface_uis_config)
 COPY src/ ./src/
 
 # Python path includes /app so imports work correctly

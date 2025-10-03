@@ -15,7 +15,13 @@ from supabase import create_client, Client
 import time
 
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+parent_path = str(Path(__file__).parent.parent)
+sys.path.insert(0, parent_path)
+
+# Debug logging for import paths
+print(f"🔍 Working directory: {os.getcwd()}")
+print(f"🔍 Parent path added to sys.path: {parent_path}")
+print(f"🔍 sys.path: {sys.path[:3]}...")  # First 3 paths
 
 load_dotenv()
 
@@ -248,7 +254,9 @@ async def get_all_schemas():
                 }
             }
         except Exception as e:
-            print(f"Error loading {agent_path}: {e}")
+            import traceback
+            print(f"❌ Error loading {agent_path}: {e}")
+            print(f"   Traceback: {traceback.format_exc()}")
             continue
 
     return {"agents": list(schemas.values())}

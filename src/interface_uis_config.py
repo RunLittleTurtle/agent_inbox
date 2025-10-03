@@ -14,17 +14,18 @@ import os
 # Detect environment mode
 DEPLOYMENT_ENV = os.getenv('DEPLOYMENT_ENV', 'local')  # 'local' or 'production'
 
-# Production LangGraph Cloud URLs (set these in .env for production)
-PRODUCTION_MULTI_AGENT_URL = os.getenv('LANGGRAPH_CLOUD_MULTI_AGENT_URL', 'https://multi-agent-app-1d1e061875eb5640a47e3bb.default.us.langgraph.app')
-PRODUCTION_EXECUTIVE_URL = os.getenv('LANGGRAPH_CLOUD_EXECUTIVE_URL', 'https://executive-ai-assistant.default.us.langgraph.app')
+# Production LangGraph Cloud URL (all graphs use same deployment)
+PRODUCTION_DEPLOYMENT_URL = os.getenv('LANGGRAPH_CLOUD_URL', 'https://multi-agent-app-1d1e061875eb5640a47e3bb201edb076.us.langgraph.app')
 
-# Local development URLs
+# Local development URLs (different ports for different graphs)
 LOCAL_MULTI_AGENT_URL = 'http://localhost:2024'
 LOCAL_EXECUTIVE_URL = 'http://localhost:2025'
 
 # Choose URLs based on environment
-MULTI_AGENT_DEPLOYMENT_URL = PRODUCTION_MULTI_AGENT_URL if DEPLOYMENT_ENV == 'production' else LOCAL_MULTI_AGENT_URL
-EXECUTIVE_DEPLOYMENT_URL = PRODUCTION_EXECUTIVE_URL if DEPLOYMENT_ENV == 'production' else LOCAL_EXECUTIVE_URL
+# In production: same URL, different graph IDs
+# In local: different URLs (ports) for each graph
+MULTI_AGENT_DEPLOYMENT_URL = PRODUCTION_DEPLOYMENT_URL if DEPLOYMENT_ENV == 'production' else LOCAL_MULTI_AGENT_URL
+EXECUTIVE_DEPLOYMENT_URL = PRODUCTION_DEPLOYMENT_URL if DEPLOYMENT_ENV == 'production' else LOCAL_EXECUTIVE_URL
 
 CONFIG_INFO = {
     'name': 'Interface UIs',

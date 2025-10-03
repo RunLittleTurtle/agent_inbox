@@ -303,6 +303,39 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
         raise HTTPException(status_code=400, detail="user_id required")
 
     try:
+        # Handle interface_uis specially (environment-aware deployment configs)
+        if agent_id == "interface_uis":
+            from interface_uis_config import CONFIG_SECTIONS
+
+            # Get user-specific LangSmith keys from Supabase (if saved)
+            result = supabase.table("agent_configs") \
+                .select("config_data") \
+                .eq("clerk_id", user_id) \
+                .eq("agent_id", "interface_uis") \
+                .maybe_single() \
+                .execute()
+
+            user_data = result.data.get("config_data", {}) if result and result.data else {}
+
+            # Build response with defaults from config + user overrides
+            values = {}
+            for section in CONFIG_SECTIONS:
+                section_key = section['key']
+                values[section_key] = {}
+
+                for field in section['fields']:
+                    field_key = field['key']
+                    default_value = field.get('default', '')
+                    user_value = user_data.get(section_key, {}).get(field_key)
+
+                    # For user-editable fields (like LangSmith keys), include user override
+                    values[section_key][field_key] = user_value if user_value is not None else default_value
+
+            return {
+                "agent_id": "interface_uis",
+                "values": values
+            }
+
         if agent_id == "global":
             # Global config: read from Supabase user_secrets table
             # Return empty defaults if no data exists yet

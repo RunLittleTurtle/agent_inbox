@@ -1,17 +1,34 @@
 """
 Interface UIs Configuration
-Read-only reference values for connecting UI interfaces to LangGraph deployments
+Environment-aware configuration for connecting UI interfaces to LangGraph deployments
 
-This page displays environment variables in a copyable format for configuring:
+This page displays deployment values for configuring:
 - Agent Chat UI instances (agent-chat-ui-1, agent-chat-ui-2)
 - Agent Inbox instances (multi-agent system, executive AI)
 
-All fields are read-only and pulled from environment variables.
+Deployment URLs are read-only and pulled from environment.
+LangSmith API keys are user-specific and stored in Supabase.
 """
+import os
+
+# Detect environment mode
+DEPLOYMENT_ENV = os.getenv('DEPLOYMENT_ENV', 'local')  # 'local' or 'production'
+
+# Production LangGraph Cloud URLs (set these in .env for production)
+PRODUCTION_MULTI_AGENT_URL = os.getenv('LANGGRAPH_CLOUD_MULTI_AGENT_URL', 'https://multi-agent-app-1d1e061875eb5640a47e3bb.default.us.langgraph.app')
+PRODUCTION_EXECUTIVE_URL = os.getenv('LANGGRAPH_CLOUD_EXECUTIVE_URL', 'https://executive-ai-assistant.default.us.langgraph.app')
+
+# Local development URLs
+LOCAL_MULTI_AGENT_URL = 'http://localhost:2024'
+LOCAL_EXECUTIVE_URL = 'http://localhost:2025'
+
+# Choose URLs based on environment
+MULTI_AGENT_DEPLOYMENT_URL = PRODUCTION_MULTI_AGENT_URL if DEPLOYMENT_ENV == 'production' else LOCAL_MULTI_AGENT_URL
+EXECUTIVE_DEPLOYMENT_URL = PRODUCTION_EXECUTIVE_URL if DEPLOYMENT_ENV == 'production' else LOCAL_EXECUTIVE_URL
 
 CONFIG_INFO = {
     'name': 'Interface UIs',
-    'description': 'Reference configuration for UI interface connections (read-only)',
+    'description': f'UI interface configuration ({DEPLOYMENT_ENV} mode)',
     'config_type': 'interface_uis',
     'config_path': 'src/interface_uis_config.py'
 }
@@ -20,81 +37,83 @@ CONFIG_SECTIONS = [
     {
         'key': 'agent_chat_ui_1',
         'label': 'Agent Chat UI 1 - Multi-Agent System',
-        'description': 'Copy these values for your first Agent Chat UI instance',
+        'description': 'Configuration for your first Agent Chat UI instance',
         'fields': [
             {
                 'key': 'chat1_deployment_url',
                 'label': 'Deployment URL',
                 'type': 'text',
-                'envVar': 'LANGGRAPH_DEPLOYMENT_URL',
+                'default': MULTI_AGENT_DEPLOYMENT_URL,
                 'readonly': True,
                 'showCopyButton': True,
-                'description': 'LangGraph deployment URL from environment'
+                'description': f'Multi-agent deployment URL ({DEPLOYMENT_ENV})'
             },
             {
                 'key': 'chat1_graph_id',
                 'label': 'Assistant / Graph ID',
                 'type': 'text',
-                'envVar': 'AGENT_INBOX_GRAPH_ID',
+                'default': 'agent',
                 'readonly': True,
                 'showCopyButton': True,
-                'description': 'Graph ID from environment'
+                'description': 'Multi-agent graph ID'
             },
             {
                 'key': 'chat1_langsmith_key',
-                'label': 'LangSmith API Key',
+                'label': 'Your LangSmith API Key',
                 'type': 'password',
-                'envVar': 'LANGSMITH_API_KEY',
-                'readonly': True,
-                'showCopyButton': True,
-                'description': 'Optional for local development'
+                'default': '',
+                'readonly': False,
+                'showCopyButton': False,
+                'description': 'Your personal LangSmith API key for tracing (optional)',
+                'placeholder': 'lsv2_pt_...'
             }
         ]
     },
     {
         'key': 'agent_chat_ui_2',
         'label': 'Agent Chat UI 2 - Multi-Agent System',
-        'description': 'Copy these values for your second Agent Chat UI instance',
+        'description': 'Configuration for your second Agent Chat UI instance (parallel conversations)',
         'fields': [
             {
                 'key': 'chat2_deployment_url',
                 'label': 'Deployment URL',
                 'type': 'text',
-                'envVar': 'LANGGRAPH_DEPLOYMENT_URL',
+                'default': MULTI_AGENT_DEPLOYMENT_URL,
                 'readonly': True,
                 'showCopyButton': True,
-                'description': 'Same deployment URL for parallel conversations'
+                'description': f'Same multi-agent deployment URL ({DEPLOYMENT_ENV})'
             },
             {
                 'key': 'chat2_graph_id',
                 'label': 'Assistant / Graph ID',
                 'type': 'text',
-                'envVar': 'AGENT_INBOX_GRAPH_ID',
+                'default': 'agent',
                 'readonly': True,
                 'showCopyButton': True,
                 'description': 'Same graph ID for parallel conversations'
             },
             {
                 'key': 'chat2_langsmith_key',
-                'label': 'LangSmith API Key',
+                'label': 'Your LangSmith API Key',
                 'type': 'password',
-                'envVar': 'LANGSMITH_API_KEY',
-                'readonly': True,
-                'showCopyButton': True,
-                'description': 'Optional for local development'
+                'default': '',
+                'readonly': False,
+                'showCopyButton': False,
+                'description': 'Your personal LangSmith API key for tracing (optional)',
+                'placeholder': 'lsv2_pt_...'
             }
         ]
     },
     {
         'key': 'agent_inbox_multi',
         'label': 'Agent Inbox - Multi-Agent System',
-        'description': 'For general multi-agent workflows with human oversight',
+        'description': 'Configuration for Agent Inbox with multi-agent workflows',
         'fields': [
             {
                 'key': 'multi_graph_id',
                 'label': 'Assistant/Graph ID',
                 'type': 'text',
-                'envVar': 'AGENT_INBOX_GRAPH_ID',
+                'default': 'agent',
                 'readonly': True,
                 'showCopyButton': True,
                 'description': 'Multi-agent system graph ID'
@@ -103,26 +122,27 @@ CONFIG_SECTIONS = [
                 'key': 'multi_deployment_url',
                 'label': 'Deployment URL',
                 'type': 'text',
-                'envVar': 'LANGGRAPH_DEPLOYMENT_URL',
+                'default': MULTI_AGENT_DEPLOYMENT_URL,
                 'readonly': True,
                 'showCopyButton': True,
-                'description': 'Multi-agent system deployment URL'
+                'description': f'Multi-agent deployment URL ({DEPLOYMENT_ENV})'
             },
             {
                 'key': 'multi_name',
-                'label': 'Name',
+                'label': 'Inbox Name',
                 'type': 'text',
                 'default': 'Multi-Agent System',
-                'readonly': True,
-                'showCopyButton': True,
-                'description': 'Display name for this inbox configuration'
+                'readonly': False,
+                'showCopyButton': False,
+                'description': 'Optional display name for this inbox',
+                'placeholder': 'Multi-Agent System'
             }
         ]
     },
     {
         'key': 'agent_inbox_executive',
         'label': 'Agent Inbox - Executive AI Assistant',
-        'description': 'For executive decision workflows and strategic planning',
+        'description': 'Configuration for Executive AI Assistant inbox',
         'fields': [
             {
                 'key': 'exec_graph_id',
@@ -137,19 +157,20 @@ CONFIG_SECTIONS = [
                 'key': 'exec_deployment_url',
                 'label': 'Deployment URL',
                 'type': 'text',
-                'default': 'http://localhost:2025',
+                'default': EXECUTIVE_DEPLOYMENT_URL,
                 'readonly': True,
                 'showCopyButton': True,
-                'description': 'Executive AI runs on port 2025'
+                'description': f'Executive AI deployment URL ({DEPLOYMENT_ENV})'
             },
             {
                 'key': 'exec_name',
-                'label': 'Name',
+                'label': 'Inbox Name',
                 'type': 'text',
                 'default': 'Executive AI Assistant',
-                'readonly': True,
-                'showCopyButton': True,
-                'description': 'Display name for executive inbox'
+                'readonly': False,
+                'showCopyButton': False,
+                'description': 'Optional display name for executive inbox',
+                'placeholder': 'Executive AI Assistant'
             }
         ]
     }

@@ -356,42 +356,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Handle Interface UIs configuration
-    if (agentId === 'interface_uis') {
-      const envValues = getCurrentEnvValues();
-
-      // Return values organized by sections as defined in interface_uis_config.py
-      const interfaceUIsValues = {
-        agent_chat_ui_1: {
-          chat1_deployment_url: envValues.LANGGRAPH_DEPLOYMENT_URL || 'http://localhost:2024',
-          chat1_graph_id: envValues.AGENT_INBOX_GRAPH_ID || 'agent',
-          chat1_langsmith_key: envValues.LANGSMITH_API_KEY || ''
-        },
-        agent_chat_ui_2: {
-          chat2_deployment_url: envValues.LANGGRAPH_DEPLOYMENT_URL || 'http://localhost:2024',
-          chat2_graph_id: envValues.AGENT_INBOX_GRAPH_ID || 'agent',
-          chat2_langsmith_key: envValues.LANGSMITH_API_KEY || ''
-        },
-        agent_inbox_multi: {
-          multi_graph_id: envValues.AGENT_INBOX_GRAPH_ID || 'agent',
-          multi_deployment_url: envValues.LANGGRAPH_DEPLOYMENT_URL || 'http://localhost:2024',
-          multi_name: 'Multi-Agent System'
-        },
-        agent_inbox_executive: {
-          exec_graph_id: 'main',
-          exec_deployment_url: 'http://localhost:2025',
-          exec_name: 'Executive AI Assistant'
-        }
-      };
-
-      return NextResponse.json({
-        success: true,
-        values: interfaceUIsValues,
-        agentId: 'interface_uis',
-      });
-    }
-
-    // ✅ PHASE 4: Call FastAPI Bridge for agent-specific configs
+    // ✅ PHASE 4: Call FastAPI Bridge for agent-specific configs (including interface_uis)
     // FastAPI reads Python defaults + merges with Supabase user overrides
     console.log(`[Phase 4] Calling FastAPI bridge for agent: ${agentId}, user: ${userId}`);
 

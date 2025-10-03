@@ -37,15 +37,25 @@ if not CLERK_PUBLISHABLE_KEY:
     logger.warning("⚠️  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not set - auth will fail in production")
     CLERK_JWKS_URL = None
 else:
-    # Extract instance ID from publishable key
-    # Format: pk_test_<instance>_<random> or pk_live_<instance>_<random>
-    parts = CLERK_PUBLISHABLE_KEY.split("_")
-    if len(parts) >= 3:
-        instance_id = parts[2]
-        CLERK_JWKS_URL = f"https://{instance_id}.clerk.accounts.dev/.well-known/jwks.json"
-        logger.info(f"🔐 Clerk JWKS URL: {CLERK_JWKS_URL}")
-    else:
-        logger.error(f"❌ Invalid CLERK_PUBLISHABLE_KEY format: {CLERK_PUBLISHABLE_KEY}")
+    # Extract instance from publishable key
+    # Format: pk_test_<base64> or pk_live_<base64>
+    # The base64 decodes to: <instance>.clerk.accounts.dev
+    try:
+        import base64
+        parts = CLERK_PUBLISHABLE_KEY.split("_")
+        if len(parts) >= 2:
+            # Decode base64 to get instance domain
+            encoded_instance = parts[2] if len(parts) >= 3 else parts[1]
+            decoded = base64.b64decode(encoded_instance + "==").decode('utf-8').strip()
+            # Remove trailing $ if present
+            instance_domain = decoded.rstrip('$')
+            CLERK_JWKS_URL = f"https://{instance_domain}/.well-known/jwks.json"
+            logger.info(f"🔐 Clerk JWKS URL: {CLERK_JWKS_URL}")
+        else:
+            logger.error(f"❌ Invalid CLERK_PUBLISHABLE_KEY format: {CLERK_PUBLISHABLE_KEY}")
+            CLERK_JWKS_URL = None
+    except Exception as e:
+        logger.error(f"❌ Failed to parse CLERK_PUBLISHABLE_KEY: {e}")
         CLERK_JWKS_URL = None
 
 # Initialize JWT verifier client (only if JWKS URL is available)
@@ -141,7 +151,7 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
         )
 
 @auth.on
-async def authorize_all_resources(value: dict, user: Auth.types.MinimalUserDict) -> Auth.types.FilterType:
+async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> Auth.types.FilterType:
     """
     AUTHORIZATION LAYER - Single-Owner Resources Pattern (2025).
 
@@ -153,8 +163,8 @@ async def authorize_all_resources(value: dict, user: Auth.types.MinimalUserDict)
     - Filters queries to only return user's own resources
 
     Args:
+        ctx: Authorization context containing user info
         value: The mutable data being sent to the endpoint
-        user: The authenticated user object
 
     Returns:
         Filter dict to restrict access to user's resources
@@ -172,6 +182,7 @@ async def authorize_all_resources(value: dict, user: Auth.types.MinimalUserDict)
     References:
         - https://docs.langchain.com/langgraph-platform/custom-auth
     """
+    user = ctx.user
 
     # Add 'owner' metadata to resources being created
     # This tags the resource with the user's identity

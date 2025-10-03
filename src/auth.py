@@ -141,7 +141,7 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
         )
 
 @auth.on
-async def authorize_all_resources(ctx: Auth.types.AuthContext) -> Auth.types.FilterType:
+async def authorize_all_resources(value: dict, user: Auth.types.MinimalUserDict) -> Auth.types.FilterType:
     """
     AUTHORIZATION LAYER - Single-Owner Resources Pattern (2025).
 
@@ -153,7 +153,8 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext) -> Auth.types.Fil
     - Filters queries to only return user's own resources
 
     Args:
-        ctx: Authorization context with user and resource value
+        value: The mutable data being sent to the endpoint
+        user: The authenticated user object
 
     Returns:
         Filter dict to restrict access to user's resources
@@ -171,8 +172,6 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext) -> Auth.types.Fil
     References:
         - https://docs.langchain.com/langgraph-platform/custom-auth
     """
-    value = ctx.value
-    user = ctx.user
 
     # Add 'owner' metadata to resources being created
     # This tags the resource with the user's identity

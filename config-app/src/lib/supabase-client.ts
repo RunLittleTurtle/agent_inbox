@@ -13,41 +13,25 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { useSession } from "@clerk/nextjs";
 
 /**
- * Creates a Supabase client with Clerk session token injection
+ * Creates a basic Supabase client for client-side usage
  *
- * Usage in React components:
+ * Note: For client-side auth with Clerk, manually add headers:
  * ```tsx
- * const supabase = createClerkSupabaseClient();
- * const { data } = await supabase.from('user_secrets').select('*');
+ * const { session } = useSession();
+ * const token = await session?.getToken();
+ * const supabase = createClient(url, key, {
+ *   global: { headers: { Authorization: `Bearer ${token}` } }
+ * });
  * ```
  *
- * The client automatically:
- * 1. Gets the current Clerk session
- * 2. Extracts the JWT token
- * 3. Injects it as Authorization header
- * 4. Supabase validates the token and applies RLS policies
+ * For most use cases, use the server-side client in API routes instead.
  */
 export function createClerkSupabaseClient() {
-  const { session } = useSession();
-
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      global: {
-        headers: async () => {
-          // Get Clerk JWT token
-          const token = await session?.getToken();
-
-          return {
-            Authorization: token ? `Bearer ${token}` : "",
-          };
-        },
-      },
-    }
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 }
 

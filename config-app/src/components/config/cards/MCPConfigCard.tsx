@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Link, Server, Eye, EyeOff, Copy, Check, Save, RefreshCw } from "lucide-react";
+import { Info, AlertTriangle, Link, Server, Eye, EyeOff, Copy, Check, Save, RefreshCw, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { extractCurrentValue } from '@/lib/config-utils';
+import { validateCredential, inferCredentialType, type ValidationResult, type CredentialType } from '@/lib/credential-validator';
 
 interface MCPField {
   key: string;
@@ -22,6 +23,7 @@ interface MCPField {
   envVar?: string;
   showCopyButton?: boolean;
   default?: any;
+  validationType?: CredentialType; // Optional: specify validation type, otherwise auto-inferred
 }
 
 interface MCPConfigCardProps {
@@ -49,6 +51,8 @@ export function MCPConfigCard({
 }: MCPConfigCardProps) {
   const [showPasswords, setShowPasswords] = React.useState<Record<string, boolean>>({});
   const [copiedFields, setCopiedFields] = React.useState<Record<string, boolean>>({});
+  const [focusedFields, setFocusedFields] = React.useState<Record<string, boolean>>({});
+  const [validationResults, setValidationResults] = React.useState<Record<string, ValidationResult>>({});
 
   const togglePasswordVisibility = (fieldKey: string) => {
     setShowPasswords(prev => ({
@@ -90,6 +94,25 @@ export function MCPConfigCard({
     onValueChange(field.key, value, field.envVar);
   };
 
+  const handleFieldBlur = (field: MCPField, fieldId: string, value: string) => {
+    // Only validate non-empty values
+    if (value && !field.readonly) {
+      const validationType = field.validationType || inferCredentialType(field.key);
+      const result = validateCredential(value, validationType);
+
+      setValidationResults(prev => ({
+        ...prev,
+        [fieldId]: result
+      }));
+    }
+
+    // Clear focused state
+    setFocusedFields(prev => ({ ...prev, [fieldId]: false }));
+  };
+
+  // Check if there are any validation errors
+  const hasValidationErrors = Object.values(validationResults).some(result => !result.isValid);
+
   const getFieldIcon = (field: MCPField) => {
     if (field.key.toLowerCase().includes('url') || field.key.toLowerCase().includes('server')) {
       return <Server className="h-4 w-4 text-green-500" />;
@@ -117,7 +140,7 @@ export function MCPConfigCard({
           </div>
           <Button
             onClick={onSave}
-            disabled={!isDirty || isSaving}
+            disabled={!isDirty || isSaving || hasValidationErrors}
             size="sm"
             className="ml-4"
           >
@@ -157,13 +180,17 @@ export function MCPConfigCard({
                 <div className="relative">
                   <Input
                     id={fieldId}
-                    type={field.type === 'password' && !showPasswords[fieldId] ? "password" : "text"}
+                    type={field.type === 'password' && !showPasswords[fieldId] && !focusedFields[fieldId] ? "password" : "text"}
                     value={currentValue}
                     onChange={(e) => !field.readonly && handleFieldChange(field, e.target.value)}
+                    onFocus={() => setFocusedFields(prev => ({ ...prev, [fieldId]: true }))}
+                    onBlur={() => handleFieldBlur(field, fieldId, getCurrentValue(field))}
                     placeholder={field.placeholder}
                     className={`${field.showCopyButton || field.type === 'password' ? 'pr-20' : 'pr-10'} ${
                       field.readonly
                         ? 'bg-green-100 text-green-700 border-green-200'
+                        : validationResults[fieldId] && !validationResults[fieldId].isValid
+                        ? 'bg-white border-red-400 focus:border-red-500 focus:ring-red-400'
                         : 'bg-white border-green-300 focus:border-green-400 focus:ring-green-400'
                     } transition-colors font-mono text-sm`}
                     readOnly={field.readonly}
@@ -211,6 +238,26 @@ export function MCPConfigCard({
                   <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>{field.description}</span>
                 </div>
+              )}
+
+              {/* Validation Error */}
+              {validationResults[fieldId] && !validationResults[fieldId].isValid && (
+                <Alert variant="destructive" className="bg-red-50 border-red-300">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-red-800">
+                    {validationResults[fieldId].error}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Validation Warning */}
+              {validationResults[fieldId] && validationResults[fieldId].isValid && validationResults[fieldId].warning && (
+                <Alert className="bg-amber-50 border-amber-300">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800">
+                    {validationResults[fieldId].warning}
+                  </AlertDescription>
+                </Alert>
               )}
 
               {field.warning && (

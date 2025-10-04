@@ -95,7 +95,7 @@ class BookingNode:
         # **PROPER LANGGRAPH PATTERN**: Use interrupt() with structured payload
         approval_prompt = {
             "type": "booking_approval",
-            "message": "📅 Booking Approval Required",
+            "message": "Booking Approval Required",
             "booking_details": {
                 "title": booking_request.title,
                 "start_time": booking_request.start_time,
@@ -162,7 +162,7 @@ class BookingNode:
                         current_task.complete("Booking rejected by user")
 
                     return {
-                        "messages": messages + [AIMessage(content="❌ Booking cancelled by user.")],
+                        "messages": messages + [AIMessage(content="Booking cancelled by user.")],
                         "booking_execution_result": None,
                         "last_tool_output": "Booking cancelled by user"
                     }
@@ -183,15 +183,15 @@ class BookingNode:
                                 "location": booking_request.location or "None",
                                 "description": booking_request.description or "None"
                             }
-                            approval_prompt["message"] = "📅 Updated Booking - Please Review"
+                            approval_prompt["message"] = "Updated Booking - Please Review"
                         else:
-                            approval_prompt["message"] = "❌ Could not process modifications. Please try again."
+                            approval_prompt["message"] = "Could not process modifications. Please try again."
                     except Exception as e:
-                        approval_prompt["message"] = f"❌ Error processing modifications: {e}"
+                        approval_prompt["message"] = f"Error processing modifications: {e}"
 
             else:
                 # Invalid response - update prompt with validation message
-                approval_prompt["message"] = f"❌ {validation_result['error']}. Please try again."
+                approval_prompt["message"] = f"{validation_result['error']}. Please try again."
                 approval_prompt["instructions"] = "Valid responses: 'approve', 'reject', or modification details"
 
     def _extract_real_tool_output(self, execution_result) -> str:
@@ -301,7 +301,7 @@ class BookingNode:
                 if event_id and 'original_args' in result:
                     result['original_args']['event_id'] = event_id
                     result['requires_event_id'] = True
-                    print(f"🔧 Added event_id to booking request: {event_id}")
+                    print(f"Added event_id to booking request: {event_id}")
 
                 # Add context metadata
                 result['_context'] = {
@@ -344,7 +344,7 @@ class BookingNode:
                 event_id_match = re.search(r'Event ID[:\*\s]*([a-zA-Z0-9]+)', content)
                 if event_id_match:
                     event_id = event_id_match.group(1)
-                    print(f"🔍 Found event ID in calendar agent message: {event_id}")
+                    print(f"Found event ID in calendar agent message: {event_id}")
                     # Don't break here, continue looking for routing context
 
         # Fallback: Extract from conversation if no routing context found

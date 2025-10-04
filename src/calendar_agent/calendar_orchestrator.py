@@ -126,15 +126,15 @@ class CalendarAgentWithMCP:
             mcp_url = mcp_integration.get("mcp_server_url")
 
             if mcp_url:
-                self.logger.info(f"✅ Found MCP URL in Supabase for user {user_id}")
+                self.logger.info(f"Found MCP URL in Supabase for user {user_id}")
                 return {"mcp_server_url": mcp_url}
             else:
-                self.logger.info(f"ℹ️  No MCP URL configured in Supabase for user {user_id}")
+                self.logger.info(f"No MCP URL configured in Supabase for user {user_id}")
                 return {}
 
         except Exception as e:
-            self.logger.error(f"❌ Error loading user config from Supabase: {e}")
-            self.logger.info("ℹ️  Falling back to .env configuration")
+            self.logger.error(f"Error loading user config from Supabase: {e}")
+            self.logger.info("Falling back to .env configuration")
             return {}
 
     async def _get_mcp_tools(self):
@@ -326,10 +326,10 @@ class CalendarAgentWithMCP:
                 ))
 
                 # Log routing decision for debugging
-                print(f"🤖 Smart Router Decision: {decision.next_action}")
-                print(f"📝 Reasoning: {decision.reasoning}")
-                print(f"🎯 User Intent: {decision.user_intent}")
-                print(f"🎯 MCP tools to use: {decision.mcp_tools_to_use}")
+                print(f"Smart Router Decision: {decision.next_action}")
+                print(f"Reasoning: {decision.reasoning}")
+                print(f"User Intent: {decision.user_intent}")
+                print(f"MCP tools to use: {decision.mcp_tools_to_use}")
 
                 # **CRITICAL**: Preserve routing decision in state
                 if decision.needs_booking_approval:
@@ -347,7 +347,7 @@ class CalendarAgentWithMCP:
                     # Add routing decision and booking context to messages
                     from langchain_core.messages import AIMessage
                     context_message = AIMessage(
-                        content=f"🔄 ROUTING CONTEXT: {decision.reasoning}",
+                        content=f"ROUTING CONTEXT: {decision.reasoning}",
                         additional_kwargs={
                             "routing_decision": decision.dict(),
                             "booking_context": booking_context.dict(),
@@ -360,7 +360,7 @@ class CalendarAgentWithMCP:
                     # Add routing decision to messages with additional_kwargs for context preservation
                     from langchain_core.messages import AIMessage
                     context_message = AIMessage(
-                        content=f"🔄 ROUTING CONTEXT: {decision.reasoning}",
+                        content=f"ROUTING CONTEXT: {decision.reasoning}",
                         additional_kwargs={
                             "routing_decision": decision.dict(),
                             "booking_context": booking_context.dict(),
@@ -374,14 +374,14 @@ class CalendarAgentWithMCP:
                     state["messages"] = state.get("messages", []) + [context_message]
 
                     # **FIXED**: Return the specific next action, not just a boolean check
-                    print(f"📍 Routing to: {decision.next_action}")
+                    print(f"Routing to: {decision.next_action}")
                     return decision.next_action
                 else:
-                    print("📍 Routing to: END (no booking approval needed)")
+                    print("Routing to: END (no booking approval needed)")
                     return END
 
             except Exception as e:
-                print(f"⚠️ Smart routing failed, using fallback: {e}")
+                print(f"Smart routing failed, using fallback: {e}")
                 # Fallback to keyword detection if LLM fails
                 last_msg = messages[-1] if messages else None
                 if last_msg and hasattr(last_msg, 'content'):
@@ -390,10 +390,10 @@ class CalendarAgentWithMCP:
                     if ("booking approval" in content or
                         "approval workflow" in content or
                         "requires booking" in content):
-                        print("🔄 Fallback: Detected booking approval needed")
+                        print("Fallback: Detected booking approval needed")
                         return "booking_approval"
 
-                print("🔄 Fallback: Routing to END")
+                print("Fallback: Routing to END")
                 return END
 
         def route_after_booking(state: MessagesState):
@@ -411,7 +411,7 @@ class CalendarAgentWithMCP:
                 from .execution_result import ExecutionStatus
 
                 if booking_execution_result.overall_status in [ExecutionStatus.SUCCESS, ExecutionStatus.PARTIAL_SUCCESS]:
-                    print(f"🔄 Booking completed successfully: {booking_execution_result.overall_status}")
+                    print(f"Booking completed successfully: {booking_execution_result.overall_status}")
 
                     # Add the real tool output to state for supervisor visibility
                     if last_tool_output:
@@ -422,12 +422,12 @@ class CalendarAgentWithMCP:
                     return END
 
                 elif booking_execution_result.overall_status == ExecutionStatus.FAILED:
-                    print(f"🔄 Booking failed: {booking_execution_result.get_primary_error()}")
+                    print(f"Booking failed: {booking_execution_result.get_primary_error()}")
                     return END
 
             # Handle user cancellation
             if last_tool_output == "Booking cancelled by user":
-                print("🔄 Booking cancelled by user")
+                print("Booking cancelled by user")
                 return END
 
             # Check if there's human feedback that needs processing
@@ -438,11 +438,11 @@ class CalendarAgentWithMCP:
 
                 # If it's accept/reject, stay in booking flow
                 if response in ["accept", "reject"]:
-                    print("🔄 Accept/reject detected - staying in booking flow")
+                    print("Accept/reject detected - staying in booking flow")
                     return "booking_approval"
                 else:
                     # It's feedback - route back to calendar_agent with preserved context
-                    print("🔄 User feedback detected - routing back to calendar_agent")
+                    print("User feedback detected - routing back to calendar_agent")
                     return "calendar_agent"
 
             # Fallback to message content analysis for backward compatibility
@@ -453,8 +453,8 @@ class CalendarAgentWithMCP:
                 # Check for completion indicators
                 if ("successfully updated" in content.lower() or
                     "booking cancelled by user" in content or
-                    "✅" in content):
-                    print("🔄 Operation completed - ending flow")
+                    "completed successfully" in content.lower()):
+                    print("Operation completed - ending flow")
                     return END
 
             return END

@@ -80,11 +80,11 @@ class MCPToolExecutor:
             )
 
         try:
-            print(f"🔧 Executing {tool_name} with args: {args}")
+            print(f"Executing {tool_name} with args: {args}")
             raw_result = await tool_to_use.ainvoke(args)
             execution_time = time.time() - start_time
 
-            print(f"📥 Raw result from {tool_name}: {raw_result}")
+            print(f"Raw result from {tool_name}: {raw_result}")
 
             # CRITICAL: Parse the result properly
             parsed_result = self._parse_mcp_result(tool_name, raw_result)

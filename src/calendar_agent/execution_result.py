@@ -106,18 +106,18 @@ class BookingExecutionResult(BaseModel):
     def _generate_user_messages(self):
         """Generate appropriate user-facing messages based on results"""
         if self.overall_status == ExecutionStatus.SUCCESS:
-            self.success_message = f"✅ {self.booking_title} completed successfully!"
+            self.success_message = f"{self.booking_title} completed successfully!"
             if self.api_restrictions_encountered:
-                self.info_message = "ℹ️ " + "; ".join(set(self.api_restrictions_encountered))
+                self.info_message = "" + "; ".join(set(self.api_restrictions_encountered))
 
         elif self.overall_status == ExecutionStatus.PARTIAL_SUCCESS:
-            self.success_message = f"⚠️ {self.booking_title} partially completed"
+            self.success_message = f"{self.booking_title} partially completed"
             self.error_message = "Some operations failed: " + "; ".join(self.failed_operations)
             if self.api_restrictions_encountered:
-                self.info_message = "ℹ️ " + "; ".join(set(self.api_restrictions_encountered))
+                self.info_message = "" + "; ".join(set(self.api_restrictions_encountered))
 
         else:
-            self.error_message = f"❌ {self.booking_title} failed: " + "; ".join(self.failed_operations)
+            self.error_message = f"{self.booking_title} failed: " + "; ".join(self.failed_operations)
 
     def get_supervisor_message(self) -> str:
         """Get the complete message to send to supervisor"""
@@ -134,12 +134,12 @@ class BookingExecutionResult(BaseModel):
 
         # Add operation details
         if self.successful_operations:
-            parts.append("📋 Successful operations:")
+            parts.append("Successful operations:")
             for op in self.successful_operations:
                 parts.append(f"  • {op}")
 
         if self.failed_operations:
-            parts.append("❌ Failed operations:")
+            parts.append("Failed operations:")
             for op in self.failed_operations:
                 parts.append(f"  • {op}")
 

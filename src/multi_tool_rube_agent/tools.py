@@ -22,7 +22,7 @@ try:
     COMPOSIO_AVAILABLE = True
 except ImportError:
     COMPOSIO_AVAILABLE = False
-    print("⚠️ composio-langchain not available - using MCP only")
+    print("composio-langchain not available - using MCP only")
 
 # Import centralized config - handle both module import and direct execution
 try:
@@ -300,15 +300,15 @@ def get_composio_tools() -> List[BaseTool]:
             try:
                 app_tools = composio_toolset.get_tools(apps=[app])
                 composio_tools.extend(app_tools)
-                print(f"✅ Loaded {len(app_tools)} tools from {app.value}")
+                print(f"Loaded {len(app_tools)} tools from {app.value}")
             except Exception as e:
-                print(f"⚠️ Could not load tools from {app.value}: {e}")
+                print(f"Could not load tools from {app.value}: {e}")
 
-        print(f"✅ Total Composio tools loaded: {len(composio_tools)}")
+        print(f"Total Composio tools loaded: {len(composio_tools)}")
         return composio_tools
 
     except Exception as e:
-        print(f"⚠️ Failed to initialize Composio tools: {e}")
+        print(f"Failed to initialize Composio tools: {e}")
         return []
 
 async def get_agent_tools_with_mcp() -> List[BaseTool]:
@@ -325,12 +325,12 @@ async def get_agent_tools_with_mcp() -> List[BaseTool]:
         tools.extend(mcp_tools)
 
         if mcp_tools:
-            print(f"✅ Loaded {len(mcp_tools)} Rube {AGENT_NAME} MCP tools: {[t.name for t in mcp_tools]}")
+            print(f"Loaded {len(mcp_tools)} Rube {AGENT_NAME} MCP tools: {[t.name for t in mcp_tools]}")
         else:
-            print(f"⚠️ No Rube {AGENT_NAME} MCP tools available")
+            print(f"No Rube {AGENT_NAME} MCP tools available")
 
     except Exception as e:
-        print(f"⚠️ Failed to load {AGENT_NAME} MCP tools: {e}")
+        print(f"Failed to load {AGENT_NAME} MCP tools: {e}")
 
     return tools
 
@@ -349,7 +349,7 @@ def get_agent_simple_tools() -> List[BaseTool]:
             return asyncio.run(get_agent_tools_with_mcp())
 
     except Exception as e:
-        print(f"⚠️ Rube {AGENT_NAME} MCP connection failed: {e}")
+        print(f"Rube {AGENT_NAME} MCP connection failed: {e}")
 
         # Fallback to sub-agent tools only
         # TODO: Return your local/sub-agent tools as fallback
@@ -394,7 +394,7 @@ def discover_mcp_tools_sync() -> List[Dict[str, str]]:
         else:
             return asyncio.run(discover_mcp_tools())
     except Exception as e:
-        print(f"⚠️ Tool discovery failed: {e}")
+        print(f"Tool discovery failed: {e}")
         return []
 
 
@@ -405,19 +405,19 @@ def print_discovered_tools():
     Run this function to get the exact tool names to add to your USEFUL_TOOL_NAMES set.
     Perfect for template configuration and debugging.
     """
-    print(f"\n🔍 Discovering Rube {AGENT_NAME.upper()} MCP Tools...")
+    print(f"\nDiscovering Rube {AGENT_NAME.upper()} MCP Tools...")
     print("=" * 60)
 
     tools_info = discover_mcp_tools_sync()
 
     if not tools_info:
-        print(f"❌ No tools discovered. Check your Rube MCP server configuration.")
+        print(f"No tools discovered. Check your Rube MCP server configuration.")
         print(f"Environment variable: {MCP_ENV_VAR}")
         print(f"Current value: {os.getenv(MCP_ENV_VAR, 'NOT SET')}")
         return
 
-    print(f"✅ Discovered {len(tools_info)} tools:")
-    print("\n📋 Copy these lines to your USEFUL_TOOL_NAMES:")
+    print(f"Discovered {len(tools_info)} tools:")
+    print("\nCopy these lines to your USEFUL_TOOL_NAMES:")
     print("USEFUL_TOOL_NAMES = {")
 
     for tool in tools_info:
@@ -427,7 +427,7 @@ def print_discovered_tools():
 
     print("}")
 
-    print(f"\n📊 Tool Details:")
+    print(f"\nTool Details:")
     for i, tool in enumerate(tools_info, 1):
         print(f"{i:2d}. {tool['name']}")
         print(f"    Description: {tool['description']}")

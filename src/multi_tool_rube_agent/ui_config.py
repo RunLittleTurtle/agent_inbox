@@ -1,7 +1,7 @@
 """
 React Agent MCP Template UI Configuration Schema
 
-⚠️  CRITICAL: When duplicating this template:
+CRITICAL: When duplicating this template:
 1. Replace ALL {PLACEHOLDER} values with actual agent details
 2. Only include fields that are actually implemented in your agent
 3. Update agent-inbox/src/pages/api/config/ endpoints (see MCP_AGENT_CONFIGURATION_GUIDE.md)

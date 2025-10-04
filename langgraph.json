@@ -1,7 +1,7 @@
 {
   "dependencies": ["./src", "./src/executive-ai-assistant"],
   "graphs": {
-    "agent": "./src/graph.py:make_graph",
+    "agent": "./src/graph.py:graph",
     "executive_main": "./src/executive-ai-assistant/eaia/main/graph.py:app",
     "executive_cron": "./src/executive-ai-assistant/eaia/cron_graph.py:graph",
     "executive_general_reflection": "./src/executive-ai-assistant/eaia/reflection_graphs.py:general_reflection_graph",

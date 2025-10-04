@@ -9,15 +9,11 @@ async def main(
     url: Optional[str] = None,
     minutes_since: int = 60,
 ):
-    import os
-    api_key = os.getenv("LANGSMITH_API_KEY")
-
     if url is None:
         client = get_client(url="http://127.0.0.1:2025")
     else:
         client = get_client(
-            url=url,
-            api_key=api_key  # Add API key for authentication
+            url=url
         )
     await client.crons.create("executive_cron", schedule="*/10 * * * *", input={"minutes_since": minutes_since})
 

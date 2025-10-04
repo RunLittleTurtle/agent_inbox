@@ -41,6 +41,12 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# DIAGNOSTIC: Check Python encoding configuration
+logger.info(f"[ENCODING] Python default encoding: {sys.getdefaultencoding()}")
+logger.info(f"[ENCODING] PYTHONIOENCODING env var: {os.getenv('PYTHONIOENCODING', 'NOT_SET')}")
+logger.info(f"[ENCODING] PYTHONUTF8 env var: {os.getenv('PYTHONUTF8', 'NOT_SET')}")
+logger.info(f"[ENCODING] stdout encoding: {sys.stdout.encoding if hasattr(sys.stdout, 'encoding') else 'NO_ATTR'}")
+
 # ============================================================================
 # 2025 Runtime Context Schema (Phase 2.1)
 # ============================================================================

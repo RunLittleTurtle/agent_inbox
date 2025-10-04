@@ -93,7 +93,10 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
     # STUDIO BYPASS: Studio sends no authorization header
     # This allows developers to use LangGraph Studio for debugging without JWT
     if not authorization or authorization.strip() == "":
-        logger.info("🎨 Studio request detected (no auth header) - allowing access")
+        logger.info("=" * 80)
+        logger.info("🎨 STUDIO REQUEST DETECTED (no auth header)")
+        logger.info("🎨 Returning identity='studio' for full access")
+        logger.info("=" * 80)
         return {
             "identity": "studio",
             "is_authenticated": True,
@@ -217,8 +220,9 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> A
     # STUDIO BYPASS: Give Studio full access to all resources (for development/debugging)
     # Studio needs to see all threads/runs/crons to help developers debug issues
     if user.identity == "studio":
-        logger.info(f"🎨 Studio access to {resource_type} - no filtering (full visibility for debugging)")
-        return None  # No filter = Studio sees everything
+        logger.info(f"🎨 Studio access to {resource_type} - returning empty dict for full visibility")
+        logger.info(f"🎨 Studio request details - resource: {resource_type}, value: {value}")
+        return {}  # Empty dict = no filter = Studio sees everything
 
     # ASSISTANTS: Deployment-level resources - shared by all authenticated users
     # No owner metadata, no filtering - allows all API users to see them

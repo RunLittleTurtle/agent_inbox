@@ -99,32 +99,37 @@ def get_current_context():
 # Runtime Wrapper Nodes (Phase 2.1) - 2025 Pattern
 # ============================================================================
 
-async def calendar_agent_node(state: WorkflowState, runtime: Runtime[UserContext]) -> Dict[str, Any]:
+async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
     """Runtime wrapper for calendar agent with dynamic MCP tool loading.
 
     This node loads calendar MCP tools at REQUEST TIME based on user-specific
-    configuration, following LangGraph 2025 Runtime API best practices.
+    configuration from Supabase, following LangGraph 2025 best practices.
 
     Args:
         state: Current workflow state with messages
-        runtime: Runtime context with user-specific MCP URLs
+        config: RunnableConfig with user API keys
 
     Returns:
         Dict with updated messages from calendar agent
     """
-    # Extract user context (type-safe!)
-    user_id = runtime.context.user_id
-    mcp_url = runtime.context.mcp_calendar_url
+    # Get user_id from config
+    api_keys = get_api_keys_from_config(config)
+    user_id = api_keys["user_id"]
 
     logger.info(f"📅 [calendar_agent_node] Loading for user: {user_id}")
-    logger.info(f"📅 [calendar_agent_node] MCP URL: {mcp_url or 'Not configured'}")
 
-    # For now, delegate to existing CalendarAgentWithMCP implementation
-    # This will be refactored in subsequent iterations
+    # Load MCP URL from Supabase at runtime
+    from utils.config_utils import get_agent_config_from_supabase
+
+    agent_config = get_agent_config_from_supabase(user_id, "calendar_agent")
+    mcp_integration = agent_config.get("mcp_integration", {})
+    mcp_url = mcp_integration.get("mcp_server_url")
+
+    logger.info(f"📅 [calendar_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}")
+
+    # Delegate to existing CalendarAgentWithMCP implementation
+    # CalendarAgentWithMCP will load MCP tools using the user_id
     from calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
-
-    # Get API keys from config
-    api_keys = get_api_keys_from_config(runtime.config)
 
     # Create calendar model
     calendar_model = ChatAnthropic(
@@ -135,9 +140,10 @@ async def calendar_agent_node(state: WorkflowState, runtime: Runtime[UserContext
     )
 
     # Create calendar agent instance with runtime user_id
+    # ✅ KEY CHANGE: Pass user_id from request config, not fallback "local_dev_user"
     calendar_agent_instance = CalendarAgentWithMCP(
         model=calendar_model,
-        user_id=user_id  # ✅ Use runtime user_id, not fallback
+        user_id=user_id
     )
     await calendar_agent_instance.initialize()
 
@@ -150,29 +156,34 @@ async def calendar_agent_node(state: WorkflowState, runtime: Runtime[UserContext
     return result
 
 
-async def multi_tool_rube_agent_node(state: WorkflowState, runtime: Runtime[UserContext]) -> Dict[str, Any]:
+async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
     """Runtime wrapper for multi-tool Rube agent with dynamic MCP tool loading.
 
     This node loads Rube MCP tools at REQUEST TIME based on user-specific
-    configuration, following LangGraph 2025 Runtime API best practices.
+    configuration from Supabase, following LangGraph 2025 best practices.
 
     Args:
         state: Current workflow state with messages
-        runtime: Runtime context with user-specific MCP URLs and auth tokens
+        config: RunnableConfig with user API keys
 
     Returns:
         Dict with updated messages from Rube agent
     """
-    # Extract user context (type-safe!)
-    user_id = runtime.context.user_id
-    mcp_url = runtime.context.mcp_rube_url
-    auth_token = runtime.context.rube_auth_token
+    # Get user_id from config
+    api_keys = get_api_keys_from_config(config)
+    user_id = api_keys["user_id"]
 
     logger.info(f"🔧 [multi_tool_rube_agent_node] Loading for user: {user_id}")
-    logger.info(f"🔧 [multi_tool_rube_agent_node] MCP URL: {mcp_url or 'Not configured'}")
 
-    # Get API keys from config
-    api_keys = get_api_keys_from_config(runtime.config)
+    # Load MCP URL from Supabase at runtime
+    from utils.config_utils import get_agent_config_from_supabase
+
+    agent_config = get_agent_config_from_supabase(user_id, "multi_tool_rube_agent")
+    mcp_integration = agent_config.get("mcp_integration", {})
+    mcp_url = mcp_integration.get("mcp_server_url")
+    auth_token = mcp_integration.get("auth_token")  # Optional auth token
+
+    logger.info(f"🔧 [multi_tool_rube_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}")
 
     # Create Rube model
     rube_model = ChatAnthropic(
@@ -261,6 +272,54 @@ async def multi_tool_rube_agent_node(state: WorkflowState, runtime: Runtime[User
 
     logger.info(f"🔧 [multi_tool_rube_agent_node] Completed for user: {user_id}")
     return result
+
+
+# ============================================================================
+# Runtime-Aware Agent Graph Builders (Phase 3)
+# ============================================================================
+
+def create_runtime_calendar_agent() -> Any:
+    """Create compiled calendar agent graph with Runtime API support.
+
+    This creates a simple StateGraph containing the runtime wrapper node.
+    The supervisor can route to this graph, and Runtime context will be available.
+
+    Returns:
+        Compiled graph that invokes calendar_agent_node with Runtime context
+    """
+    from langgraph.graph import StateGraph, START, END
+
+    # Create simple graph with single node
+    workflow = StateGraph(WorkflowState)
+    workflow.add_node("calendar_agent", calendar_agent_node)
+    workflow.add_edge(START, "calendar_agent")
+    workflow.add_edge("calendar_agent", END)
+
+    compiled_graph = workflow.compile(name="calendar_agent")
+    logger.info("✅ Runtime-aware calendar agent graph created")
+    return compiled_graph
+
+
+def create_runtime_multi_tool_agent() -> Any:
+    """Create compiled multi-tool Rube agent graph with Runtime API support.
+
+    This creates a simple StateGraph containing the runtime wrapper node.
+    The supervisor can route to this graph, and Runtime context will be available.
+
+    Returns:
+        Compiled graph that invokes multi_tool_rube_agent_node with Runtime context
+    """
+    from langgraph.graph import StateGraph, START, END
+
+    # Create simple graph with single node
+    workflow = StateGraph(WorkflowState)
+    workflow.add_node("multi_tool_rube_agent", multi_tool_rube_agent_node)
+    workflow.add_edge(START, "multi_tool_rube_agent")
+    workflow.add_edge("multi_tool_rube_agent", END)
+
+    compiled_graph = workflow.compile(name="multi_tool_rube_agent")
+    logger.info("✅ Runtime-aware multi-tool Rube agent graph created")
+    return compiled_graph
 
 
 def get_api_keys_from_config(config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
@@ -549,7 +608,10 @@ def validate_environment():
     logger.info("Environment validation passed")
 
 async def create_supervisor_graph(config: Optional[RunnableConfig] = None):
-    """Create multi-agent supervisor with multi-tenant support.
+    """Create multi-agent supervisor with Runtime API support (Phase 3).
+
+    This supervisor uses runtime-aware agent graphs that load MCP tools dynamically
+    at request time based on user-specific context.
 
     Args:
         config: RunnableConfig with user-specific API keys in configurable dict
@@ -570,12 +632,13 @@ async def create_supervisor_graph(config: Optional[RunnableConfig] = None):
         logger.info("Local development mode: Using API keys from .env")
         # validate_environment()  # Disabled for multi-tenant deployment
 
-    # Create agents with user-specific config
-    logger.info(f"Creating agents for user: {api_keys['user_id']}...")
-    calendar_agent = await create_calendar_agent(config)
-    multi_tool_rube_agent = await create_multi_tool_rube_agent(config)
+    # ✅ PHASE 3: Create runtime-aware agent graphs
+    # These graphs contain wrapper nodes that load MCP tools at REQUEST TIME
+    logger.info(f"Creating runtime-aware agents for user: {api_keys['user_id']}...")
+    calendar_agent = create_runtime_calendar_agent()
+    multi_tool_rube_agent = create_runtime_multi_tool_agent()
 
-    logger.info(f"All agents created successfully for user: {api_keys['user_id']}")
+    logger.info(f"✅ Runtime-aware agents created for user: {api_keys['user_id']}")
 
     # Create supervisor model with user's API key
     supervisor_model = ChatAnthropic(

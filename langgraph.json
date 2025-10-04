@@ -26,9 +26,5 @@
       "sweep_interval_minutes": 60,
       "default_ttl": 43200
     }
-  },
-  "auth": {
-    "path": "./src/auth.py:auth",
-    "disable_studio_auth": true
   }
 }

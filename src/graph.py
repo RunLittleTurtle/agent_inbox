@@ -30,6 +30,7 @@ import io
 # Solution: Reconfigure stdout/stderr to UTF-8 IMMEDIATELY at module load.
 # ============================================================================
 
+
 def _fix_encoding():
     """Force UTF-8 encoding for stdout/stderr to prevent UnicodeEncodeError.
 
@@ -38,17 +39,18 @@ def _fix_encoding():
     """
     try:
         # Python 3.7+ has reconfigure() method
-        if hasattr(sys.stdout, 'reconfigure'):
-            sys.stdout.reconfigure(encoding='utf-8')
-            sys.stderr.reconfigure(encoding='utf-8')
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stderr.reconfigure(encoding="utf-8")
         else:
             # Fallback for older Python versions
-            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
     except Exception:
         # If reconfiguration fails, we're in an environment that doesn't support it
         # (e.g., some IDEs). Ignore silently - encoding is likely already UTF-8.
         pass
+
 
 # Apply encoding fix IMMEDIATELY
 _fix_encoding()
@@ -87,12 +89,15 @@ logger = logging.getLogger(__name__)
 logger.info(f"[ENCODING-FIX] Python default encoding: {sys.getdefaultencoding()}")
 logger.info(f"[ENCODING-FIX] stdout encoding: {sys.stdout.encoding}")
 logger.info(f"[ENCODING-FIX] stderr encoding: {sys.stderr.encoding}")
-logger.info(f"[ENCODING-FIX] PYTHONIOENCODING: {os.getenv('PYTHONIOENCODING', 'NOT_SET')}")
+logger.info(
+    f"[ENCODING-FIX] PYTHONIOENCODING: {os.getenv('PYTHONIOENCODING', 'NOT_SET')}"
+)
 logger.info(f"[ENCODING-FIX] PYTHONUTF8: {os.getenv('PYTHONUTF8', 'NOT_SET')}")
 
 # ============================================================================
 # 2025 Runtime Context Schema (Phase 2.1)
 # ============================================================================
+
 
 @dataclass
 class UserContext:
@@ -107,10 +112,12 @@ class UserContext:
         mcp_rube_url: Optional user-specific MCP server URL for Rube multi-tool
         rube_auth_token: Optional auth token for Rube MCP server
     """
+
     user_id: str
     mcp_calendar_url: str | None = None
     mcp_rube_url: str | None = None
     rube_auth_token: str | None = None
+
 
 # Local dev only - uses git submodules from library/
 # In deployment, these packages come from requirements.txt (pip-installed from PyPI)
@@ -123,6 +130,7 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.prebuilt import create_react_agent
 from langgraph_supervisor import create_supervisor
 
+
 def get_current_context():
     """Get current time and timezone context using USER_TIMEZONE from .env"""
     user_timezone = os.getenv("USER_TIMEZONE", "America/Toronto")
@@ -132,7 +140,7 @@ def get_current_context():
         return {
             "current_time": current_time.isoformat(),
             "timezone": str(timezone_zone),
-            "timezone_name": user_timezone
+            "timezone_name": user_timezone,
         }
     except Exception as e:
         logger.error(f"Error getting timezone context: {e}")
@@ -141,14 +149,18 @@ def get_current_context():
         return {
             "current_time": current_time.isoformat(),
             "timezone": "UTC",
-            "timezone_name": "UTC"
+            "timezone_name": "UTC",
         }
+
 
 # ============================================================================
 # Runtime Wrapper Nodes (Phase 2.1) - 2025 Pattern
 # ============================================================================
 
-async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
+
+async def calendar_agent_node(
+    state: WorkflowState, config: Optional[RunnableConfig] = None
+) -> Dict[str, Any]:
     """Runtime wrapper for calendar agent with dynamic MCP tool loading.
 
     This node loads calendar MCP tools at REQUEST TIME based on user-specific
@@ -174,7 +186,9 @@ async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableCon
     mcp_integration = agent_config.get("mcp_integration", {})
     mcp_url = mcp_integration.get("mcp_server_url")
 
-    logger.info(f"[calendar_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}")
+    logger.info(
+        f"[calendar_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}"
+    )
 
     # Delegate to existing CalendarAgentWithMCP implementation
     # CalendarAgentWithMCP will load MCP tools using the user_id
@@ -185,14 +199,13 @@ async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableCon
         model=DEFAULT_LLM_MODEL,
         temperature=0,
         anthropic_api_key=api_keys["anthropic_api_key"],
-        streaming=False
+        streaming=False,
     )
 
     # Create calendar agent instance with runtime user_id
     #  KEY CHANGE: Pass user_id from request config, not fallback "local_dev_user"
     calendar_agent_instance = CalendarAgentWithMCP(
-        model=calendar_model,
-        user_id=user_id
+        model=calendar_model, user_id=user_id
     )
     await calendar_agent_instance.initialize()
 
@@ -205,7 +218,9 @@ async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableCon
     return result
 
 
-async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
+async def multi_tool_rube_agent_node(
+    state: WorkflowState, config: Optional[RunnableConfig] = None
+) -> Dict[str, Any]:
     """Runtime wrapper for multi-tool Rube agent with dynamic MCP tool loading.
 
     This node loads Rube MCP tools at REQUEST TIME based on user-specific
@@ -232,32 +247,31 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
     mcp_url = mcp_integration.get("mcp_server_url")
     auth_token = mcp_integration.get("auth_token")  # Optional auth token
 
-    logger.info(f"[multi_tool_rube_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}")
+    logger.info(
+        f"[multi_tool_rube_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}"
+    )
 
     # Create Rube model
     rube_model = ChatAnthropic(
         model=DEFAULT_LLM_MODEL,
         temperature=0,
         anthropic_api_key=api_keys["anthropic_api_key"],
-        streaming=False
+        streaming=False,
     )
 
     # Load MCP tools dynamically
     tools = []
     if mcp_url:
         try:
-            logger.info(f"[multi_tool_rube_agent_node] Loading MCP tools from: {mcp_url}")
+            logger.info(
+                f"[multi_tool_rube_agent_node] Loading MCP tools from: {mcp_url}"
+            )
 
             # Import MCP client
             from langchain_mcp_adapters.client import MultiServerMCPClient
 
             # Create MCP client with user-specific URL
-            mcp_config = {
-                "rube": {
-                    "url": mcp_url,
-                    "transport": "streamable_http"
-                }
-            }
+            mcp_config = {"rube": {"url": mcp_url, "transport": "streamable_http"}}
 
             # Add auth token if provided
             if auth_token:
@@ -268,26 +282,39 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
             client = MultiServerMCPClient(mcp_config)
             tools = await client.get_tools()
 
-            logger.info(f"[multi_tool_rube_agent_node] Loaded {len(tools)} tools: {[t.name for t in tools]}")
+            logger.info(
+                f"[multi_tool_rube_agent_node] Loaded {len(tools)} tools: {[t.name for t in tools]}"
+            )
         except Exception as e:
             logger.error(f"[multi_tool_rube_agent_node] Failed to load MCP tools: {e}")
             import traceback
+
             traceback.print_exc()
             tools = []
     else:
-        logger.warning(f"[multi_tool_rube_agent_node] No MCP URL configured for user {user_id}")
+        logger.warning(
+            f"[multi_tool_rube_agent_node] No MCP URL configured for user {user_id}"
+        )
 
     # Filter to useful Rube tools (if we loaded any)
     if tools:
-        useful_tools = [tool for tool in tools if hasattr(tool, 'name') and tool.name in {
-            'RUBE_SEARCH_TOOLS',
-            'RUBE_MULTI_EXECUTE_TOOL',
-            'RUBE_CREATE_PLAN',
-            'RUBE_MANAGE_CONNECTIONS',
-            'RUBE_REMOTE_WORKBENCH',
-            'RUBE_REMOTE_BASH_TOOL'
-        }]
-        logger.info(f"[multi_tool_rube_agent_node] Filtered to {len(useful_tools)} useful tools")
+        useful_tools = [
+            tool
+            for tool in tools
+            if hasattr(tool, "name")
+            and tool.name
+            in {
+                "RUBE_SEARCH_TOOLS",
+                "RUBE_MULTI_EXECUTE_TOOL",
+                "RUBE_CREATE_PLAN",
+                "RUBE_MANAGE_CONNECTIONS",
+                "RUBE_REMOTE_WORKBENCH",
+                "RUBE_REMOTE_BASH_TOOL",
+            }
+        ]
+        logger.info(
+            f"[multi_tool_rube_agent_node] Filtered to {len(useful_tools)} useful tools"
+        )
     else:
         useful_tools = []
 
@@ -313,7 +340,7 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
         model=rube_model,
         tools=useful_tools,
         name="multi_tool_rube_agent",
-        prompt=rube_prompt
+        prompt=rube_prompt,
     )
 
     # Invoke agent with current state
@@ -326,6 +353,7 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
 # ============================================================================
 # Runtime-Aware Agent Graph Builders (Phase 3)
 # ============================================================================
+
 
 def create_runtime_calendar_agent() -> Any:
     """Create compiled calendar agent graph with Runtime API support.
@@ -403,11 +431,15 @@ def get_api_keys_from_config(config: Optional[RunnableConfig] = None) -> Dict[st
 
         # In production, require at least one API key
         if not openai_key and not anthropic_key:
-            error_msg = f"Production mode: No API keys provided in config for user {user_id}"
+            error_msg = (
+                f"Production mode: No API keys provided in config for user {user_id}"
+            )
             logger.error(error_msg)
             raise EnvironmentError(error_msg)
 
-        logger.info(f"Multi-tenant mode: Using API keys from config for user: {user_id}")
+        logger.info(
+            f"Multi-tenant mode: Using API keys from config for user: {user_id}"
+        )
 
         return {
             "openai_api_key": openai_key,
@@ -432,6 +464,7 @@ def get_api_keys_from_config(config: Optional[RunnableConfig] = None) -> Dict[st
         "user_id": "local_dev_user",
     }
 
+
 async def create_calendar_agent(config: Optional[RunnableConfig] = None):
     """Create calendar agent with MCP integration (multi-tenant).
 
@@ -454,23 +487,19 @@ async def create_calendar_agent(config: Optional[RunnableConfig] = None):
         model=DEFAULT_LLM_MODEL,
         temperature=0,
         anthropic_api_key=api_keys["anthropic_api_key"],
-        streaming=False
+        streaming=False,
     )
 
     # Create calendar agent instance with MCP integration
     # Pass user_id so agent can load user-specific MCP config from Supabase
     calendar_agent_instance = CalendarAgentWithMCP(
         model=calendar_model,
-        user_id=api_keys["user_id"]  #  NEW: Load user-specific MCP URL from Supabase
+        user_id=api_keys["user_id"],  #  NEW: Load user-specific MCP URL from Supabase
     )
     await calendar_agent_instance.initialize()
 
     logger.info(f"Calendar agent initialized for user: {api_keys['user_id']}")
     return await calendar_agent_instance.get_agent()
-
-
-
-
 
 
 async def create_multi_tool_rube_agent(config: Optional[RunnableConfig] = None):
@@ -489,7 +518,7 @@ async def create_multi_tool_rube_agent(config: Optional[RunnableConfig] = None):
     api_keys = get_api_keys_from_config(config)
 
     # Import the Multi-Tool Rube Agent configuration
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'multi_tool_rube_agent'))
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "multi_tool_rube_agent"))
     from tools import _agent_mcp
 
     logger.info(f"Creating Multi-Tool Rube Agent for user: {api_keys['user_id']}...")
@@ -499,23 +528,31 @@ async def create_multi_tool_rube_agent(config: Optional[RunnableConfig] = None):
         model=DEFAULT_LLM_MODEL,
         temperature=0,
         anthropic_api_key=api_keys["anthropic_api_key"],
-        streaming=False
+        streaming=False,
     )
 
     # Get Rube MCP tools
     mcp_tools = await _agent_mcp.get_mcp_tools()
 
     # Filter to useful Rube tools
-    useful_tools = [tool for tool in mcp_tools if hasattr(tool, 'name') and tool.name in {
-        'RUBE_SEARCH_TOOLS',
-        'RUBE_MULTI_EXECUTE_TOOL',
-        'RUBE_CREATE_PLAN',
-        'RUBE_MANAGE_CONNECTIONS',
-        'RUBE_REMOTE_WORKBENCH',
-        'RUBE_REMOTE_BASH_TOOL'
-    }]
+    useful_tools = [
+        tool
+        for tool in mcp_tools
+        if hasattr(tool, "name")
+        and tool.name
+        in {
+            "RUBE_SEARCH_TOOLS",
+            "RUBE_MULTI_EXECUTE_TOOL",
+            "RUBE_CREATE_PLAN",
+            "RUBE_MANAGE_CONNECTIONS",
+            "RUBE_REMOTE_WORKBENCH",
+            "RUBE_REMOTE_BASH_TOOL",
+        }
+    ]
 
-    logger.info(f"Found {len(useful_tools)} Rube tools for user {api_keys['user_id']}: {[t.name for t in useful_tools]}")
+    logger.info(
+        f"Found {len(useful_tools)} Rube tools for user {api_keys['user_id']}: {[t.name for t in useful_tools]}"
+    )
 
     # Create agent prompt with confirmed capabilities
     rube_prompt = """You are the Multi-Tool Rube Agent with access to 89 tools across 10 connected applications through Rube MCP server.
@@ -532,10 +569,7 @@ async def create_multi_tool_rube_agent(config: Optional[RunnableConfig] = None):
 - Search documents, create pages, database operations
 - Collaborative document editing and data management
 
-**SLACK** (8 tools) - Team Communication:
-- Find channels, send messages, fetch conversation history
-- Search messages, list channels and users
-- Workspace communication management
+
 
 **GITHUB** (10 tools) - Development & Collaboration:
 - Find repositories, manage branches, create pull requests
@@ -557,20 +591,6 @@ async def create_multi_tool_rube_agent(config: Optional[RunnableConfig] = None):
 - Find and list files, create folders
 - File organization and collaboration
 
-**GOOGLE CALENDAR** (8 tools) - Calendar Management:
-- List calendars, find free slots, create events
-- Get specific calendars, free/busy queries
-- Event scheduling and availability management
-
-**NOTION** (8 tools) - Productivity & Notes:
-- Search pages, create pages, add content blocks
-- Fetch block contents, update pages, query databases
-- Knowledge management and collaboration
-
-**LINEAR** (10 tools) - Project Management:
-- Manage user profile, list projects and issues
-- Create and update issues, add comments
-- Attach files and track project progress
 
 **HOW TO USE YOUR TOOLS:**
 
@@ -608,11 +628,14 @@ You have verified access to these 89 tools and can perform real operations acros
         model=rube_model,
         tools=useful_tools,
         name="multi_tool_rube_agent",
-        prompt=rube_prompt
+        prompt=rube_prompt,
     )
 
-    logger.info(f"Multi-Tool Rube Agent created successfully for user: {api_keys['user_id']}")
+    logger.info(
+        f"Multi-Tool Rube Agent created successfully for user: {api_keys['user_id']}"
+    )
     return rube_agent
+
 
 async def post_model_hook(messages, model_output=None):
     """
@@ -623,7 +646,9 @@ async def post_model_hook(messages, model_output=None):
             return messages
 
         last_msg = messages[-1]
-        if isinstance(last_msg, AIMessage) and ("recap" in last_msg.content.lower() or "summary" in last_msg.content.lower()):
+        if isinstance(last_msg, AIMessage) and (
+            "recap" in last_msg.content.lower() or "summary" in last_msg.content.lower()
+        ):
             return messages
 
         source_text = ""
@@ -634,7 +659,9 @@ async def post_model_hook(messages, model_output=None):
                     break
 
         if not source_text:
-            recap_content = "Recap: The supervisor completed routing and agent handoff as required."
+            recap_content = (
+                "Recap: The supervisor completed routing and agent handoff as required."
+            )
         else:
             short_snippet = " ".join(source_text.splitlines())[:480].strip()
             recap_content = f"Recap: {short_snippet}"
@@ -646,15 +673,19 @@ async def post_model_hook(messages, model_output=None):
         logger.exception("post_model_hook failed -- returning original messages.")
         return messages
 
+
 def validate_environment():
     """Validate required environment variables"""
     required_vars = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
 
     if missing_vars:
-        raise EnvironmentError(f"Missing required environment variables: {missing_vars}")
+        raise EnvironmentError(
+            f"Missing required environment variables: {missing_vars}"
+        )
 
     logger.info("Environment validation passed")
+
 
 async def create_supervisor_graph(config: Optional[RunnableConfig] = None):
     """Create multi-agent supervisor with Runtime API support (Phase 3).
@@ -694,7 +725,7 @@ async def create_supervisor_graph(config: Optional[RunnableConfig] = None):
         model=DEFAULT_LLM_MODEL,
         temperature=0,
         anthropic_api_key=api_keys["anthropic_api_key"],
-        streaming=False
+        streaming=False,
     )
 
     # Get dynamic context
@@ -704,17 +735,14 @@ async def create_supervisor_graph(config: Optional[RunnableConfig] = None):
     supervisor_prompt = f"""You are a team supervisor dispatching requests and managing specialized agents.
 
 CURRENT CONTEXT:
-- Today: {datetime.fromisoformat(context['current_time']).strftime("%Y-%m-%d")} at {datetime.fromisoformat(context['current_time']).strftime("%I:%M %p")}
-- Timezone: {context['timezone_name']}
+- Today: {datetime.fromisoformat(context["current_time"]).strftime("%Y-%m-%d")} at {datetime.fromisoformat(context["current_time"]).strftime("%I:%M %p")}
+- Timezone: {context["timezone_name"]}
 
 IMPORTANT --> Always look at agent list before trying to answer!!
 
 AGENT CAPABILITIES:
 - calendar_agent: All calendar operations (create/view/modify events, check availability, scheduling)
-- email_agent: **PRIMARY EMAIL AGENT** - Email composition/drafting/writing -> email_agent / Email management (list, send drafts, search) -> email_agent / Email reading/organization/ -> email_agent IMPORTANT : If the agent writes a DRAFTor a NEW email you MUST show it to the user
-- ALL EMAIL TASKS -> email_agent (autonomous subgraph)
-- drive_agent: File management, Google Drive integration, file sharing, document collaboration
-- multi_tool_rube_agent: Multi-application tasks across Gmail, Slack, GitHub, Google Workspace, Coda, Linear, Notion, and other connected platforms
+- multi_tool_rube_agent: Multi-application tasks across Gmail, GitHub, Google Workspace, Coda, Shopify and other connected platforms
 
 ROUTING STRATEGY:
 1. ANALYZE the user's request carefully
@@ -724,14 +752,9 @@ ROUTING STRATEGY:
 
 ROUTING RULES:
 - Calendar/scheduling/appointments/meetings -> calendar_agent
-- ALL EMAIL TASKS (composition, sending, management, organization, triage) -> email_agent
-- Multi-app tasks involving Slack, GitHub, Coda, Linear, Notion, Google Workspace -> multi_tool_rube_agent
+- Multi-app tasks involving gmail, Drive, GitHub, Coda, Shopify, and other, Google Workspace -> multi_tool_rube_agent
 - Cross-platform workflows and automation -> multi_tool_rube_agent
 - General questions of the world -> Only if there is no agent related, you can answer
-
-EMAIL ROUTING - IMPORTANT:
-- Any mention of email, Gmail, inbox, sending, drafting, replying -> email_agent
-- Email management -> email_agent
 
 
 CRITICAL GUIDELINES:
@@ -756,8 +779,11 @@ When an agent completes their task, analyze if additional routing is needed."""
 
     # Compile the workflow
     compiled_graph = workflow.compile(name="multi_agent_system")
-    logger.info(f"Multi-agent supervisor created successfully for user: {api_keys['user_id']}")
+    logger.info(
+        f"Multi-agent supervisor created successfully for user: {api_keys['user_id']}"
+    )
     return compiled_graph
+
 
 async def make_graph_async(config: Optional[RunnableConfig] = None):
     """Async factory for creating supervisor graph with multi-tenant support.
@@ -774,6 +800,7 @@ async def make_graph_async(config: Optional[RunnableConfig] = None):
     graph_instance = await create_supervisor_graph(config)
     logger.info("Graph creation completed successfully")
     return graph_instance
+
 
 def make_graph(config: Optional[RunnableConfig] = None):
     """Sync factory function for LangGraph Platform with multi-tenant support.
@@ -795,6 +822,7 @@ def make_graph(config: Optional[RunnableConfig] = None):
     """
     logger.info("Creating supervisor graph via sync factory function")
     return asyncio.run(make_graph_async(config))
+
 
 # Export a static graph instance for LangGraph Platform registration
 # Platform uses this instance and injects config on each request via RunnableConfig

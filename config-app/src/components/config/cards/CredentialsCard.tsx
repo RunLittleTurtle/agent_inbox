@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Key, Eye, EyeOff, Copy, Check, Shield, Save, RefreshCw } from "lucide-react";
+import { Info, AlertTriangle, Key, Eye, EyeOff, Copy, Check, Shield, Save, RefreshCw, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { extractCurrentValue, maskCredential } from '@/lib/config-utils';
+import { validateCredential, inferCredentialType, type ValidationResult, type CredentialType } from '@/lib/credential-validator';
 
 interface CredentialField {
   key: string;
@@ -22,6 +23,7 @@ interface CredentialField {
   default?: any;
   showCopyButton?: boolean;
   envVar?: string;
+  validationType?: CredentialType; // Optional: specify validation type, otherwise auto-inferred
 }
 
 interface CredentialsCardProps {
@@ -52,6 +54,7 @@ export function CredentialsCard({
   const [showPasswords, setShowPasswords] = React.useState<Record<string, boolean>>({});
   const [copiedFields, setCopiedFields] = React.useState<Record<string, boolean>>({});
   const [focusedFields, setFocusedFields] = React.useState<Record<string, boolean>>({});
+  const [validationResults, setValidationResults] = React.useState<Record<string, ValidationResult>>({});
 
   const togglePasswordVisibility = (fieldKey: string) => {
     setShowPasswords(prev => ({
@@ -85,6 +88,25 @@ export function CredentialsCard({
   const handleFieldChange = (field: CredentialField, value: string) => {
     onValueChange(field.key, value, field.envVar);
   };
+
+  const handleFieldBlur = (field: CredentialField, fieldId: string, value: string) => {
+    // Only validate non-empty values
+    if (value && !field.readonly) {
+      const validationType = field.validationType || inferCredentialType(field.key);
+      const result = validateCredential(value, validationType);
+
+      setValidationResults(prev => ({
+        ...prev,
+        [fieldId]: result
+      }));
+    }
+
+    // Clear focused state
+    setFocusedFields(prev => ({ ...prev, [fieldId]: false }));
+  };
+
+  // Check if there are any validation errors
+  const hasValidationErrors = Object.values(validationResults).some(result => !result.isValid);
 
   const getSecurityIcon = (field: CredentialField) => {
     if (field.type === 'password' || field.key.toLowerCase().includes('secret') || field.key.toLowerCase().includes('token')) {
@@ -129,7 +151,7 @@ export function CredentialsCard({
           </div>
           <Button
             onClick={onSave}
-            disabled={!isDirty || isSaving}
+            disabled={!isDirty || isSaving || hasValidationErrors}
             size="sm"
             className="ml-4"
           >
@@ -169,11 +191,13 @@ export function CredentialsCard({
                     value={displayValue}
                     onChange={(e) => !field.readonly && handleFieldChange(field, e.target.value)}
                     onFocus={() => setFocusedFields(prev => ({ ...prev, [fieldId]: true }))}
-                    onBlur={() => setFocusedFields(prev => ({ ...prev, [fieldId]: false }))}
+                    onBlur={() => handleFieldBlur(field, fieldId, getCurrentValue(field))}
                     placeholder={field.placeholder}
                     className={`${field.showCopyButton || field.type === 'password' ? 'pr-20' : 'pr-10'} ${
                       field.readonly
                         ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
+                        : validationResults[fieldId] && !validationResults[fieldId].isValid
+                        ? 'bg-white border-red-400 focus:border-red-500 focus:ring-red-400'
                         : 'bg-white border-yellow-300 focus:border-yellow-400 focus:ring-yellow-400'
                     } transition-colors font-mono text-sm`}
                     readOnly={field.readonly}
@@ -221,6 +245,26 @@ export function CredentialsCard({
                   <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>{field.description}</span>
                 </div>
+              )}
+
+              {/* Validation Error */}
+              {validationResults[fieldId] && !validationResults[fieldId].isValid && (
+                <Alert variant="destructive" className="bg-red-50 border-red-300">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-red-800">
+                    {validationResults[fieldId].error}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Validation Warning */}
+              {validationResults[fieldId] && validationResults[fieldId].isValid && validationResults[fieldId].warning && (
+                <Alert className="bg-amber-50 border-amber-300">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800">
+                    {validationResults[fieldId].warning}
+                  </AlertDescription>
+                </Alert>
               )}
 
               {field.warning && (

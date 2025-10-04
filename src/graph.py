@@ -643,7 +643,7 @@ async def post_model_hook(messages, model_output=None):
         return messages
 
     except Exception as e:
-        logger.exception("post_model_hook failed — returning original messages.")
+        logger.exception("post_model_hook failed -- returning original messages.")
         return messages
 
 def validate_environment():
@@ -711,8 +711,8 @@ IMPORTANT --> Always look at agent list before trying to answer!!
 
 AGENT CAPABILITIES:
 - calendar_agent: All calendar operations (create/view/modify events, check availability, scheduling)
-- email_agent: **PRIMARY EMAIL AGENT** - Email composition/drafting/writing → email_agent / Email management (list, send drafts, search) → email_agent / Email reading/organization/ → email_agent IMPORTANT : If the agent writes a DRAFTor a NEW email you MUST show it to the user
-- ALL EMAIL TASKS → email_agent (autonomous subgraph)
+- email_agent: **PRIMARY EMAIL AGENT** - Email composition/drafting/writing -> email_agent / Email management (list, send drafts, search) -> email_agent / Email reading/organization/ -> email_agent IMPORTANT : If the agent writes a DRAFTor a NEW email you MUST show it to the user
+- ALL EMAIL TASKS -> email_agent (autonomous subgraph)
 - drive_agent: File management, Google Drive integration, file sharing, document collaboration
 - multi_tool_rube_agent: Multi-application tasks across Gmail, Slack, GitHub, Google Workspace, Coda, Linear, Notion, and other connected platforms
 
@@ -723,14 +723,14 @@ ROUTING STRATEGY:
 4. Let the agent handle the task completely
 
 ROUTING RULES:
-- Calendar/scheduling/appointments/meetings → calendar_agent
-- ALL EMAIL TASKS (composition, sending, management, organization, triage) → email_agent
-- Multi-app tasks involving Slack, GitHub, Coda, Linear, Notion, Google Workspace → multi_tool_rube_agent
-- Cross-platform workflows and automation → multi_tool_rube_agent
-- General questions of the world → Only if there is no agent related, you can answer
+- Calendar/scheduling/appointments/meetings -> calendar_agent
+- ALL EMAIL TASKS (composition, sending, management, organization, triage) -> email_agent
+- Multi-app tasks involving Slack, GitHub, Coda, Linear, Notion, Google Workspace -> multi_tool_rube_agent
+- Cross-platform workflows and automation -> multi_tool_rube_agent
+- General questions of the world -> Only if there is no agent related, you can answer
 
 EMAIL ROUTING - IMPORTANT:
-- Any mention of email, Gmail, inbox, sending, drafting, replying → email_agent
+- Any mention of email, Gmail, inbox, sending, drafting, replying -> email_agent
 - Email management -> email_agent
 
 

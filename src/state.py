@@ -23,7 +23,7 @@ class AgentType(str, Enum):
 
 
 class TaskStatus(str, Enum):
-    """Statut d'une tâche"""
+    """Status of a task"""
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -31,7 +31,7 @@ class TaskStatus(str, Enum):
 
 
 class SimpleTask(BaseModel):
-    """Tâche simple pour le tracking basique"""
+    """Simple task for basic tracking"""
     id: str = Field(default_factory=lambda: str(uuid4()))
     agent_name: AgentType = Field(...)
     description: str = Field(...)
@@ -42,20 +42,20 @@ class SimpleTask(BaseModel):
     result: Optional[str] = Field(default=None)
 
     def complete(self, result: str):
-        """Marquer la tâche comme complétée"""
+        """Mark the task as completed"""
         self.status = TaskStatus.COMPLETED
         self.completed_at = datetime.now()
         self.result = result
 
     def fail(self, error: str):
-        """Marquer la tâche comme échouée"""
+        """Mark the task as failed"""
         self.status = TaskStatus.FAILED
         self.completed_at = datetime.now()
         self.result = f"Error: {error}"
 
 
 def add_tasks(existing: List[SimpleTask], new: List[SimpleTask]) -> List[SimpleTask]:
-    """Reducer pour les tâches"""
+    """Reducer for tasks"""
     existing_map = {task.id: task for task in existing}
     for task in new:
         existing_map[task.id] = task

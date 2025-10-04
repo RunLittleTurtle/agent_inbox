@@ -2,8 +2,8 @@
 Utility functions for loading user and agent-specific configuration from Supabase.
 
 This module provides runtime config loading for agents. It's separate from config_api/main.py:
-- config_api/main.py: UI ↔ Supabase (editing config, merging with defaults for display)
-- config_utils.py: Agents ↔ Supabase (loading config at runtime)
+- config_api/main.py: UI <-> Supabase (editing config, merging with defaults for display)
+- config_utils.py: Agents <-> Supabase (loading config at runtime)
 
 Both query Supabase but serve different purposes - not duplication!
 """

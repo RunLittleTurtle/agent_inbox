@@ -48,7 +48,7 @@ class LocalCronTimer:
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully"""
-        print(f"\n🛑 Received signal {signum}, shutting down local cron timer...")
+        print(f"\n[STOP] Received signal {signum}, shutting down local cron timer...")
         self.running = False
 
     async def _check_server_health(self) -> bool:
@@ -82,7 +82,7 @@ class LocalCronTimer:
                 minutes_since=self.minutes_since,
             ):
                 email_count += 1
-                print(f"📬 Email {email_count}: {email.get('subject', 'No Subject')} from {email.get('from_email', 'Unknown')}")
+                print(f"[EMAIL] Email {email_count}: {email.get('subject', 'No Subject')} from {email.get('from_email', 'Unknown')}")
 
                 thread_id = str(
                     uuid.UUID(hex=hashlib.md5(email["thread_id"].encode("UTF-8")).hexdigest())

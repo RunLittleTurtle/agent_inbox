@@ -136,12 +136,12 @@ class BookingExecutionResult(BaseModel):
         if self.successful_operations:
             parts.append("Successful operations:")
             for op in self.successful_operations:
-                parts.append(f"  • {op}")
+                parts.append(f"  - {op}")
 
         if self.failed_operations:
             parts.append("Failed operations:")
             for op in self.failed_operations:
-                parts.append(f"  • {op}")
+                parts.append(f"  - {op}")
 
         return "\n".join(parts)
 

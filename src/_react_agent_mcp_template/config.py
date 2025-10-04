@@ -1,11 +1,11 @@
 """
 Agent configuration - centralized settings
 
-🔥 CRITICAL: Replace ALL placeholder values below for configuration UI to work:
-- {AGENT_NAME} → actual agent name (e.g., "gmail", "sheets", "drive")
-- {AGENT_DISPLAY_NAME} → display name (e.g., "Gmail", "Google Sheets")
-- {AGENT_DESCRIPTION} → description (e.g., "email management", "spreadsheet operations")
-- {MCP_SERVICE} → MCP service name (e.g., "google_gmail", "google_sheets")
+CRITICAL: CRITICAL: Replace ALL placeholder values below for configuration UI to work:
+- {AGENT_NAME} -> actual agent name (e.g., "gmail", "sheets", "drive")
+- {AGENT_DISPLAY_NAME} -> display name (e.g., "Gmail", "Google Sheets")
+- {AGENT_DESCRIPTION} -> description (e.g., "email management", "spreadsheet operations")
+- {MCP_SERVICE} -> MCP service name (e.g., "google_gmail", "google_sheets")
 
 Also update agent-inbox/src/pages/api/config/ endpoints when duplicating.
 See ../../MCP_AGENT_CONFIGURATION_GUIDE.md for complete instructions.
@@ -33,7 +33,7 @@ from .prompt import AGENT_SYSTEM_PROMPT
 #   1. This config.py reads the MCP URL from the main .env file using os.getenv()
 #   2. The UI config (ui_config.py) reads from THIS file, not from .env
 #   3. Prompts (prompt.py) also read from THIS file, not from .env
-#   This ensures proper separation: .env → config.py → UI/prompts
+#   This ensures proper separation: .env -> config.py -> UI/prompts
 #
 # Specify the exact environment variable name that contains your MCP server URL
 # This is flexible - works with any MCP provider (Rube, Composio, Pipedream, custom, etc.)

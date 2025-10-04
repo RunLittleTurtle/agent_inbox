@@ -83,9 +83,9 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
     This function is called on EVERY request to LangGraph Platform API.
 
     Authentication Flow:
-    1. Studio requests (no auth header) → Allow with "studio" identity for debugging
-    2. API requests (Bearer token) → Validate Clerk JWT using JWKS
-    3. Invalid/expired tokens → Reject with 401
+    1. Studio requests (no auth header) -> Allow with "studio" identity for debugging
+    2. API requests (Bearer token) -> Validate Clerk JWT using JWKS
+    3. Invalid/expired tokens -> Reject with 401
 
     Args:
         authorization: HTTP Authorization header (format: "Bearer <token>" or None for Studio)
@@ -195,9 +195,9 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> A
     - Threads/Runs/Crons/Store: User-level (private per user, except Studio)
 
     Pattern: "Resource-Specific Authorization with Studio Bypass"
-    - Studio → No filtering on any resource (full visibility for debugging)
-    - Assistants → No filtering for all users (shared resource)
-    - Other resources → Owner metadata + filtering for API users (multi-tenant)
+    - Studio -> No filtering on any resource (full visibility for debugging)
+    - Assistants -> No filtering for all users (shared resource)
+    - Other resources -> Owner metadata + filtering for API users (multi-tenant)
 
     Args:
         ctx: Authorization context containing user info and resource type
@@ -213,15 +213,15 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> A
 
     Example:
         Studio Access:
-          Studio user → All resources visible (threads from all users, for debugging)
+          Studio user -> All resources visible (threads from all users, for debugging)
 
         Assistants (All Users):
-          User A queries assistants → All assistants returned (no filter)
-          User B queries assistants → All assistants returned (no filter)
+          User A queries assistants -> All assistants returned (no filter)
+          User B queries assistants -> All assistants returned (no filter)
 
         Threads (API Users):
-          User A creates thread → metadata = {"owner": "user_abc123"}
-          User A queries threads → filter = {"owner": "user_abc123"}
+          User A creates thread -> metadata = {"owner": "user_abc123"}
+          User A queries threads -> filter = {"owner": "user_abc123"}
           User B cannot see User A's threads (filtered by owner)
 
     References:

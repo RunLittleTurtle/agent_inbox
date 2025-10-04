@@ -54,7 +54,7 @@ async def main(
         gmail_secret=gmail_secret,
     ):
         email_count += 1
-        print(f"📬 Email {email_count}: {email.get('subject', 'No Subject')} from {email.get('from_email', 'Unknown')}")
+        print(f"[INBOX] Email {email_count}: {email.get('subject', 'No Subject')} from {email.get('from_email', 'Unknown')}")
 
         thread_id = str(
             uuid.UUID(hex=hashlib.md5(email["thread_id"].encode("UTF-8")).hexdigest())

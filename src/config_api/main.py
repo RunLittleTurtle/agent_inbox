@@ -57,7 +57,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 else:
     try:
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("✓ Supabase client initialized successfully")
+        print("[OK] Supabase client initialized successfully")
     except Exception as e:
         print(f"  WARNING: Invalid Supabase credentials - database features disabled")
         print(f"   Error: {e}")
@@ -106,18 +106,18 @@ def get_agent_defaults(agent_id: str) -> Dict[str, Any]:
     Returns defaults from prompt.py and config.py (if they exist)
 
     Each agent has its OWN defaults - NOT shared!
-    calendar defaults ≠ email defaults ≠ executive defaults
+    calendar defaults != email defaults != executive defaults
 
     Note: prompt.py is optional - Executive AI Assistant doesn't use it
     """
     # Map agent_id to actual Python module name
     # This handles cases where agent_id differs from folder name
-    # Example: "calendar" agent_id → "calendar_agent" module to avoid Python's built-in calendar
+    # Example: "calendar" agent_id -> "calendar_agent" module to avoid Python's built-in calendar
     AGENT_MODULE_MAP = {
         "calendar": "calendar_agent",
         "email": "email_agent",
         "executive": "executive_agent",
-        "executive_ai_assistant": "executive-ai-assistant",  # Normalized agent_id (underscores) → folder (dashes)
+        "executive_ai_assistant": "executive-ai-assistant",  # Normalized agent_id (underscores) -> folder (dashes)
         "executive-ai-assistant": "executive-ai-assistant",  # Folder uses dashes
         "multi_tool_rube": "multi_tool_rube_agent",  # agent_id without _agent suffix
     }

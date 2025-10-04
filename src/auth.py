@@ -216,13 +216,22 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> A
     """
     user = ctx.user
     resource_type = ctx.resource  # e.g., "assistants", "threads", "runs", "crons", "store"
+    user_id = user.identity
 
-    # STUDIO BYPASS: Give Studio full access to all resources (for development/debugging)
-    # Studio needs to see all threads/runs/crons to help developers debug issues
-    if user.identity == "studio":
-        logger.info(f"🎨 Studio access to {resource_type} - returning empty dict for full visibility")
-        logger.info(f"🎨 Studio request details - resource: {resource_type}, value: {value}")
-        return {}  # Empty dict = no filter = Studio sees everything
+    # STUDIO/LANGSMITH BYPASS: Detect Studio and LangSmith-authenticated users
+    # Studio authenticates via LangSmith API and gets a UUID-format identity
+    # Clerk users have format: user_<alphanumeric>
+    # LangSmith users have format: <uuid> (e.g., 6ee08f61-3091-40f4-b20c-8dcffbe7573f)
+
+    is_langsmith_user = (
+        user_id == "studio" or  # Direct Studio (no auth header)
+        (len(user_id) == 36 and user_id.count('-') == 4)  # UUID format = LangSmith
+    )
+
+    if is_langsmith_user:
+        logger.info(f"🎨 LangSmith/Studio user detected: {user_id}")
+        logger.info(f"🎨 Full access to {resource_type} - no filtering for debugging")
+        return {}  # Empty dict = no filter = see all resources
 
     # ASSISTANTS: Deployment-level resources - shared by all authenticated users
     # No owner metadata, no filtering - allows all API users to see them

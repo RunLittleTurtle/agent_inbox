@@ -64,44 +64,55 @@ jwks_client = PyJWKClient(CLERK_JWKS_URL) if CLERK_JWKS_URL else None
 @auth.authenticate
 async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserDict:
     """
-    Authenticate user via Clerk JWT token using JWKS verification (2025 method).
+    Authenticate user with Studio bypass and Clerk JWT validation (2025).
 
     This function is called on EVERY request to LangGraph Platform API.
-    It validates the Clerk JWT token using public key cryptography (JWKS).
+
+    Authentication Flow:
+    1. Studio requests (no auth header) → Allow with "studio" identity for debugging
+    2. API requests (Bearer token) → Validate Clerk JWT using JWKS
+    3. Invalid/expired tokens → Reject with 401
 
     Args:
-        authorization: HTTP Authorization header (format: "Bearer <token>")
+        authorization: HTTP Authorization header (format: "Bearer <token>" or None for Studio)
 
     Returns:
         MinimalUserDict with:
-        - identity: Clerk user ID (used for filtering)
+        - identity: User ID from Clerk JWT or "studio" for Studio requests
         - is_authenticated: Boolean flag
 
     Raises:
-        Auth.exceptions.HTTPException: If authentication fails
+        Auth.exceptions.HTTPException: If API authentication fails
 
-    Flow:
-        1. Extract Bearer token from header
-        2. Verify JWT signature using Clerk's JWKS
-        3. Extract user ID from 'sub' claim
-        4. Return user identity for LangGraph to use
+    Security Model:
+        - Studio (no token): Full access for development/debugging
+        - API users (Clerk JWT): Authenticated + owner-filtered resources (multi-tenant)
 
     Note: Uses JWKS for cryptographic verification (no API calls needed).
     """
+    # STUDIO BYPASS: Studio sends no authorization header
+    # This allows developers to use LangGraph Studio for debugging without JWT
+    if not authorization or authorization.strip() == "":
+        logger.info("🎨 Studio request detected (no auth header) - allowing access")
+        return {
+            "identity": "studio",
+            "is_authenticated": True,
+        }
+
+    # API REQUEST VALIDATION: Check for valid Bearer token format
+    if not authorization.startswith("Bearer "):
+        logger.error("❌ Invalid authorization header format (expected 'Bearer <token>')")
+        raise Auth.exceptions.HTTPException(
+            status_code=401,
+            detail="Invalid authorization header"
+        )
+
     # Check if JWKS client is available
     if not jwks_client:
         logger.error("❌ JWKS client not initialized - check NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
         raise Auth.exceptions.HTTPException(
             status_code=500,
             detail="Authentication not configured"
-        )
-
-    # Check authorization header
-    if not authorization or not authorization.startswith("Bearer "):
-        logger.error("❌ No authorization header provided")
-        raise Auth.exceptions.HTTPException(
-            status_code=401,
-            detail="Authentication required"
         )
 
     # Extract token
@@ -153,40 +164,48 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
 @auth.on
 async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> Auth.types.FilterType:
     """
-    AUTHORIZATION LAYER - Resource-Specific Access Control (2025).
+    AUTHORIZATION LAYER - Resource-Specific Access Control with Studio Support (2025).
 
     This function is called for EVERY resource access (threads, runs, assistants, crons).
-    It enforces different access patterns based on resource type:
+    It enforces different access patterns based on user type and resource type.
+
+    User Types:
+    - Studio user (identity="studio"): Full access to all resources (development/debugging)
+    - API users (identity=Clerk user_id): Owner-filtered access (multi-tenant isolation)
 
     Resource Types:
-    - Assistants: Deployment-level (shared by all users)
-    - Threads/Runs/Crons/Store: User-level (private per user)
+    - Assistants: Deployment-level (shared by all authenticated users)
+    - Threads/Runs/Crons/Store: User-level (private per user, except Studio)
 
-    Pattern: "Resource-Specific Authorization"
-    - Assistants → No owner metadata, no filtering (public to authenticated users)
-    - Other resources → Owner metadata + filtering (single-owner pattern)
+    Pattern: "Resource-Specific Authorization with Studio Bypass"
+    - Studio → No filtering on any resource (full visibility for debugging)
+    - Assistants → No filtering for all users (shared resource)
+    - Other resources → Owner metadata + filtering for API users (multi-tenant)
 
     Args:
         ctx: Authorization context containing user info and resource type
         value: The mutable data being sent to the endpoint
 
     Returns:
-        Filter dict to restrict access (None for public resources)
+        Filter dict to restrict access (None for public/Studio access)
 
-    Security:
-        - All requests require authentication
-        - Assistants are shared (deployment-level configuration)
-        - Threads/runs are isolated (per-user data)
+    Security Model:
+        - Studio: Full access (development tool only, no production impact)
+        - API Users: Clerk authenticated + owner-filtered (multi-tenant isolation)
+        - User A cannot see User B's threads/runs/crons (owner-based filtering)
 
     Example:
-        Assistants:
+        Studio Access:
+          Studio user → All resources visible (threads from all users, for debugging)
+
+        Assistants (All Users):
           User A queries assistants → All assistants returned (no filter)
           User B queries assistants → All assistants returned (no filter)
 
-        Threads:
+        Threads (API Users):
           User A creates thread → metadata = {"owner": "user_abc123"}
           User A queries threads → filter = {"owner": "user_abc123"}
-          User B cannot see User A's threads (filtered out)
+          User B cannot see User A's threads (filtered by owner)
 
     References:
         - https://docs.langchain.com/langgraph-platform/resource-auth
@@ -195,19 +214,25 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> A
     user = ctx.user
     resource_type = ctx.resource  # e.g., "assistants", "threads", "runs", "crons", "store"
 
-    # Assistants are deployment-level resources - shared by all authenticated users
-    # No owner metadata, no filtering - allows Studio and all users to see them
+    # STUDIO BYPASS: Give Studio full access to all resources (for development/debugging)
+    # Studio needs to see all threads/runs/crons to help developers debug issues
+    if user.identity == "studio":
+        logger.info(f"🎨 Studio access to {resource_type} - no filtering (full visibility for debugging)")
+        return None  # No filter = Studio sees everything
+
+    # ASSISTANTS: Deployment-level resources - shared by all authenticated users
+    # No owner metadata, no filtering - allows all API users to see them
     if resource_type == "assistants":
         logger.info(f"📋 Assistants access for user {user.identity} - no owner filtering (shared resource)")
-        return None  # No filter = all assistants visible to authenticated users
+        return None  # No filter = all assistants visible
 
-    # All other resources (threads, runs, crons, store) are user-specific
-    # Add owner metadata and apply filtering for multi-tenant isolation
+    # OTHER RESOURCES (threads, runs, crons, store): User-specific with multi-tenant isolation
+    # Add owner metadata and apply filtering to ensure users only see their own data
     metadata = value.setdefault("metadata", {})
     metadata["owner"] = user.identity
     logger.info(f"🔒 {resource_type} access for owner: {user.identity}")
 
-    # Return filter: only show resources owned by this user
+    # Return filter: only show resources owned by this specific user
     return {"owner": user.identity}
 
 

@@ -490,7 +490,8 @@ def make_graph(config: Optional[RunnableConfig] = None):
     logger.info("Creating supervisor graph via sync factory function")
     return asyncio.run(make_graph_async(config))
 
-# Export the sync factory function for LangGraph Platform
-# Platform will call make_graph() per request with user-specific config
-graph = make_graph
-logger.info("Sync graph factory exported successfully for LangGraph Platform")
+# Export a static graph instance for LangGraph Platform registration
+# Platform uses this instance and injects config on each request via RunnableConfig
+# This pattern matches the working executive graphs (static compilation)
+graph = make_graph(None)  # Create with None config - will use env vars for registration
+logger.info("✅ Static supervisor graph instance created for LangGraph Platform")

@@ -472,22 +472,8 @@ async def make_graph(config: Optional[RunnableConfig] = None):
     logger.info("Graph creation completed successfully")
     return graph_instance
 
-def create_graph(config: Optional[RunnableConfig] = None):
-    """Synchronous graph factory for local development.
-
-    Args:
-        config: Optional RunnableConfig (None for local dev, injected in production)
-
-    Returns:
-        Compiled graph instance
-
-    Raises:
-        Exception: Clear error if graph creation fails
-    """
-    return asyncio.run(make_graph(config))
-
-# Export graph for LangGraph Platform
-# In local dev: Uses .env keys
-# In production: LangGraph Platform injects config per request
-graph = create_graph()
-logger.info("Graph initialized successfully for export")
+# Export the factory function for LangGraph Platform
+# Platform will call make_graph() per request with user-specific config
+# DO NOT instantiate graph at module level - breaks multi-tenant config injection
+graph = make_graph
+logger.info("Graph factory exported successfully for LangGraph Platform")

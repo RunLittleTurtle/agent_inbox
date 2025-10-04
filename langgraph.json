@@ -22,11 +22,13 @@
   },
   "checkpoints": {
     "ttl": {
-      "strategy": "time_based",
-      "days": 30
+      "strategy": "delete",
+      "sweep_interval_minutes": 60,
+      "default_ttl": 43200
     }
   },
   "auth": {
-    "path": "./src/auth.py:auth"
+    "path": "./src/auth.py:auth",
+    "disable_studio_auth": true
   }
 }

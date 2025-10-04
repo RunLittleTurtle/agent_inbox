@@ -153,46 +153,61 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
 @auth.on
 async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> Auth.types.FilterType:
     """
-    AUTHORIZATION LAYER - Single-Owner Resources Pattern (2025).
+    AUTHORIZATION LAYER - Resource-Specific Access Control (2025).
 
     This function is called for EVERY resource access (threads, runs, assistants, crons).
-    It enforces that users can only access resources they own.
+    It enforces different access patterns based on resource type:
 
-    Pattern: "Single-Owner Resources"
-    - Adds 'owner' metadata to all created resources
-    - Filters queries to only return user's own resources
+    Resource Types:
+    - Assistants: Deployment-level (shared by all users)
+    - Threads/Runs/Crons/Store: User-level (private per user)
+
+    Pattern: "Resource-Specific Authorization"
+    - Assistants → No owner metadata, no filtering (public to authenticated users)
+    - Other resources → Owner metadata + filtering (single-owner pattern)
 
     Args:
-        ctx: Authorization context containing user info
+        ctx: Authorization context containing user info and resource type
         value: The mutable data being sent to the endpoint
 
     Returns:
-        Filter dict to restrict access to user's resources
+        Filter dict to restrict access (None for public resources)
 
     Security:
-        - Enforces authentication (user must be authenticated)
-        - Automatically adds owner to metadata
-        - Returns filter applied to ALL queries
+        - All requests require authentication
+        - Assistants are shared (deployment-level configuration)
+        - Threads/runs are isolated (per-user data)
 
     Example:
-        User A creates thread → metadata = {"owner": "user_abc123"}
-        User A queries threads → filter = {"owner": "user_abc123"}
-        User B cannot see User A's threads (filtered out automatically)
+        Assistants:
+          User A queries assistants → All assistants returned (no filter)
+          User B queries assistants → All assistants returned (no filter)
+
+        Threads:
+          User A creates thread → metadata = {"owner": "user_abc123"}
+          User A queries threads → filter = {"owner": "user_abc123"}
+          User B cannot see User A's threads (filtered out)
 
     References:
+        - https://docs.langchain.com/langgraph-platform/resource-auth
         - https://docs.langchain.com/langgraph-platform/custom-auth
     """
     user = ctx.user
+    resource_type = ctx.resource  # e.g., "assistants", "threads", "runs", "crons", "store"
 
-    # Add 'owner' metadata to resources being created
-    # This tags the resource with the user's identity
-    # Use setdefault to ensure metadata dict always exists
+    # Assistants are deployment-level resources - shared by all authenticated users
+    # No owner metadata, no filtering - allows Studio and all users to see them
+    if resource_type == "assistants":
+        logger.info(f"📋 Assistants access for user {user.identity} - no owner filtering (shared resource)")
+        return None  # No filter = all assistants visible to authenticated users
+
+    # All other resources (threads, runs, crons, store) are user-specific
+    # Add owner metadata and apply filtering for multi-tenant isolation
     metadata = value.setdefault("metadata", {})
     metadata["owner"] = user.identity
-    logger.info(f"📝 Tagged resource with owner: {user.identity}")
+    logger.info(f"🔒 {resource_type} access for owner: {user.identity}")
 
     # Return filter: only show resources owned by this user
-    # This is applied to all queries (search, read, list, etc.)
     return {"owner": user.identity}
 
 

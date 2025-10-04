@@ -240,15 +240,21 @@ async def multi_tool_rube_agent_node(
     logger.info(f"[multi_tool_rube_agent_node] Loading for user: {user_id}")
 
     # Load MCP URL from Supabase at runtime
-    from utils.config_utils import get_agent_config_from_supabase
+    from utils.config_utils import get_agent_config_from_supabase, get_user_secrets_from_supabase
 
     agent_config = get_agent_config_from_supabase(user_id, "multi_tool_rube_agent")
     mcp_integration = agent_config.get("mcp_integration", {})
     mcp_url = mcp_integration.get("mcp_server_url")
-    auth_token = mcp_integration.get("auth_token")  # Optional auth token
+
+    # Load Rube auth token from user_secrets (global credentials)
+    user_secrets = get_user_secrets_from_supabase(user_id)
+    auth_token = user_secrets.get("rube_token")  # Rube auth token from Global Environment
 
     logger.info(
         f"[multi_tool_rube_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}"
+    )
+    logger.info(
+        f"[multi_tool_rube_agent_node] Rube auth token: {'Present' if auth_token else 'Missing'}"
     )
 
     # Create Rube model

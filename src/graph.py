@@ -116,7 +116,7 @@ async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableCon
     api_keys = get_api_keys_from_config(config)
     user_id = api_keys["user_id"]
 
-    logger.info(f"📅 [calendar_agent_node] Loading for user: {user_id}")
+    logger.info(f"[calendar_agent_node] Loading for user: {user_id}")
 
     # Load MCP URL from Supabase at runtime
     from utils.config_utils import get_agent_config_from_supabase
@@ -125,7 +125,7 @@ async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableCon
     mcp_integration = agent_config.get("mcp_integration", {})
     mcp_url = mcp_integration.get("mcp_server_url")
 
-    logger.info(f"📅 [calendar_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}")
+    logger.info(f"[calendar_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}")
 
     # Delegate to existing CalendarAgentWithMCP implementation
     # CalendarAgentWithMCP will load MCP tools using the user_id
@@ -152,7 +152,7 @@ async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableCon
     # Invoke agent with current state
     result = await agent.ainvoke(state)
 
-    logger.info(f"📅 [calendar_agent_node] Completed for user: {user_id}")
+    logger.info(f"[calendar_agent_node] Completed for user: {user_id}")
     return result
 
 
@@ -173,7 +173,7 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
     api_keys = get_api_keys_from_config(config)
     user_id = api_keys["user_id"]
 
-    logger.info(f"🔧 [multi_tool_rube_agent_node] Loading for user: {user_id}")
+    logger.info(f"[multi_tool_rube_agent_node] Loading for user: {user_id}")
 
     # Load MCP URL from Supabase at runtime
     from utils.config_utils import get_agent_config_from_supabase
@@ -183,7 +183,7 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
     mcp_url = mcp_integration.get("mcp_server_url")
     auth_token = mcp_integration.get("auth_token")  # Optional auth token
 
-    logger.info(f"🔧 [multi_tool_rube_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}")
+    logger.info(f"[multi_tool_rube_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}")
 
     # Create Rube model
     rube_model = ChatAnthropic(
@@ -197,7 +197,7 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
     tools = []
     if mcp_url:
         try:
-            logger.info(f"🔧 [multi_tool_rube_agent_node] Loading MCP tools from: {mcp_url}")
+            logger.info(f"[multi_tool_rube_agent_node] Loading MCP tools from: {mcp_url}")
 
             # Import MCP client
             from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -219,14 +219,14 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
             client = MultiServerMCPClient(mcp_config)
             tools = await client.get_tools()
 
-            logger.info(f"🔧 [multi_tool_rube_agent_node] Loaded {len(tools)} tools: {[t.name for t in tools]}")
+            logger.info(f"[multi_tool_rube_agent_node] Loaded {len(tools)} tools: {[t.name for t in tools]}")
         except Exception as e:
-            logger.error(f"🔧 [multi_tool_rube_agent_node] Failed to load MCP tools: {e}")
+            logger.error(f"[multi_tool_rube_agent_node] Failed to load MCP tools: {e}")
             import traceback
             traceback.print_exc()
             tools = []
     else:
-        logger.warning(f"🔧 [multi_tool_rube_agent_node] No MCP URL configured for user {user_id}")
+        logger.warning(f"[multi_tool_rube_agent_node] No MCP URL configured for user {user_id}")
 
     # Filter to useful Rube tools (if we loaded any)
     if tools:
@@ -238,7 +238,7 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
             'RUBE_REMOTE_WORKBENCH',
             'RUBE_REMOTE_BASH_TOOL'
         }]
-        logger.info(f"🔧 [multi_tool_rube_agent_node] Filtered to {len(useful_tools)} useful tools")
+        logger.info(f"[multi_tool_rube_agent_node] Filtered to {len(useful_tools)} useful tools")
     else:
         useful_tools = []
 
@@ -270,7 +270,7 @@ async def multi_tool_rube_agent_node(state: WorkflowState, config: Optional[Runn
     # Invoke agent with current state
     result = await rube_agent.ainvoke(state)
 
-    logger.info(f"🔧 [multi_tool_rube_agent_node] Completed for user: {user_id}")
+    logger.info(f"[multi_tool_rube_agent_node] Completed for user: {user_id}")
     return result
 
 
@@ -296,7 +296,7 @@ def create_runtime_calendar_agent() -> Any:
     workflow.add_edge("calendar_agent", END)
 
     compiled_graph = workflow.compile(name="calendar_agent")
-    logger.info("✅ Runtime-aware calendar agent graph created")
+    logger.info("Runtime-aware calendar agent graph created")
     return compiled_graph
 
 
@@ -318,7 +318,7 @@ def create_runtime_multi_tool_agent() -> Any:
     workflow.add_edge("multi_tool_rube_agent", END)
 
     compiled_graph = workflow.compile(name="multi_tool_rube_agent")
-    logger.info("✅ Runtime-aware multi-tool Rube agent graph created")
+    logger.info("Runtime-aware multi-tool Rube agent graph created")
     return compiled_graph
 
 
@@ -473,52 +473,52 @@ async def create_multi_tool_rube_agent(config: Optional[RunnableConfig] = None):
 
 **CONFIRMED CAPABILITIES (89 tools available):**
 
-📧 **GMAIL** (11 tools) - Email Operations:
+**GMAIL** (11 tools) - Email Operations:
 - Send emails, create drafts, fetch emails, list drafts
 - Move emails to trash, search people, get attachments
 - Access user profile and email management
 
-📄 **CODA** (10 tools) - Document & Database Management:
+**CODA** (10 tools) - Document & Database Management:
 - List and create documents, manage tables and rows
 - Search documents, create pages, database operations
 - Collaborative document editing and data management
 
-💬 **SLACK** (8 tools) - Team Communication:
+**SLACK** (8 tools) - Team Communication:
 - Find channels, send messages, fetch conversation history
 - Search messages, list channels and users
 - Workspace communication management
 
-🔧 **GITHUB** (10 tools) - Development & Collaboration:
+**GITHUB** (10 tools) - Development & Collaboration:
 - Find repositories, manage branches, create pull requests
 - Merge branches, create issues, search issues/PRs
 - Code review and repository management
 
-📊 **GOOGLE SHEETS** (10 tools) - Spreadsheet Operations:
+**GOOGLE SHEETS** (10 tools) - Spreadsheet Operations:
 - Search spreadsheets, manage sheets, batch updates
 - Add/delete sheets, clear values, update properties
 - Data analysis and spreadsheet automation
 
-📝 **GOOGLE DOCS** (7 tools) - Document Management:
+**GOOGLE DOCS** (7 tools) - Document Management:
 - Search documents, update existing documents
 - Get documents by ID, create from markdown
 - Insert text and document formatting
 
-📁 **GOOGLE DRIVE** (7 tools) - File Management:
+**GOOGLE DRIVE** (7 tools) - File Management:
 - Upload files, manage sharing preferences
 - Find and list files, create folders
 - File organization and collaboration
 
-📅 **GOOGLE CALENDAR** (8 tools) - Calendar Management:
+**GOOGLE CALENDAR** (8 tools) - Calendar Management:
 - List calendars, find free slots, create events
 - Get specific calendars, free/busy queries
 - Event scheduling and availability management
 
-📋 **NOTION** (8 tools) - Productivity & Notes:
+**NOTION** (8 tools) - Productivity & Notes:
 - Search pages, create pages, add content blocks
 - Fetch block contents, update pages, query databases
 - Knowledge management and collaboration
 
-🎯 **LINEAR** (10 tools) - Project Management:
+**LINEAR** (10 tools) - Project Management:
 - Manage user profile, list projects and issues
 - Create and update issues, add comments
 - Attach files and track project progress
@@ -632,13 +632,13 @@ async def create_supervisor_graph(config: Optional[RunnableConfig] = None):
         logger.info("Local development mode: Using API keys from .env")
         # validate_environment()  # Disabled for multi-tenant deployment
 
-    # ✅ PHASE 3: Create runtime-aware agent graphs
+    # PHASE 3: Create runtime-aware agent graphs
     # These graphs contain wrapper nodes that load MCP tools at REQUEST TIME
     logger.info(f"Creating runtime-aware agents for user: {api_keys['user_id']}...")
     calendar_agent = create_runtime_calendar_agent()
     multi_tool_rube_agent = create_runtime_multi_tool_agent()
 
-    logger.info(f"✅ Runtime-aware agents created for user: {api_keys['user_id']}")
+    logger.info(f"Runtime-aware agents created for user: {api_keys['user_id']}")
 
     # Create supervisor model with user's API key
     supervisor_model = ChatAnthropic(
@@ -751,4 +751,4 @@ def make_graph(config: Optional[RunnableConfig] = None):
 # Platform uses this instance and injects config on each request via RunnableConfig
 # This pattern matches the working executive graphs (static compilation)
 graph = make_graph(None)  # Create with None config - will use env vars for registration
-logger.info("✅ Static supervisor graph instance created for LangGraph Platform")
+logger.info("Static supervisor graph instance created for LangGraph Platform")

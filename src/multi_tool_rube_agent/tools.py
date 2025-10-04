@@ -34,6 +34,14 @@ except ImportError:
     sys.path.append(os.path.dirname(__file__))
     from config import AGENT_NAME, MCP_ENV_VAR, MCP_SERVER_URL, RUBE_AUTH_TOKEN
 
+# Import OAuth token utilities
+try:
+    from utils.mcp_auth import get_mcp_oauth_tokens
+    MCP_OAUTH_AVAILABLE = True
+except ImportError:
+    print("[Warning] utils.mcp_auth not available - OAuth tokens will not be loaded")
+    MCP_OAUTH_AVAILABLE = False
+
 # Load environment variables
 load_dotenv()
 
@@ -70,15 +78,39 @@ USEFUL_TOOL_NAMES = {
 class AgentMCPConnection:
     """MCP connection for Rube universal MCP server with caching"""
 
-    def __init__(self):
+    def __init__(self, user_id: str = None, agent_id: str = None):
         self.logger = logging.getLogger(__name__)
         self._mcp_client: Optional[MultiServerMCPClient] = None
         self._mcp_tools: List[BaseTool] = []
         self._tools_cache_time: Optional[datetime] = None
+        self.user_id = user_id
+        self.agent_id = agent_id or f"{AGENT_NAME}_agent"
 
-        # Get Rube MCP server URL and auth token from config
+        # Get Rube MCP server URL from config (default)
         self.mcp_url = MCP_SERVER_URL
-        self.auth_token = RUBE_AUTH_TOKEN
+        self.auth_token = None
+
+        # Try loading OAuth tokens first (new method)
+        if MCP_OAUTH_AVAILABLE and user_id:
+            try:
+                oauth_data = get_mcp_oauth_tokens(user_id, self.agent_id)
+                if oauth_data:
+                    self.auth_token = oauth_data.get("access_token")
+                    self.mcp_url = oauth_data.get("mcp_url") or self.mcp_url
+                    self.logger.info(f"Loaded OAuth token for {self.agent_id}")
+                else:
+                    self.logger.info(f"No OAuth tokens found for {self.agent_id}, falling back to RUBE_AUTH_TOKEN")
+                    # Fall back to static token from config
+                    self.auth_token = RUBE_AUTH_TOKEN
+            except Exception as e:
+                self.logger.error(f"Failed to load OAuth tokens: {e}")
+                # Fall back to static token
+                self.auth_token = RUBE_AUTH_TOKEN
+        else:
+            # No user_id provided or OAuth not available - use static token
+            self.auth_token = RUBE_AUTH_TOKEN
+            if not user_id:
+                self.logger.info("No user_id provided - using static RUBE_AUTH_TOKEN")
 
         if self.mcp_url:
             # Configure MCP server with Bearer token authentication
@@ -217,7 +249,7 @@ class AgentMCPConnection:
             return []
 
 
-# Global MCP connection instance
+# Global MCP connection instance (for backward compatibility, no OAuth)
 _agent_mcp = AgentMCPConnection()
 
 # =============================================================================
@@ -311,8 +343,14 @@ def get_composio_tools() -> List[BaseTool]:
         print(f"Failed to initialize Composio tools: {e}")
         return []
 
-async def get_agent_tools_with_mcp() -> List[BaseTool]:
-    """Get all agent tools: Rube MCP meta-tools + Composio direct tools + local tools"""
+async def get_agent_tools_with_mcp(user_id: str = None) -> List[BaseTool]:
+    """
+    Get all agent tools: Rube MCP meta-tools + Composio direct tools + local tools
+
+    Args:
+        user_id: Clerk user ID for loading OAuth tokens. If provided, will use
+                 per-user OAuth tokens from Supabase. Otherwise uses global config.
+    """
     tools = []
 
     # Add sub-agent tools if needed
@@ -321,7 +359,13 @@ async def get_agent_tools_with_mcp() -> List[BaseTool]:
 
     # Add MCP tools from Rube
     try:
-        mcp_tools = await _agent_mcp.get_mcp_tools()
+        # Create per-user connection if user_id provided, otherwise use global
+        if user_id:
+            agent_mcp = AgentMCPConnection(user_id=user_id, agent_id=f"{AGENT_NAME}_agent")
+            mcp_tools = await agent_mcp.get_mcp_tools()
+        else:
+            mcp_tools = await _agent_mcp.get_mcp_tools()
+
         tools.extend(mcp_tools)
 
         if mcp_tools:
@@ -335,18 +379,24 @@ async def get_agent_tools_with_mcp() -> List[BaseTool]:
     return tools
 
 
-def get_agent_simple_tools() -> List[BaseTool]:
-    """Synchronous wrapper for getting agent tools"""
+def get_agent_simple_tools(user_id: str = None) -> List[BaseTool]:
+    """
+    Synchronous wrapper for getting agent tools
+
+    Args:
+        user_id: Clerk user ID for loading OAuth tokens. If provided, will use
+                 per-user OAuth tokens from Supabase. Otherwise uses global config.
+    """
     try:
         # Handle asyncio event loop
         loop = asyncio.get_event_loop()
         if loop.is_running():
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, get_agent_tools_with_mcp())
+                future = executor.submit(asyncio.run, get_agent_tools_with_mcp(user_id=user_id))
                 return future.result(timeout=10)
         else:
-            return asyncio.run(get_agent_tools_with_mcp())
+            return asyncio.run(get_agent_tools_with_mcp(user_id=user_id))
 
     except Exception as e:
         print(f"Rube {AGENT_NAME} MCP connection failed: {e}")

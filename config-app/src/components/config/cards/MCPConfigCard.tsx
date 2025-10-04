@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertTriangle, Link, Server, Eye, EyeOff, Copy, Check, Save, RefreshCw, AlertCircle } from "lucide-react";
+import { Info, AlertTriangle, Link, Server, Eye, EyeOff, Copy, Check, Save, RefreshCw, AlertCircle, CheckCircle, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { extractCurrentValue } from '@/lib/config-utils';
 import { validateCredential, inferCredentialType, type ValidationResult, type CredentialType } from '@/lib/credential-validator';
+import { useToast } from "@/hooks/use-toast";
 
 interface MCPField {
   key: string;
@@ -36,6 +37,7 @@ interface MCPConfigCardProps {
   onSave: () => Promise<void>;
   isDirty: boolean;
   isSaving: boolean;
+  agentId?: string; // For OAuth flow
 }
 
 export function MCPConfigCard({
@@ -47,12 +49,17 @@ export function MCPConfigCard({
   sectionKey,
   onSave,
   isDirty,
-  isSaving
+  isSaving,
+  agentId
 }: MCPConfigCardProps) {
+  const { toast } = useToast();
   const [showPasswords, setShowPasswords] = React.useState<Record<string, boolean>>({});
   const [copiedFields, setCopiedFields] = React.useState<Record<string, boolean>>({});
   const [focusedFields, setFocusedFields] = React.useState<Record<string, boolean>>({});
   const [validationResults, setValidationResults] = React.useState<Record<string, ValidationResult>>({});
+  const [oauthStatus, setOauthStatus] = React.useState<'connected' | 'disconnected' | 'loading'>('disconnected');
+  const [connectedApps, setConnectedApps] = React.useState<string[]>([]);
+  const [isConnecting, setIsConnecting] = React.useState(false);
 
   const togglePasswordVisibility = (fieldKey: string) => {
     setShowPasswords(prev => ({
@@ -72,6 +79,108 @@ export function MCPConfigCard({
       console.error('Failed to copy text: ', err);
     }
   };
+
+  // OAuth Connection Handler
+  const handleConnectMCP = async () => {
+    const mcpUrlField = fields.find(f => f.key === 'mcp_server_url');
+    if (!mcpUrlField) {
+      toast({ variant: "destructive", title: "Error", description: "MCP server URL field not found" });
+      return;
+    }
+
+    const mcp_url = getCurrentValue(mcpUrlField);
+    if (!mcp_url) {
+      toast({ variant: "destructive", title: "Error", description: "Please enter MCP server URL first" });
+      return;
+    }
+
+    if (!agentId) {
+      toast({ variant: "destructive", title: "Error", description: "Agent ID not found" });
+      return;
+    }
+
+    setIsConnecting(true);
+
+    try {
+      // 1. Initiate OAuth flow
+      const response = await fetch('/api/mcp/oauth/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: agentId,
+          mcp_url: mcp_url
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'OAuth initiation failed');
+      }
+
+      const { authUrl } = await response.json();
+
+      // 2. Open OAuth popup
+      const popup = window.open(
+        authUrl,
+        'MCP OAuth',
+        'width=600,height=700,left=100,top=100'
+      );
+
+      if (!popup) {
+        toast({ variant: "destructive", title: "Popup Blocked", description: "Please allow popups for this site" });
+        setIsConnecting(false);
+        return;
+      }
+
+      // 3. Listen for completion
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data.type === 'mcp_oauth_complete') {
+          popup?.close();
+          window.removeEventListener('message', handleMessage);
+          setIsConnecting(false);
+          setOauthStatus('connected');
+          toast({ title: "Success", description: "Apps connected successfully!" });
+          // Reload OAuth status
+          loadOAuthStatus();
+        } else if (event.data.type === 'mcp_oauth_error') {
+          popup?.close();
+          window.removeEventListener('message', handleMessage);
+          setIsConnecting(false);
+          toast({ variant: "destructive", title: "Connection Failed", description: event.data.error });
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+    } catch (error: any) {
+      setIsConnecting(false);
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+  };
+
+  // Load OAuth connection status
+  const loadOAuthStatus = async () => {
+    if (!agentId) return;
+
+    try {
+      // Check if OAuth tokens exist in agent config
+      const mcpIntegration = values[sectionKey]?.oauth_tokens;
+      if (mcpIntegration && mcpIntegration.access_token) {
+        setOauthStatus('connected');
+        // TODO: Extract connected apps from metadata
+        setConnectedApps(['Rube MCP']);
+      } else {
+        setOauthStatus('disconnected');
+      }
+    } catch (error) {
+      console.error('Failed to load OAuth status:', error);
+    }
+  };
+
+  // Load OAuth status on mount
+  React.useEffect(() => {
+    loadOAuthStatus();
+  }, [values]);
 
   const getCurrentValue = (field: MCPField) => {
     // Handle environment variable fields (flat structure from API)
@@ -159,6 +268,56 @@ export function MCPConfigCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* OAuth Connection Status */}
+        {sectionKey === 'mcp_integration' && agentId && (
+          <div className="space-y-3 pb-4 border-b border-green-200">
+            {oauthStatus === 'connected' ? (
+              <Alert className="bg-green-100 border-green-300">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  <div className="flex items-center justify-between">
+                    <span>Connected to {connectedApps.join(', ')}</span>
+                    <Button
+                      onClick={handleConnectMCP}
+                      variant="ghost"
+                      size="sm"
+                      disabled={isConnecting}
+                      className="ml-4"
+                    >
+                      {isConnecting ? 'Connecting...' : 'Reconnect'}
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert className="bg-amber-50 border-amber-300">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  OAuth required. Click below to connect your apps.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              onClick={handleConnectMCP}
+              disabled={isConnecting || !getCurrentValue(fields.find(f => f.key === 'mcp_server_url') || fields[0])}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              {isConnecting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2" />
+                  {oauthStatus === 'connected' ? 'Reconnect Apps' : 'Connect Apps'}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         {fields.map((field) => {
           const fieldId = `${sectionKey}-${field.key}`;
           const currentValue = getCurrentValue(field);

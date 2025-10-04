@@ -5,7 +5,7 @@ Non-breaking wrapper that translates between existing config.yaml/config.py and 
 """
 React Agent MCP Template UI Configuration Schema
 
-⚠️  CRITICAL: When duplicating this template:
+  CRITICAL: When duplicating this template:
 1. Replace ALL {PLACEHOLDER} values with actual agent details
 2. Only include fields that are actually implemented in your agent
 3. Update agent-inbox/src/pages/api/config/ endpoints (see MCP_AGENT_CONFIGURATION_GUIDE.md)
@@ -409,7 +409,7 @@ def get_defaults():
         }
     except ImportError as e:
         # Graceful fallback if config.py doesn't exist
-        print(f"⚠️  Warning: Could not load executive-ai-assistant defaults: {e}")
+        print(f"  Warning: Could not load executive-ai-assistant defaults: {e}")
         return {
             "config": {},
             "prompts": {},

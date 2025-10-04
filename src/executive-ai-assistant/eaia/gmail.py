@@ -80,11 +80,11 @@ async def get_credentials(
                         refresh_token = google_workspace.get("google_refresh_token")
 
                         if all([client_id, client_secret, refresh_token]):
-                            logger.info("✅ Loaded Google credentials from user_secrets (Supabase)")
+                            logger.info(" Loaded Google credentials from user_secrets (Supabase)")
             else:
-                logger.warning("⚠️  No user_id found in config - skipping Supabase fetch")
+                logger.warning("  No user_id found in config - skipping Supabase fetch")
         except Exception as e:
-            logger.warning(f"⚠️  Could not load credentials from user_secrets: {e}")
+            logger.warning(f"  Could not load credentials from user_secrets: {e}")
 
     # Fallback to environment variables (.env file)
     if not all([client_id, client_secret, refresh_token]):
@@ -93,7 +93,7 @@ async def get_credentials(
         refresh_token = refresh_token or os.getenv("GMAIL_REFRESH_TOKEN")
 
         if all([client_id, client_secret, refresh_token]):
-            logger.info("✅ Loaded Google credentials from environment variables (.env)")
+            logger.info(" Loaded Google credentials from environment variables (.env)")
 
     if not all([client_id, client_secret, refresh_token]):
         raise ValueError(

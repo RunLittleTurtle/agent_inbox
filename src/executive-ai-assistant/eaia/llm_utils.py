@@ -59,7 +59,7 @@ def get_llm(model_name: str, temperature: float = 0, anthropic_api_key: str = No
         if not is_reasoning_model:
             llm_kwargs["temperature"] = temperature
         else:
-            print(f"⚠️ Model {model_name} is a reasoning model - excluding temperature parameter")
+            print(f" Model {model_name} is a reasoning model - excluding temperature parameter")
 
         return ChatOpenAI(**llm_kwargs)
 

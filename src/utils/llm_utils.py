@@ -43,7 +43,7 @@ def get_llm(model_name: str, temperature: float = 0, **kwargs) -> BaseChatModel:
     else:  # OpenAI models (gpt-*, o3)
         # Don't pass temperature for reasoning models
         if is_reasoning_model:
-            print(f"⚠️ Model {model_name} is a reasoning model - excluding temperature parameter")
+            print(f" Model {model_name} is a reasoning model - excluding temperature parameter")
             return ChatOpenAI(model=model_name, **kwargs)
         else:
             return ChatOpenAI(model=model_name, temperature=temperature, **kwargs)

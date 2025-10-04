@@ -34,7 +34,7 @@ auth = Auth()
 CLERK_PUBLISHABLE_KEY = os.getenv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
 
 if not CLERK_PUBLISHABLE_KEY:
-    logger.warning("⚠️  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not set - auth will fail in production")
+    logger.warning("  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not set - auth will fail in production")
     CLERK_JWKS_URL = None
 else:
     # Extract instance from publishable key
@@ -50,12 +50,12 @@ else:
             # Remove trailing $ if present
             instance_domain = decoded.rstrip('$')
             CLERK_JWKS_URL = f"https://{instance_domain}/.well-known/jwks.json"
-            logger.info(f"🔐 Clerk JWKS URL: {CLERK_JWKS_URL}")
+            logger.info(f" Clerk JWKS URL: {CLERK_JWKS_URL}")
         else:
-            logger.error(f"❌ Invalid CLERK_PUBLISHABLE_KEY format: {CLERK_PUBLISHABLE_KEY}")
+            logger.error(f" Invalid CLERK_PUBLISHABLE_KEY format: {CLERK_PUBLISHABLE_KEY}")
             CLERK_JWKS_URL = None
     except Exception as e:
-        logger.error(f"❌ Failed to parse CLERK_PUBLISHABLE_KEY: {e}")
+        logger.error(f" Failed to parse CLERK_PUBLISHABLE_KEY: {e}")
         CLERK_JWKS_URL = None
 
 # Initialize JWT verifier client (only if JWKS URL is available)
@@ -94,8 +94,8 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
     # This allows developers to use LangGraph Studio for debugging without JWT
     if not authorization or authorization.strip() == "":
         logger.info("=" * 80)
-        logger.info("🎨 STUDIO REQUEST DETECTED (no auth header)")
-        logger.info("🎨 Returning identity='studio' for full access")
+        logger.info(" STUDIO REQUEST DETECTED (no auth header)")
+        logger.info(" Returning identity='studio' for full access")
         logger.info("=" * 80)
         return {
             "identity": "studio",
@@ -104,7 +104,7 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
 
     # API REQUEST VALIDATION: Check for valid Bearer token format
     if not authorization.startswith("Bearer "):
-        logger.error("❌ Invalid authorization header format (expected 'Bearer <token>')")
+        logger.error(" Invalid authorization header format (expected 'Bearer <token>')")
         raise Auth.exceptions.HTTPException(
             status_code=401,
             detail="Invalid authorization header"
@@ -112,7 +112,7 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
 
     # Check if JWKS client is available
     if not jwks_client:
-        logger.error("❌ JWKS client not initialized - check NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
+        logger.error(" JWKS client not initialized - check NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
         raise Auth.exceptions.HTTPException(
             status_code=500,
             detail="Authentication not configured"
@@ -138,7 +138,7 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
         if not user_id:
             raise ValueError("Token missing 'sub' claim")
 
-        logger.info(f"✅ Authenticated user: {user_id}")
+        logger.info(f" Authenticated user: {user_id}")
 
         return {
             "identity": user_id,
@@ -146,19 +146,19 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
         }
 
     except jwt.ExpiredSignatureError:
-        logger.error("❌ JWT token has expired")
+        logger.error(" JWT token has expired")
         raise Auth.exceptions.HTTPException(
             status_code=401,
             detail="Token expired"
         )
     except jwt.InvalidTokenError as e:
-        logger.error(f"❌ Invalid JWT token: {e}")
+        logger.error(f" Invalid JWT token: {e}")
         raise Auth.exceptions.HTTPException(
             status_code=401,
             detail="Invalid token"
         )
     except Exception as e:
-        logger.error(f"❌ Authentication error: {e}")
+        logger.error(f" Authentication error: {e}")
         raise Auth.exceptions.HTTPException(
             status_code=401,
             detail="Authentication failed"
@@ -229,27 +229,27 @@ async def authorize_all_resources(ctx: Auth.types.AuthContext, value: dict) -> A
     )
 
     if is_langsmith_user:
-        logger.info(f"🎨 LangSmith/Studio user detected: {user_id}")
-        logger.info(f"🎨 Full access to {resource_type} - no filtering for debugging")
+        logger.info(f" LangSmith/Studio user detected: {user_id}")
+        logger.info(f" Full access to {resource_type} - no filtering for debugging")
         return {}  # Empty dict = no filter = see all resources
 
     # ASSISTANTS: Deployment-level resources - shared by all authenticated users
     # No owner metadata, no filtering - allows all API users to see them
     if resource_type == "assistants":
-        logger.info(f"📋 Assistants access for user {user.identity} - no owner filtering (shared resource)")
+        logger.info(f" Assistants access for user {user.identity} - no owner filtering (shared resource)")
         return None  # No filter = all assistants visible
 
     # OTHER RESOURCES (threads, runs, crons, store): User-specific with multi-tenant isolation
     # Add owner metadata and apply filtering to ensure users only see their own data
     metadata = value.setdefault("metadata", {})
     metadata["owner"] = user.identity
-    logger.info(f"🔒 {resource_type} access for owner: {user.identity}")
+    logger.info(f" {resource_type} access for owner: {user.identity}")
 
     # Return filter: only show resources owned by this specific user
     return {"owner": user.identity}
 
 
-logger.info("✅ Auth handler initialized - Clerk JWT with single-owner resource isolation")
+logger.info(" Auth handler initialized - Clerk JWT with single-owner resource isolation")
 
 # Export auth object for langgraph.json
 __all__ = ["auth"]

@@ -29,18 +29,18 @@ async def test_platform_flow():
         async for email_data in fetch_group_emails(
             email, 
             minutes_since=10080,  # 7 days
-            config=mock_config  # ✅ Pass config to force Supabase fetch
+            config=mock_config  #  Pass config to force Supabase fetch
         ):
             count += 1
             if count <= 3:
-                print(f"📧 Email {count}:")
+                print(f" Email {count}:")
                 print(f"   From: {email_data.get('from_email', 'N/A')[:50]}")
                 print(f"   Subject: {email_data.get('subject', 'N/A')[:60]}")
         
-        print(f"\n✅ SUCCESS! Supabase credentials work! Found {count} emails")
+        print(f"\n SUCCESS! Supabase credentials work! Found {count} emails")
         
     except Exception as e:
-        print(f"❌ ERROR: {type(e).__name__}: {e}")
+        print(f" ERROR: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
 

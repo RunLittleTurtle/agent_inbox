@@ -10,6 +10,8 @@ For testing -> use your tool : MCP server chrome dev tool
 
 For documentation -> Use your tools :Langgraph MCP server AND Next.js MCP server
 
+NEVER ADD EMOJIES! It breaks when we deploy in production
+
 For Langgraph Cloud Plateform read this : https://langchain-ai.github.io/langgraphjs/how-tos/#langgraph-platform
 
 For deployement information use their platform CLI : Vercel CLI , Railway CLI, LangGraph Platform Cloud CLI

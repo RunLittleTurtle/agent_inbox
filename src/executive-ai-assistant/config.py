@@ -1,7 +1,7 @@
 """
 Executive AI Assistant Config Defaults
-⚠️ IMPORTANT: These are FALLBACK values only
-⚠️ Actual runtime values loaded from config.yaml via eaia/main/config.py
+ IMPORTANT: These are FALLBACK values only
+ Actual runtime values loaded from config.yaml via eaia/main/config.py
 
 This file exists to:
 1. Fix broken ui_config.py imports (lines 413-414)
@@ -57,7 +57,7 @@ def _load_config_yaml():
         with open(config_path) as stream:
             return yaml.safe_load(stream)
     except Exception as e:
-        print(f"⚠️  Warning: Could not load config.yaml: {e}")
+        print(f"  Warning: Could not load config.yaml: {e}")
         return {}
 
 def _load_triage_prompts_from_config_yaml():

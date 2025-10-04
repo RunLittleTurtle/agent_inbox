@@ -140,7 +140,7 @@ async def calendar_agent_node(state: WorkflowState, config: Optional[RunnableCon
     )
 
     # Create calendar agent instance with runtime user_id
-    # ✅ KEY CHANGE: Pass user_id from request config, not fallback "local_dev_user"
+    #  KEY CHANGE: Pass user_id from request config, not fallback "local_dev_user"
     calendar_agent_instance = CalendarAgentWithMCP(
         model=calendar_model,
         user_id=user_id
@@ -412,7 +412,7 @@ async def create_calendar_agent(config: Optional[RunnableConfig] = None):
     # Pass user_id so agent can load user-specific MCP config from Supabase
     calendar_agent_instance = CalendarAgentWithMCP(
         model=calendar_model,
-        user_id=api_keys["user_id"]  # ✅ NEW: Load user-specific MCP URL from Supabase
+        user_id=api_keys["user_id"]  #  NEW: Load user-specific MCP URL from Supabase
     )
     await calendar_agent_instance.initialize()
 

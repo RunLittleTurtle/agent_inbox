@@ -32,7 +32,7 @@ try:
     from tools import discover_mcp_tools_sync, _agent_mcp
     from config import AGENT_NAME, MCP_SERVICE, MCP_ENV_VAR, MCP_SERVER_URL
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f" Import error: {e}")
     print("Make sure you're running this script from the agent directory")
     print("and that you've configured the template in config.py")
     sys.exit(1)
@@ -41,7 +41,7 @@ except ImportError as e:
 def print_header():
     """Print script header"""
     print("="*70)
-    print("🔍 MCP TOOL DISCOVERY - React Agent Template")
+    print(" MCP TOOL DISCOVERY - React Agent Template")
     print("="*70)
     print(f"Agent: {AGENT_NAME}")
     print(f"Service: {MCP_SERVICE}")
@@ -105,7 +105,7 @@ def format_tools_as_table(tools_info):
     if not tools_info:
         return "No tools discovered."
 
-    output = f"\n📊 Discovered {len(tools_info)} tools:\n\n"
+    output = f"\n Discovered {len(tools_info)} tools:\n\n"
 
     for i, tool in enumerate(tools_info, 1):
         output += f"{i:2d}. {tool['name']}\n"
@@ -155,7 +155,7 @@ def main():
 
     # Check if template is configured
     if AGENT_NAME == "{AGENT_NAME}" or MCP_SERVICE == "{MCP_SERVICE}":
-        print("❌ Template not configured yet!")
+        print(" Template not configured yet!")
         print("Please configure the following in config.py:")
         print(f"  - AGENT_NAME: currently '{AGENT_NAME}'")
         print(f"  - MCP_SERVICE: currently '{MCP_SERVICE}'")
@@ -167,24 +167,24 @@ def main():
     # Validate environment
     mcp_url = MCP_SERVER_URL
     if not mcp_url:
-        print(f"❌ Environment variable {MCP_ENV_VAR} is not set")
+        print(f" Environment variable {MCP_ENV_VAR} is not set")
         print(f"Please add it to your .env file:")
         print(f"{MCP_ENV_VAR}=https://your-mcp-provider.com/your-id/{MCP_SERVICE}")
         sys.exit(1)
 
     if args.validate_env:
-        print("✅ Environment configuration is valid")
+        print(" Environment configuration is valid")
         return
 
     if not args.quiet:
-        print("🔄 Discovering tools from MCP server...")
+        print(" Discovering tools from MCP server...")
 
     try:
         # Discover tools
         tools_info = discover_mcp_tools_sync()
 
         if not tools_info:
-            print("❌ No tools discovered. Check your MCP server configuration.")
+            print(" No tools discovered. Check your MCP server configuration.")
             sys.exit(1)
 
         # Format output
@@ -198,17 +198,17 @@ def main():
         # Display or save
         if args.save:
             Path(args.save).write_text(output)
-            print(f"✅ Results saved to {args.save}")
+            print(f" Results saved to {args.save}")
         else:
             print(output)
 
         if not args.quiet and args.format == 'table':
             print("\n" + "="*70)
-            print("💡 TIP: Use --format copy-paste to get ready-to-use USEFUL_TOOL_NAMES")
-            print("💡 TIP: Use --save output.txt to save results to a file")
+            print(" TIP: Use --format copy-paste to get ready-to-use USEFUL_TOOL_NAMES")
+            print(" TIP: Use --save output.txt to save results to a file")
 
     except Exception as e:
-        print(f"❌ Discovery failed: {e}")
+        print(f" Discovery failed: {e}")
         if not args.quiet:
             import traceback
             traceback.print_exc()

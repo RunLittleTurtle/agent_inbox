@@ -59,7 +59,7 @@ async def _fetch_from_supabase(config: dict) -> dict | None:
         user_id = metadata.get("user_id") or metadata.get("clerk_user_id")
 
     if not user_id:
-        print("⚠️  No user_id found in config - skipping Supabase fetch")
+        print("  No user_id found in config - skipping Supabase fetch")
         return None
 
     # Get Config API URL from environment or use default
@@ -81,13 +81,13 @@ async def _fetch_from_supabase(config: dict) -> dict | None:
             )
 
             if agent_response.status_code != 200:
-                print(f"⚠️  Config API returned {agent_response.status_code} - falling back to config.yaml")
+                print(f"  Config API returned {agent_response.status_code} - falling back to config.yaml")
                 return None
 
             agent_data = agent_response.json()
             global_data = global_response.json() if global_response.status_code == 200 else {}
 
-            print(f"✅ Fetched config from Supabase for user {user_id}")
+            print(f" Fetched config from Supabase for user {user_id}")
 
             # Flatten nested config structure to match config.yaml format
             # Input:  { values: { section_key: { field_key: { current: value, ... } } } }
@@ -121,13 +121,13 @@ async def _fetch_from_supabase(config: dict) -> dict | None:
                         flat_config["google_client_secret"] = section_value.get("google_client_secret", "")
                         flat_config["google_refresh_token"] = section_value.get("google_refresh_token", "")
 
-            print(f"🔍 DEBUG: Flattened config has {len(flat_config)} fields")
-            print(f"🔍 DEBUG: Has API keys: anthropic={bool(flat_config.get('anthropic_api_key'))}, openai={bool(flat_config.get('openai_api_key'))}")
+            print(f" DEBUG: Flattened config has {len(flat_config)} fields")
+            print(f" DEBUG: Has API keys: anthropic={bool(flat_config.get('anthropic_api_key'))}, openai={bool(flat_config.get('openai_api_key'))}")
 
             return flat_config
 
     except Exception as e:
-        print(f"⚠️  Error fetching from Supabase Config API: {e}")
+        print(f"  Error fetching from Supabase Config API: {e}")
         return None
 
 

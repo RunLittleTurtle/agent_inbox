@@ -85,6 +85,6 @@ if __name__ == "__main__":
     """Test the orchestrator"""
     try:
         workflow = create_default_orchestrator()
-        print(f"✅ {AGENT_NAME} Agent Created Successfully")
+        print(f" {AGENT_NAME} Agent Created Successfully")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")

@@ -73,19 +73,19 @@ def get_agent_config_from_supabase(
             .execute()
 
         if result.data and result.data.get("config_data"):
-            logger.info(f"✅ Loaded config for {agent_id}, user {user_id}")
+            logger.info(f" Loaded config for {agent_id}, user {user_id}")
             return result.data["config_data"]
         else:
-            logger.info(f"ℹ️  No config found for {agent_id}, user {user_id} - will use defaults")
+            logger.info(f"  No config found for {agent_id}, user {user_id} - will use defaults")
             return {}
 
     except ValueError as e:
         # Missing Supabase credentials - expected in local dev without Supabase
-        logger.warning(f"⚠️  Supabase not configured: {e}")
-        logger.info(f"ℹ️  Falling back to .env defaults for {agent_id}")
+        logger.warning(f"  Supabase not configured: {e}")
+        logger.info(f"  Falling back to .env defaults for {agent_id}")
         return {}
     except Exception as e:
-        logger.error(f"❌ Error loading config for {agent_id}: {e}")
+        logger.error(f" Error loading config for {agent_id}: {e}")
         return {}
 
 
@@ -118,16 +118,16 @@ def get_user_secrets_from_supabase(user_id: str) -> Dict[str, Any]:
             .execute()
 
         if result.data:
-            logger.info(f"✅ Loaded user secrets for user {user_id}")
+            logger.info(f" Loaded user secrets for user {user_id}")
             return result.data
         else:
-            logger.info(f"ℹ️  No user secrets found for {user_id} - will use defaults")
+            logger.info(f"  No user secrets found for {user_id} - will use defaults")
             return {}
 
     except ValueError as e:
         # Missing Supabase credentials - expected in local dev without Supabase
-        logger.warning(f"⚠️  Supabase not configured: {e}")
+        logger.warning(f"  Supabase not configured: {e}")
         return {}
     except Exception as e:
-        logger.error(f"❌ Error loading user secrets: {e}")
+        logger.error(f" Error loading user secrets: {e}")
         return {}

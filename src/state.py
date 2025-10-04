@@ -63,7 +63,7 @@ def add_tasks(existing: List[SimpleTask], new: List[SimpleTask]) -> List[SimpleT
 
 
 # KISS-Compliant State for Prebuilt Components
-class WorkflowState(MessagesState):  # ✅ MUST inherit from MessagesState
+class WorkflowState(MessagesState):  #  MUST inherit from MessagesState
     """
     Simple state compatible with create_react_agent and langgraph_supervisor
     Only adds what's absolutely necessary beyond messages

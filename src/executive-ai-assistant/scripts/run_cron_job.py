@@ -34,7 +34,7 @@ async def check_server_health(url: str) -> bool:
             response = await client.get(f"{url}/docs")
             return response.status_code == 200
     except Exception as e:
-        print(f"❌ Server health check failed: {e}")
+        print(f" Server health check failed: {e}")
         return False
 
 
@@ -43,14 +43,14 @@ async def run_cron_graph(url: str, minutes_since: int) -> None:
     try:
         # Check server health first
         if not await check_server_health(url):
-            print(f"🔴 LangGraph server at {url} is not available, skipping email check")
+            print(f" LangGraph server at {url} is not available, skipping email check")
             return
 
         # Initialize LangGraph client
         client = get_client(url=url)
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"🚀 [{timestamp}] Starting email check via cron graph...")
+        print(f" [{timestamp}] Starting email check via cron graph...")
 
         # Create a run for the cron graph
         run_result = await client.runs.create(
@@ -61,12 +61,12 @@ async def run_cron_graph(url: str, minutes_since: int) -> None:
         )
 
         run_id = run_result.get('run_id', 'Unknown')
-        print(f"✅ Cron graph run created successfully: {run_id}")
+        print(f" Cron graph run created successfully: {run_id}")
 
-        print(f"📈 Email check completed via cron graph")
+        print(f" Email check completed via cron graph")
 
     except Exception as e:
-        print(f"❌ Error running cron graph: {e}")
+        print(f" Error running cron graph: {e}")
         sys.exit(1)
 
 
@@ -94,8 +94,8 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n👋 Cron job interrupted")
+        print("\n Cron job interrupted")
         sys.exit(0)
     except Exception as e:
-        print(f"❌ Fatal error in cron job: {e}")
+        print(f" Fatal error in cron job: {e}")
         sys.exit(1)

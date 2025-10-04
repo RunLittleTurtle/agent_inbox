@@ -63,7 +63,7 @@ def setup_google_oauth():
             print("Try revoking access at https://myaccount.google.com/permissions and run this script again.")
             return False
 
-        print(f"\n✅ OAuth setup successful!")
+        print(f"\n OAuth setup successful!")
         print(f"Refresh token: {refresh_token}")
         print(f"\nAdd this to your .env file:")
         print(f"GMAIL_REFRESH_TOKEN={refresh_token}")
@@ -71,7 +71,7 @@ def setup_google_oauth():
         return True
 
     except Exception as e:
-        print(f"❌ Error during OAuth setup: {e}")
+        print(f" Error during OAuth setup: {e}")
         return False
 
 

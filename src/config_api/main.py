@@ -19,9 +19,9 @@ parent_path = str(Path(__file__).parent.parent)
 sys.path.insert(0, parent_path)
 
 # Debug logging for import paths
-print(f"🔍 Working directory: {os.getcwd()}")
-print(f"🔍 Parent path added to sys.path: {parent_path}")
-print(f"🔍 sys.path: {sys.path[:3]}...")  # First 3 paths
+print(f" Working directory: {os.getcwd()}")
+print(f" Parent path added to sys.path: {parent_path}")
+print(f" sys.path: {sys.path[:3]}...")  # First 3 paths
 
 load_dotenv()
 
@@ -51,7 +51,7 @@ SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("⚠️  WARNING: Missing Supabase credentials - database features disabled")
+    print("  WARNING: Missing Supabase credentials - database features disabled")
     print("   Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY in .env")
     supabase = None
 else:
@@ -59,7 +59,7 @@ else:
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         print("✓ Supabase client initialized successfully")
     except Exception as e:
-        print(f"⚠️  WARNING: Invalid Supabase credentials - database features disabled")
+        print(f"  WARNING: Invalid Supabase credentials - database features disabled")
         print(f"   Error: {e}")
         print("   Get the correct anon/service_role key from Supabase dashboard:")
         print("   https://supabase.com/dashboard/project/lcswsadubzhynscruzfn/settings/api")
@@ -134,25 +134,25 @@ def get_agent_defaults(agent_id: str) -> Dict[str, Any]:
         prompt_module = import_module(f"{module_name}.prompt")
         if hasattr(prompt_module, "DEFAULTS"):
             defaults["prompts"] = prompt_module.DEFAULTS
-            print(f"✅ Loaded {len(defaults['prompts'])} prompt defaults for {agent_id}")
+            print(f" Loaded {len(defaults['prompts'])} prompt defaults for {agent_id}")
         else:
-            print(f"ℹ️  No DEFAULTS export found in {agent_id}.prompt (this is fine for some agents)")
+            print(f"  No DEFAULTS export found in {agent_id}.prompt (this is fine for some agents)")
     except ImportError:
         # prompt.py doesn't exist - this is expected for Executive AI Assistant
-        print(f"ℹ️  No prompt.py for {agent_id} (triage prompts may be in config.py instead)")
+        print(f"  No prompt.py for {agent_id} (triage prompts may be in config.py instead)")
     except Exception as e:
-        print(f"⚠️  Warning: Could not load {agent_id} prompt defaults: {e}")
+        print(f"  Warning: Could not load {agent_id} prompt defaults: {e}")
 
     # Load config.py (required)
     try:
         config_module = import_module(f"{module_name}.config")
         if hasattr(config_module, "DEFAULTS"):
             defaults["config"] = config_module.DEFAULTS
-            print(f"✅ Loaded {len(defaults['config'])} config defaults for {agent_id}")
+            print(f" Loaded {len(defaults['config'])} config defaults for {agent_id}")
         else:
-            print(f"⚠️  No DEFAULTS export found in {agent_id}.config")
+            print(f"  No DEFAULTS export found in {agent_id}.config")
     except Exception as e:
-        print(f"⚠️  Warning: Could not load {agent_id} config defaults: {e}")
+        print(f"  Warning: Could not load {agent_id} config defaults: {e}")
 
     return defaults
 
@@ -275,7 +275,7 @@ async def get_all_schemas():
             }
         except Exception as e:
             import traceback
-            print(f"❌ Error loading {agent_path}: {e}")
+            print(f" Error loading {agent_path}: {e}")
             print(f"   Traceback: {traceback.format_exc()}")
             continue
 

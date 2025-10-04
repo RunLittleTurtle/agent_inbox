@@ -72,7 +72,7 @@ class LocalCronTimer:
             if not self.client:
                 self.client = get_client(url=self.url)
 
-            print(f"📧 Fetching emails for {email_address} from last {self.minutes_since} minutes...")
+            print(f" Fetching emails for {email_address} from last {self.minutes_since} minutes...")
 
             email_count = 0
             processed_count = 0
@@ -96,7 +96,7 @@ class LocalCronTimer:
                     if e.response.status_code == 404:
                         thread_info = await self.client.threads.create(thread_id=thread_id)
                     else:
-                        print(f"❌ Error getting thread: {e}")
+                        print(f" Error getting thread: {e}")
                         continue
 
                 if "user_respond" in email:
@@ -105,12 +105,12 @@ class LocalCronTimer:
 
                 recent_email = thread_info["metadata"].get("email_id")
                 if recent_email == email["id"]:
-                    print(f"⏭️  Email already processed, skipping...")
+                    print(f"  Email already processed, skipping...")
                     break
 
                 await self.client.threads.update(thread_id, metadata={"email_id": email["id"]})
 
-                print(f"🚀 Creating workflow run for thread {thread_id}")
+                print(f" Creating workflow run for thread {thread_id}")
                 run_result = await self.client.runs.create(
                     thread_id,
                     "main",  # Use the correct graph name for local setup
@@ -118,31 +118,31 @@ class LocalCronTimer:
                     multitask_strategy="rollback",
                 )
                 processed_count += 1
-                print(f"✅ Workflow run created: {run_result.get('run_id', 'Unknown')}")
+                print(f" Workflow run created: {run_result.get('run_id', 'Unknown')}")
 
             if email_count == 0:
-                print("📭 No new emails found")
+                print(" No new emails found")
             else:
-                print(f"📈 Processed {processed_count} out of {email_count} emails")
+                print(f" Processed {processed_count} out of {email_count} emails")
 
         except Exception as e:
-            print(f"❌ Error during email ingestion: {e}")
+            print(f" Error during email ingestion: {e}")
 
     async def run(self) -> None:
         """Main timer loop"""
-        print(f"⏰ Starting Local Cron Timer")
-        print(f"   📅 Interval: Every {self.interval_minutes} minutes")
-        print(f"   📧 Email window: Last {self.minutes_since} minutes")
-        print(f"   🔗 LangGraph URL: {self.url}")
-        print(f"   🔄 Press Ctrl+C to stop")
+        print(f" Starting Local Cron Timer")
+        print(f"    Interval: Every {self.interval_minutes} minutes")
+        print(f"    Email window: Last {self.minutes_since} minutes")
+        print(f"    LangGraph URL: {self.url}")
+        print(f"    Press Ctrl+C to stop")
         print()
 
         # Run initial email check
         if await self._check_server_health():
-            print("🟢 LangGraph server is running, performing initial email check...")
+            print(" LangGraph server is running, performing initial email check...")
             await self._run_email_ingestion()
         else:
-            print("🔴 LangGraph server not available, waiting for next interval...")
+            print(" LangGraph server not available, waiting for next interval...")
 
         # Main timer loop
         while self.running:
@@ -159,18 +159,18 @@ class LocalCronTimer:
                 # Check server health before processing
                 if await self._check_server_health():
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    print(f"\n⏰ [{timestamp}] Timer triggered - checking for new emails...")
+                    print(f"\n [{timestamp}] Timer triggered - checking for new emails...")
                     await self._run_email_ingestion()
                 else:
-                    print(f"\n🔴 [{datetime.now().strftime('%H:%M:%S')}] LangGraph server not available, skipping this cycle...")
+                    print(f"\n [{datetime.now().strftime('%H:%M:%S')}] LangGraph server not available, skipping this cycle...")
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"❌ Unexpected error in timer loop: {e}")
+                print(f" Unexpected error in timer loop: {e}")
                 # Continue running even if there's an error
 
-        print("👋 Local Cron Timer stopped")
+        print(" Local Cron Timer stopped")
 
 
 async def main():
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n👋 Goodbye!")
+        print("\n Goodbye!")
     except Exception as e:
-        print(f"❌ Fatal error: {e}")
+        print(f" Fatal error: {e}")
         sys.exit(1)

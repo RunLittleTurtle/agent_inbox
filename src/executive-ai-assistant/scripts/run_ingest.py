@@ -44,7 +44,7 @@ async def main(
             url=url
         )
 
-    print(f"📧 Fetching emails for {email_address} from last {minutes_since} minutes...")
+    print(f" Fetching emails for {email_address} from last {minutes_since} minutes...")
 
     email_count = 0
     async for email in fetch_group_emails(
@@ -82,14 +82,14 @@ async def main(
                     continue
         await client.threads.update(thread_id, metadata={"email_id": email["id"]})
 
-        print(f"🚀 Creating workflow run for thread {thread_id} with graph main")
+        print(f" Creating workflow run for thread {thread_id} with graph main")
         run_result = await client.runs.create(
             thread_id,
             "main",
             input={"email": email},
             multitask_strategy="rollback",
         )
-        print(f"✅ Workflow run created: {run_result['run_id'] if run_result else 'Unknown'}")
+        print(f" Workflow run created: {run_result['run_id'] if run_result else 'Unknown'}")
 
 
 if __name__ == "__main__":

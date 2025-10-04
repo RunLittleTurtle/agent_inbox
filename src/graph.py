@@ -18,10 +18,14 @@ from dotenv import load_dotenv
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import List, Optional, Dict, Any
+from dataclasses import dataclass
 from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
+
+# LangGraph Runtime API (v0.6.0+) for multi-tenant context
+from langgraph.runtime import Runtime, get_runtime
 
 
 # Import the global state from state.py
@@ -36,6 +40,28 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# 2025 Runtime Context Schema (Phase 2.1)
+# ============================================================================
+
+@dataclass
+class UserContext:
+    """User-specific runtime context for multi-tenant MCP tool loading.
+
+    This context is passed at request time via the Runtime API (LangGraph v0.6.0+).
+    Each request can have different MCP URLs based on the user's configuration.
+
+    Attributes:
+        user_id: Clerk user ID for multi-tenant isolation
+        mcp_calendar_url: Optional user-specific MCP server URL for calendar tools
+        mcp_rube_url: Optional user-specific MCP server URL for Rube multi-tool
+        rube_auth_token: Optional auth token for Rube MCP server
+    """
+    user_id: str
+    mcp_calendar_url: str | None = None
+    mcp_rube_url: str | None = None
+    rube_auth_token: str | None = None
 
 # Local dev only - uses git submodules from library/
 # In deployment, these packages come from requirements.txt (pip-installed from PyPI)
@@ -68,6 +94,174 @@ def get_current_context():
             "timezone": "UTC",
             "timezone_name": "UTC"
         }
+
+# ============================================================================
+# Runtime Wrapper Nodes (Phase 2.1) - 2025 Pattern
+# ============================================================================
+
+async def calendar_agent_node(state: WorkflowState, runtime: Runtime[UserContext]) -> Dict[str, Any]:
+    """Runtime wrapper for calendar agent with dynamic MCP tool loading.
+
+    This node loads calendar MCP tools at REQUEST TIME based on user-specific
+    configuration, following LangGraph 2025 Runtime API best practices.
+
+    Args:
+        state: Current workflow state with messages
+        runtime: Runtime context with user-specific MCP URLs
+
+    Returns:
+        Dict with updated messages from calendar agent
+    """
+    # Extract user context (type-safe!)
+    user_id = runtime.context.user_id
+    mcp_url = runtime.context.mcp_calendar_url
+
+    logger.info(f"📅 [calendar_agent_node] Loading for user: {user_id}")
+    logger.info(f"📅 [calendar_agent_node] MCP URL: {mcp_url or 'Not configured'}")
+
+    # For now, delegate to existing CalendarAgentWithMCP implementation
+    # This will be refactored in subsequent iterations
+    from calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
+
+    # Get API keys from config
+    api_keys = get_api_keys_from_config(runtime.config)
+
+    # Create calendar model
+    calendar_model = ChatAnthropic(
+        model=DEFAULT_LLM_MODEL,
+        temperature=0,
+        anthropic_api_key=api_keys["anthropic_api_key"],
+        streaming=False
+    )
+
+    # Create calendar agent instance with runtime user_id
+    calendar_agent_instance = CalendarAgentWithMCP(
+        model=calendar_model,
+        user_id=user_id  # ✅ Use runtime user_id, not fallback
+    )
+    await calendar_agent_instance.initialize()
+
+    agent = await calendar_agent_instance.get_agent()
+
+    # Invoke agent with current state
+    result = await agent.ainvoke(state)
+
+    logger.info(f"📅 [calendar_agent_node] Completed for user: {user_id}")
+    return result
+
+
+async def multi_tool_rube_agent_node(state: WorkflowState, runtime: Runtime[UserContext]) -> Dict[str, Any]:
+    """Runtime wrapper for multi-tool Rube agent with dynamic MCP tool loading.
+
+    This node loads Rube MCP tools at REQUEST TIME based on user-specific
+    configuration, following LangGraph 2025 Runtime API best practices.
+
+    Args:
+        state: Current workflow state with messages
+        runtime: Runtime context with user-specific MCP URLs and auth tokens
+
+    Returns:
+        Dict with updated messages from Rube agent
+    """
+    # Extract user context (type-safe!)
+    user_id = runtime.context.user_id
+    mcp_url = runtime.context.mcp_rube_url
+    auth_token = runtime.context.rube_auth_token
+
+    logger.info(f"🔧 [multi_tool_rube_agent_node] Loading for user: {user_id}")
+    logger.info(f"🔧 [multi_tool_rube_agent_node] MCP URL: {mcp_url or 'Not configured'}")
+
+    # Get API keys from config
+    api_keys = get_api_keys_from_config(runtime.config)
+
+    # Create Rube model
+    rube_model = ChatAnthropic(
+        model=DEFAULT_LLM_MODEL,
+        temperature=0,
+        anthropic_api_key=api_keys["anthropic_api_key"],
+        streaming=False
+    )
+
+    # Load MCP tools dynamically
+    tools = []
+    if mcp_url:
+        try:
+            logger.info(f"🔧 [multi_tool_rube_agent_node] Loading MCP tools from: {mcp_url}")
+
+            # Import MCP client
+            from langchain_mcp_adapters.client import MultiServerMCPClient
+
+            # Create MCP client with user-specific URL
+            mcp_config = {
+                "rube": {
+                    "url": mcp_url,
+                    "transport": "streamable_http"
+                }
+            }
+
+            # Add auth token if provided
+            if auth_token:
+                mcp_config["rube"]["headers"] = {
+                    "Authorization": f"Bearer {auth_token}"
+                }
+
+            client = MultiServerMCPClient(mcp_config)
+            tools = await client.get_tools()
+
+            logger.info(f"🔧 [multi_tool_rube_agent_node] Loaded {len(tools)} tools: {[t.name for t in tools]}")
+        except Exception as e:
+            logger.error(f"🔧 [multi_tool_rube_agent_node] Failed to load MCP tools: {e}")
+            import traceback
+            traceback.print_exc()
+            tools = []
+    else:
+        logger.warning(f"🔧 [multi_tool_rube_agent_node] No MCP URL configured for user {user_id}")
+
+    # Filter to useful Rube tools (if we loaded any)
+    if tools:
+        useful_tools = [tool for tool in tools if hasattr(tool, 'name') and tool.name in {
+            'RUBE_SEARCH_TOOLS',
+            'RUBE_MULTI_EXECUTE_TOOL',
+            'RUBE_CREATE_PLAN',
+            'RUBE_MANAGE_CONNECTIONS',
+            'RUBE_REMOTE_WORKBENCH',
+            'RUBE_REMOTE_BASH_TOOL'
+        }]
+        logger.info(f"🔧 [multi_tool_rube_agent_node] Filtered to {len(useful_tools)} useful tools")
+    else:
+        useful_tools = []
+
+    # Create agent prompt
+    rube_prompt = """You are the Multi-Tool Rube Agent with access to tools across connected applications through Rube MCP server.
+
+**WORKFLOW PATTERN:**
+1. Understand the user's specific request
+2. Use RUBE_SEARCH_TOOLS to find the right tools for the task
+3. Show the user what tools were discovered
+4. Execute using RUBE_MULTI_EXECUTE_TOOL with proper parameters
+5. Present clear results and suggest next steps
+
+**IMPORTANT GUIDELINES:**
+- Always explain what you're doing and why
+- Show discovered tools before executing them
+- Handle errors gracefully and provide alternatives
+- Ask for confirmation before destructive operations
+- Respect user privacy and data security"""
+
+    # Create the agent with runtime-loaded tools
+    rube_agent = create_react_agent(
+        model=rube_model,
+        tools=useful_tools,
+        name="multi_tool_rube_agent",
+        prompt=rube_prompt
+    )
+
+    # Invoke agent with current state
+    result = await rube_agent.ainvoke(state)
+
+    logger.info(f"🔧 [multi_tool_rube_agent_node] Completed for user: {user_id}")
+    return result
+
 
 def get_api_keys_from_config(config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
     """Extract API keys from config.configurable or fallback to environment variables.

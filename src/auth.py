@@ -19,9 +19,23 @@ References:
 
 from langgraph_sdk import Auth
 import os
+import sys
 import jwt
 from jwt import PyJWKClient
 import logging
+
+# Ensure UTF-8 encoding for stdout/stderr before any logging
+# This prevents UnicodeEncodeError in Docker containers
+def _ensure_utf8_encoding():
+    """Ensure stdout/stderr use UTF-8 encoding."""
+    try:
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass  # Already configured or not supported
+
+_ensure_utf8_encoding()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

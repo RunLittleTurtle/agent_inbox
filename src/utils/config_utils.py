@@ -8,11 +8,48 @@ This module provides runtime config loading for agents. It's separate from confi
 Both query Supabase but serve different purposes - not duplication!
 """
 import os
+import sys
+import io
 import logging
 from typing import Dict, Any, Optional
 from supabase import create_client, Client
 
+# Ensure UTF-8 encoding for stdout/stderr before any logging
+# This prevents UnicodeEncodeError when Supabase returns URLs with Unicode characters
+def _ensure_utf8_encoding():
+    """Ensure stdout/stderr use UTF-8 encoding."""
+    try:
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass  # Already configured or not supported
+
+_ensure_utf8_encoding()
+
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_dict_encoding(d: Dict[str, Any]) -> None:
+    """Recursively ensure all strings in dict are properly UTF-8 encoded.
+
+    This modifies the dict in-place to handle any encoding issues from Supabase.
+    Particularly important for MCP URLs which may contain Unicode characters.
+
+    Args:
+        d: Dictionary to sanitize (modified in-place)
+    """
+    for key, value in d.items():
+        if isinstance(value, dict):
+            _sanitize_dict_encoding(value)
+        elif isinstance(value, str):
+            # Ensure string is valid UTF-8 by encoding/decoding
+            try:
+                # Most strings will already be fine, but this ensures consistency
+                d[key] = value.encode('utf-8', errors='replace').decode('utf-8')
+            except Exception:
+                # If something goes wrong, keep original value
+                pass
 
 
 def get_supabase_client() -> Client:
@@ -73,8 +110,15 @@ def get_agent_config_from_supabase(
             .execute()
 
         if result.data and result.data.get("config_data"):
+            config_data = result.data["config_data"]
+
+            # Ensure all string values are properly decoded as UTF-8
+            # This prevents issues if Supabase returns MCP URLs with Unicode characters
+            if isinstance(config_data, dict):
+                _sanitize_dict_encoding(config_data)
+
             logger.info(f" Loaded config for {agent_id}, user {user_id}")
-            return result.data["config_data"]
+            return config_data
         else:
             logger.info(f"  No config found for {agent_id}, user {user_id} - will use defaults")
             return {}

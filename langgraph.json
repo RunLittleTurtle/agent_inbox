@@ -9,6 +9,12 @@
   },
   "env": ".env",
   "python_version": "3.13",
+  "dockerfile_lines": [
+    "ENV PYTHONIOENCODING=UTF-8",
+    "ENV PYTHONUTF8=1",
+    "ENV LANG=C.UTF-8",
+    "ENV LC_ALL=C.UTF-8"
+  ],
   "store": {
     "index": {
       "embed": "openai:text-embedding-3-small",

@@ -12,6 +12,48 @@ All agents follow pure LangGraph create_react_agent patterns for consistency.
 
 import os
 import sys
+import io
+
+# ============================================================================
+# CRITICAL: Fix Unicode Encoding BEFORE Any Other Imports
+# ============================================================================
+# This MUST be the first code that runs to prevent UnicodeEncodeError
+# in Docker containers where Python defaults to ASCII encoding.
+#
+# Issue: LangGraph Cloud deployment was failing with:
+# "UnicodeEncodeError: 'ascii' codec can't encode characters"
+#
+# Root cause: Docker containers don't have locale set, so Python's
+# sys.stdout defaults to ASCII. Environment variables in .env are loaded
+# TOO LATE (after stdout encoding is already set).
+#
+# Solution: Reconfigure stdout/stderr to UTF-8 IMMEDIATELY at module load.
+# ============================================================================
+
+def _fix_encoding():
+    """Force UTF-8 encoding for stdout/stderr to prevent UnicodeEncodeError.
+
+    This function MUST run before any logging or print statements that might
+    contain Unicode characters (e.g., MCP URLs from Supabase).
+    """
+    try:
+        # Python 3.7+ has reconfigure() method
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stderr.reconfigure(encoding='utf-8')
+        else:
+            # Fallback for older Python versions
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except Exception:
+        # If reconfiguration fails, we're in an environment that doesn't support it
+        # (e.g., some IDEs). Ignore silently - encoding is likely already UTF-8.
+        pass
+
+# Apply encoding fix IMMEDIATELY
+_fix_encoding()
+
+# Now safe to import and use logging/printing
 import asyncio
 import logging
 from dotenv import load_dotenv
@@ -41,11 +83,12 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# DIAGNOSTIC: Check Python encoding configuration
-logger.info(f"[ENCODING] Python default encoding: {sys.getdefaultencoding()}")
-logger.info(f"[ENCODING] PYTHONIOENCODING env var: {os.getenv('PYTHONIOENCODING', 'NOT_SET')}")
-logger.info(f"[ENCODING] PYTHONUTF8 env var: {os.getenv('PYTHONUTF8', 'NOT_SET')}")
-logger.info(f"[ENCODING] stdout encoding: {sys.stdout.encoding if hasattr(sys.stdout, 'encoding') else 'NO_ATTR'}")
+# DIAGNOSTIC: Verify encoding configuration after fix
+logger.info(f"[ENCODING-FIX] Python default encoding: {sys.getdefaultencoding()}")
+logger.info(f"[ENCODING-FIX] stdout encoding: {sys.stdout.encoding}")
+logger.info(f"[ENCODING-FIX] stderr encoding: {sys.stderr.encoding}")
+logger.info(f"[ENCODING-FIX] PYTHONIOENCODING: {os.getenv('PYTHONIOENCODING', 'NOT_SET')}")
+logger.info(f"[ENCODING-FIX] PYTHONUTF8: {os.getenv('PYTHONUTF8', 'NOT_SET')}")
 
 # ============================================================================
 # 2025 Runtime Context Schema (Phase 2.1)

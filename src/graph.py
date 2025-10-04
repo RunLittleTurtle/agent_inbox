@@ -453,11 +453,8 @@ When an agent completes their task, analyze if additional routing is needed."""
     logger.info(f"Multi-agent supervisor created successfully for user: {api_keys['user_id']}")
     return compiled_graph
 
-async def make_graph(config: Optional[RunnableConfig] = None):
-    """Factory function for LangGraph Platform with multi-tenant support.
-
-    This function is called by LangGraph Platform on every request.
-    The config parameter is automatically injected with user-specific data.
+async def make_graph_async(config: Optional[RunnableConfig] = None):
+    """Async factory for creating supervisor graph with multi-tenant support.
 
     Args:
         config: RunnableConfig with user API keys (injected by LangGraph Platform)
@@ -472,8 +469,28 @@ async def make_graph(config: Optional[RunnableConfig] = None):
     logger.info("Graph creation completed successfully")
     return graph_instance
 
-# Export the factory function for LangGraph Platform
+def make_graph(config: Optional[RunnableConfig] = None):
+    """Sync factory function for LangGraph Platform with multi-tenant support.
+
+    This function is called by LangGraph Platform on every request.
+    The config parameter is automatically injected with user-specific data.
+
+    NOTE: This wraps the async graph creation in asyncio.run() for Platform compatibility.
+    LangGraph Platform requires sync factory functions, not async.
+
+    Args:
+        config: RunnableConfig with user API keys (injected by LangGraph Platform)
+
+    Returns:
+        Compiled graph instance
+
+    Raises:
+        Exception: Clear error if graph creation fails
+    """
+    logger.info("Creating supervisor graph via sync factory function")
+    return asyncio.run(make_graph_async(config))
+
+# Export the sync factory function for LangGraph Platform
 # Platform will call make_graph() per request with user-specific config
-# DO NOT instantiate graph at module level - breaks multi-tenant config injection
 graph = make_graph
-logger.info("Graph factory exported successfully for LangGraph Platform")
+logger.info("Sync graph factory exported successfully for LangGraph Platform")

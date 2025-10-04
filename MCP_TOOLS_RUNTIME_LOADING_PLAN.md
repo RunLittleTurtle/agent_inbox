@@ -121,52 +121,95 @@ async def send_cal_invite_node(state, config):
 
 **Key insight:** Config is fetched **inside nodes**, not at graph compile time.
 
-### New Supervisor Pattern (🎯 Target Implementation)
+### New Supervisor Pattern - 2025 Best Practices (🎯 Target Implementation)
 
 ```python
-# src/graph.py - NEW PATTERN
+# src/graph.py - 2025 PATTERN with Runtime Context API
 
-# 1. NO static agent creation
-# graph = make_graph(None)  # ❌ REMOVE THIS
+from dataclasses import dataclass
+from langgraph.runtime import Runtime, get_runtime
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
-# 2. Wrapper nodes that load tools at runtime
-async def calendar_agent_node(state: MessagesState, config: RunnableConfig):
-    """Wrapper node that loads calendar tools at runtime"""
-    # Extract user from config
-    user_id = config.get("configurable", {}).get("user_id", "local_dev_user")
+# 1. Define context schema (NEW in LangGraph v0.6.0)
+@dataclass
+class UserContext:
+    """User-specific runtime context"""
+    user_id: str
+    mcp_calendar_url: str | None = None
+    mcp_rube_url: str | None = None
+    rube_auth_token: str | None = None
 
-    # Fetch MCP URL from Supabase
-    agent_config = get_agent_config_from_supabase(user_id, "calendar_agent")
-    mcp_url = agent_config.get("mcp_integration", {}).get("mcp_server_url")
+# 2. Wrapper nodes that load tools at runtime (2025 pattern)
+async def calendar_agent_node(state: MessagesState, runtime: Runtime[UserContext]):
+    """Wrapper node that loads calendar tools at runtime using 2025 Runtime API"""
+    # Access user context (type-safe!)
+    user_id = runtime.context.user_id
+    mcp_url = runtime.context.mcp_calendar_url
 
+    logger.info(f"Loading calendar tools for user: {user_id}")
+
+    # Fallback to .env if no URL provided
     if not mcp_url:
-        # Fallback to .env for local dev
         mcp_url = os.getenv("PIPEDREAM_MCP_SERVER")
+        logger.warning(f"No MCP URL in context, using .env fallback")
 
-    # Load tools from MCP URL
-    tools = await load_mcp_tools(mcp_url, "calendar")
+    # Load MCP tools dynamically (2025 pattern - supported in workflow nodes)
+    tools = []
+    if mcp_url:
+        try:
+            client = MultiServerMCPClient({
+                "calendar": {
+                    "url": mcp_url,
+                    "transport": "streamable_http"
+                }
+            })
+            tools = await client.get_tools()
+            logger.info(f"Loaded {len(tools)} calendar tools")
+        except Exception as e:
+            logger.error(f"Failed to load MCP tools: {e}")
+            tools = []
 
-    # Create agent with tools
+    # Create agent with loaded tools
     calendar_agent = create_react_agent(model, tools, prompt)
 
     # Invoke and return
-    result = await calendar_agent.ainvoke(state, config)
+    result = await calendar_agent.ainvoke(state)
     return result
 
 # 3. Supervisor uses wrapper nodes
-def make_graph(config: Optional[RunnableConfig] = None):
+def make_graph():
+    """Factory function - uses 2025 Runtime API for context"""
     workflow = create_supervisor(
         agents=[
             {"name": "calendar_agent", "node": calendar_agent_node},  # ✅ Node, not graph
             {"name": "multi_tool_agent", "node": multi_tool_agent_node}
         ],
+        context_schema=UserContext,  # NEW: Type-safe context
         ...
     )
     return workflow.compile(name="multi_agent_system")
 
-# 4. Static export for platform registration (minimal graph structure)
-graph = make_graph(None)  # Platform needs static graph, but agents are dynamic
+# 4. Static export for platform registration
+graph = make_graph()
+
+# 5. Invoke with 2025 Runtime Context API
+graph.invoke(
+    {"messages": [{"role": "user", "content": "Check my calendar"}]},
+    context={  # NEW: context parameter (v0.6.0+)
+        "user_id": "user_123",
+        "mcp_calendar_url": "https://mcp.pipedream.net/...",
+        "mcp_rube_url": "https://rube.app/mcp",
+        "rube_auth_token": "token_abc"
+    }
+)
 ```
+
+**2025 Best Practices Applied:**
+- ✅ `Runtime[UserContext]` for type-safe context access
+- ✅ `context={}` parameter instead of `config['configurable']`
+- ✅ MCP tools loaded in workflow nodes (officially supported!)
+- ✅ `@dataclass` for context schemas
+- ✅ No manual config.get() extractions
 
 ### Utility Function: Runtime MCP Tool Loading
 
@@ -263,6 +306,23 @@ async def load_mcp_tools(
 **Reference:** `src/executive-ai-assistant/eaia/main/graph.py:143`
 **Status:** Phase 2 implementation in progress
 
+### ✅ Update: 2025 Best Practices Discovered
+**What we found:** LangGraph v0.6.0+ has Runtime Context API
+**Key changes:**
+- `Runtime[ContextSchema]` replaces manual `config.get("configurable")`
+- `context={}` parameter replaces `config={'configurable': {}}`
+- `@dataclass` context schemas for type safety
+- MCP tool loading in nodes is officially supported pattern
+
+**Benefits:**
+- Type-safe context access
+- Cleaner API (no nested dict access)
+- Better IDE autocomplete
+- Matches official 2025 documentation
+
+**Reference:** https://langchain-ai.github.io/langgraph/agents/context/
+**Status:** Updating implementation to use 2025 patterns
+
 ---
 
 ## 📁 Key Files & Locations
@@ -291,36 +351,43 @@ async def load_mcp_tools(
 
 ---
 
-## 🚀 Phase 2 Implementation Steps
+## 🚀 Phase 2 Implementation Steps (2025 Best Practices)
 
-### Step 1: Create Runtime Tool Loading Utility
-**File:** `src/utils/mcp_tools_utils.py` (NEW)
-**Function:** `load_mcp_tools(mcp_url, server_name, auth_token, timeout)`
-**Purpose:** Reusable MCP tool loading with error handling
+### Step 1: Define UserContext Schema
+**File:** `src/graph.py` (UPDATE)
+**Add:** `@dataclass class UserContext` with MCP URLs
+**Purpose:** Type-safe context for Runtime API
 
-### Step 2: Create Calendar Agent Wrapper Node
-**File:** `src/graph.py`
-**Function:** `calendar_agent_node(state, config)` (NEW)
+### Step 2: Create Calendar Agent Wrapper Node (2025 Pattern)
+**File:** `src/graph.py` (NEW FUNCTION)
+**Function:** `async def calendar_agent_node(state, runtime: Runtime[UserContext])`
 **Logic:**
-1. Extract `user_id` from `config.configurable`
-2. Fetch MCP URL from `get_agent_config_from_supabase()`
-3. Fallback to `.env` if no config
-4. Call `load_mcp_tools(mcp_url, "calendar")`
-5. Create agent with loaded tools
+1. Access context: `user_id = runtime.context.user_id`
+2. Get MCP URL: `mcp_url = runtime.context.mcp_calendar_url`
+3. Fallback to `.env` if None
+4. Load tools: `client = MultiServerMCPClient({...}); tools = await client.get_tools()`
+5. Create agent: `create_react_agent(model, tools, prompt)`
 6. Invoke and return result
 
-### Step 3: Create Multi-Tool Rube Agent Wrapper Node
-**File:** `src/graph.py`
-**Function:** `multi_tool_agent_node(state, config)` (NEW)
-**Logic:** Same as calendar but for Rube MCP
+### Step 3: Create Multi-Tool Rube Agent Wrapper Node (2025 Pattern)
+**File:** `src/graph.py` (NEW FUNCTION)
+**Function:** `async def multi_tool_agent_node(state, runtime: Runtime[UserContext])`
+**Logic:** Same as calendar but uses `runtime.context.mcp_rube_url` and `rube_auth_token`
 
-### Step 4: Update Supervisor to Use Wrapper Nodes
+### Step 4: Update Supervisor Integration (2025 Pattern)
 **File:** `src/graph.py::make_graph()`
 **Changes:**
-- Remove `create_calendar_agent()` call
-- Remove `create_multi_tool_rube_agent()` call
+- Remove `create_calendar_agent()` and `create_multi_tool_rube_agent()` calls
 - Pass wrapper node functions to `create_supervisor()`
-- Keep static graph export for platform registration
+- Add `context_schema=UserContext` parameter
+- Keep static graph export: `graph = make_graph()`
+
+### Step 5: Update Graph Invocation Layer
+**File:** Frontend/API that invokes the graph
+**Changes:**
+- Fetch MCP URLs from Supabase for user
+- Pass via `context={"user_id": ..., "mcp_calendar_url": ...}`
+- Remove old `config={'configurable': {...}}` pattern
 
 ### Step 5: Test with Both Users
 **Test 1:** User with MCP configs (`user_33TJRkCZdUVfXdlChxi1qbx5O6k`)

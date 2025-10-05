@@ -480,6 +480,7 @@ export function CardSelector({ section, values, onValueChange, agentId, onReset,
           onSave={handleSave}
           isDirty={isDirty}
           isSaving={isSaving}
+          agentId={agentId}
         />
       );
 

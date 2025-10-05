@@ -93,24 +93,33 @@ class AgentMCPConnection:
         # Try loading OAuth tokens first (new method)
         if MCP_OAUTH_AVAILABLE and user_id:
             try:
+                self.logger.info(f"[OAUTH] Attempting to load OAuth tokens for user_id={user_id}, agent_id={self.agent_id}")
                 oauth_data = get_mcp_oauth_tokens(user_id, self.agent_id)
                 if oauth_data:
                     self.auth_token = oauth_data.get("access_token")
                     self.mcp_url = oauth_data.get("mcp_url") or self.mcp_url
-                    self.logger.info(f"Loaded OAuth token for {self.agent_id}")
+                    token_preview = self.auth_token[:20] + "..." if self.auth_token and len(self.auth_token) > 20 else "NONE"
+                    self.logger.info(f"[OAUTH] Successfully loaded OAuth token for {self.agent_id}")
+                    self.logger.info(f"[OAUTH] Token length: {len(self.auth_token) if self.auth_token else 0} chars")
+                    self.logger.info(f"[OAUTH] Token preview: {token_preview}")
+                    self.logger.info(f"[OAUTH] MCP URL: {self.mcp_url}")
                 else:
-                    self.logger.info(f"No OAuth tokens found for {self.agent_id}, falling back to RUBE_AUTH_TOKEN")
+                    self.logger.warning(f"[OAUTH] No OAuth tokens found for {self.agent_id}, falling back to RUBE_AUTH_TOKEN")
                     # Fall back to static token from config
                     self.auth_token = RUBE_AUTH_TOKEN
             except Exception as e:
-                self.logger.error(f"Failed to load OAuth tokens: {e}")
+                self.logger.error(f"[OAUTH] Failed to load OAuth tokens: {e}")
+                import traceback
+                traceback.print_exc()
                 # Fall back to static token
                 self.auth_token = RUBE_AUTH_TOKEN
         else:
             # No user_id provided or OAuth not available - use static token
             self.auth_token = RUBE_AUTH_TOKEN
             if not user_id:
-                self.logger.info("No user_id provided - using static RUBE_AUTH_TOKEN")
+                self.logger.info("[OAUTH] No user_id provided - using static RUBE_AUTH_TOKEN")
+            else:
+                self.logger.warning(f"[OAUTH] MCP_OAUTH_AVAILABLE={MCP_OAUTH_AVAILABLE} - using fallback token")
 
         if self.mcp_url:
             # Configure MCP server with Bearer token authentication
@@ -124,9 +133,10 @@ class AgentMCPConnection:
                 server_config["headers"] = {
                     "Authorization": f"Bearer {self.auth_token}"
                 }
-                self.logger.info(f"Configured Rube MCP with Bearer token authentication")
+                self.logger.info(f"[MCP] Configured Rube MCP with Bearer token authentication")
+                self.logger.info(f"[MCP] Server config: url={self.mcp_url}, transport=streamable_http")
             else:
-                self.logger.warning(f"No Rube auth token found - MCP connection may fail")
+                self.logger.warning(f"[MCP] No Rube auth token found - MCP connection may fail")
 
             self.mcp_servers = {
                 f"rube_{AGENT_NAME}": server_config
@@ -147,14 +157,18 @@ class AgentMCPConnection:
             self.logger.warning(f"No Rube {AGENT_NAME} MCP server configured")
             return []
 
-        self.logger.info(f"Connecting to Rube {AGENT_NAME} MCP: {self.mcp_url}")
+        self.logger.info(f"[MCP] Connecting to Rube {AGENT_NAME} MCP: {self.mcp_url}")
 
         # Reuse MCP client to prevent memory leaks
         if self._mcp_client is None:
+            self.logger.info(f"[MCP] Creating new MultiServerMCPClient with servers: {list(self.mcp_servers.keys())}")
             self._mcp_client = MultiServerMCPClient(self.mcp_servers)
+        else:
+            self.logger.info(f"[MCP] Reusing existing MCP client instance")
 
         try:
             # 30-second timeout
+            self.logger.info(f"[MCP] Fetching tools from MCP server (30s timeout)...")
             tools = await asyncio.wait_for(
                 self._mcp_client.get_tools(),
                 timeout=30.0
@@ -162,17 +176,19 @@ class AgentMCPConnection:
 
             # DEBUG: Log all available tools for discovery
             all_tool_names = [t.name for t in tools]
-            self.logger.info(f"ALL available Rube {AGENT_NAME} MCP tools: {all_tool_names}")
+            self.logger.info(f"[MCP] Discovered {len(tools)} tools from Rube {AGENT_NAME} MCP")
+            self.logger.info(f"[MCP] ALL available tool names: {all_tool_names}")
 
             # Filter to configured tools only
             useful_tools = []
             for tool in tools:
                 if tool.name in USEFUL_TOOL_NAMES:
                     useful_tools.append(tool)
+                    self.logger.info(f"[MCP] Including tool: {tool.name}")
                 else:
-                    self.logger.debug(f"Skipping {AGENT_NAME} tool: {tool.name}")
+                    self.logger.debug(f"[MCP] Skipping {AGENT_NAME} tool: {tool.name}")
 
-            self.logger.info(f"Loaded {len(useful_tools)} Rube {AGENT_NAME} MCP tools: {[t.name for t in useful_tools]}")
+            self.logger.info(f"[MCP] Filtered to {len(useful_tools)} useful Rube {AGENT_NAME} MCP tools: {[t.name for t in useful_tools]}")
 
             # If no tools matched, show available tools for debugging
             if not useful_tools and tools:
@@ -186,10 +202,13 @@ class AgentMCPConnection:
             return useful_tools
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Rube {AGENT_NAME} MCP tools loading timed out")
+            self.logger.error(f"[MCP] Timeout fetching tools from {self.mcp_url} (30s)")
+            self.logger.error(f"[MCP] Check if Rube MCP server is responding")
             return []
         except Exception as e:
-            self.logger.error(f"Failed to load Rube {AGENT_NAME} MCP tools: {e}")
+            self.logger.error(f"[MCP] Failed to load Rube {AGENT_NAME} MCP tools: {type(e).__name__}: {e}")
+            import traceback
+            self.logger.error(f"[MCP] Traceback:\n{traceback.format_exc()}")
             return []
 
     async def discover_all_tools(self) -> List[Dict[str, str]]:
@@ -351,6 +370,9 @@ async def get_agent_tools_with_mcp(user_id: str = None) -> List[BaseTool]:
         user_id: Clerk user ID for loading OAuth tokens. If provided, will use
                  per-user OAuth tokens from Supabase. Otherwise uses global config.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     tools = []
 
     # Add sub-agent tools if needed
@@ -359,23 +381,30 @@ async def get_agent_tools_with_mcp(user_id: str = None) -> List[BaseTool]:
 
     # Add MCP tools from Rube
     try:
+        logger.info(f"[TOOLS_ASYNC] Starting MCP tool loading for user_id={user_id}")
+
         # Create per-user connection if user_id provided, otherwise use global
         if user_id:
+            logger.info(f"[TOOLS_ASYNC] Creating per-user AgentMCPConnection for {user_id}")
             agent_mcp = AgentMCPConnection(user_id=user_id, agent_id=f"{AGENT_NAME}_agent")
             mcp_tools = await agent_mcp.get_mcp_tools()
         else:
+            logger.info(f"[TOOLS_ASYNC] Using global AgentMCPConnection (no user_id)")
             mcp_tools = await _agent_mcp.get_mcp_tools()
 
         tools.extend(mcp_tools)
 
         if mcp_tools:
-            print(f"Loaded {len(mcp_tools)} Rube {AGENT_NAME} MCP tools: {[t.name for t in mcp_tools]}")
+            logger.info(f"[TOOLS_ASYNC] Loaded {len(mcp_tools)} Rube {AGENT_NAME} MCP tools: {[t.name for t in mcp_tools]}")
         else:
-            print(f"No Rube {AGENT_NAME} MCP tools available")
+            logger.warning(f"[TOOLS_ASYNC] No Rube {AGENT_NAME} MCP tools available")
 
     except Exception as e:
-        print(f"Failed to load {AGENT_NAME} MCP tools: {e}")
+        logger.error(f"[TOOLS_ASYNC] Failed to load {AGENT_NAME} MCP tools: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(f"[TOOLS_ASYNC] Traceback:\n{traceback.format_exc()}")
 
+    logger.info(f"[TOOLS_ASYNC] Returning {len(tools)} total tools")
     return tools
 
 
@@ -387,19 +416,43 @@ def get_agent_simple_tools(user_id: str = None) -> List[BaseTool]:
         user_id: Clerk user ID for loading OAuth tokens. If provided, will use
                  per-user OAuth tokens from Supabase. Otherwise uses global config.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info(f"[TOOLS] Loading tools for user_id={user_id}")
+
         # Handle asyncio event loop
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        try:
+            loop = asyncio.get_event_loop()
+            is_running = loop.is_running()
+        except RuntimeError:
+            # No event loop exists
+            is_running = False
+            logger.info(f"[TOOLS] No event loop found, will create new one")
+
+        if is_running:
+            logger.info(f"[TOOLS] Event loop already running, using ThreadPoolExecutor")
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(asyncio.run, get_agent_tools_with_mcp(user_id=user_id))
-                return future.result(timeout=10)
+                tools = future.result(timeout=45)  # Increased timeout to 45s
+                logger.info(f"[TOOLS] Successfully loaded {len(tools)} tools via ThreadPoolExecutor")
+                return tools
         else:
-            return asyncio.run(get_agent_tools_with_mcp(user_id=user_id))
+            logger.info(f"[TOOLS] No running event loop, using asyncio.run")
+            tools = asyncio.run(get_agent_tools_with_mcp(user_id=user_id))
+            logger.info(f"[TOOLS] Successfully loaded {len(tools)} tools via asyncio.run")
+            return tools
 
+    except concurrent.futures.TimeoutError:
+        logger.error(f"[TOOLS] Timeout loading tools after 45 seconds for user {user_id}")
+        logger.error(f"[TOOLS] Check if MCP server is responding or increase timeout")
+        return []
     except Exception as e:
-        print(f"Rube {AGENT_NAME} MCP connection failed: {e}")
+        logger.error(f"[TOOLS] Failed to load Rube {AGENT_NAME} MCP tools: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(f"[TOOLS] Traceback:\n{traceback.format_exc()}")
 
         # Fallback to sub-agent tools only
         # TODO: Return your local/sub-agent tools as fallback

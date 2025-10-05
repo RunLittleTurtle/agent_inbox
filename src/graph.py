@@ -237,7 +237,8 @@ async def multi_tool_rube_agent_node(
     api_keys = get_api_keys_from_config(config)
     user_id = api_keys["user_id"]
 
-    logger.info(f"[multi_tool_rube_agent_node] Loading OAuth-enabled tools for user: {user_id}")
+    logger.info(f"[multi_tool_rube_agent_node] Starting execution for user: {user_id}")
+    logger.info(f"[multi_tool_rube_agent_node] Input state keys: {list(state.keys())}")
 
     # Create Rube model
     rube_model = ChatAnthropic(
@@ -246,24 +247,25 @@ async def multi_tool_rube_agent_node(
         anthropic_api_key=api_keys["anthropic_api_key"],
         streaming=False,
     )
+    logger.info(f"[multi_tool_rube_agent_node] Created model: {DEFAULT_LLM_MODEL}")
 
     # Load tools using OAuth-aware function (supports per-user tokens from Supabase)
     try:
-        logger.info(
-            f"[multi_tool_rube_agent_node] Loading tools with OAuth support for user: {user_id}"
-        )
+        logger.info(f"[multi_tool_rube_agent_node] Loading OAuth-enabled tools for user: {user_id}")
 
         from multi_tool_rube_agent.tools import get_agent_simple_tools
 
         useful_tools = get_agent_simple_tools(user_id=user_id)
 
-        logger.info(
-            f"[multi_tool_rube_agent_node] Loaded {len(useful_tools)} tools: {[t.name for t in useful_tools]}"
-        )
+        logger.info(f"[multi_tool_rube_agent_node] Successfully loaded {len(useful_tools)} tools")
+        if useful_tools:
+            logger.info(f"[multi_tool_rube_agent_node] Tool names: {[t.name for t in useful_tools]}")
+        else:
+            logger.error(f"[multi_tool_rube_agent_node] WARNING: No tools loaded! Agent will have no capabilities.")
     except Exception as e:
-        logger.error(f"[multi_tool_rube_agent_node] Failed to load tools: {e}")
+        logger.error(f"[multi_tool_rube_agent_node] CRITICAL: Failed to load tools: {type(e).__name__}: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(f"[multi_tool_rube_agent_node] Traceback:\n{traceback.format_exc()}")
         useful_tools = []
 
     # Create agent prompt
@@ -284,18 +286,27 @@ async def multi_tool_rube_agent_node(
 - Respect user privacy and data security"""
 
     # Create the agent with runtime-loaded tools
+    logger.info(f"[multi_tool_rube_agent_node] Creating react agent with {len(useful_tools)} tools")
     rube_agent = create_react_agent(
         model=rube_model,
         tools=useful_tools,
         name="multi_tool_rube_agent",
         prompt=rube_prompt,
     )
+    logger.info(f"[multi_tool_rube_agent_node] Agent created successfully")
 
     # Invoke agent with current state
-    result = await rube_agent.ainvoke(state)
-
-    logger.info(f"[multi_tool_rube_agent_node] Completed for user: {user_id}")
-    return result
+    try:
+        logger.info(f"[multi_tool_rube_agent_node] Invoking agent with state")
+        result = await rube_agent.ainvoke(state)
+        logger.info(f"[multi_tool_rube_agent_node] Agent invocation completed successfully")
+        logger.info(f"[multi_tool_rube_agent_node] Result keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
+        return result
+    except Exception as e:
+        logger.error(f"[multi_tool_rube_agent_node] Agent invocation failed: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(f"[multi_tool_rube_agent_node] Traceback:\n{traceback.format_exc()}")
+        raise
 
 
 # ============================================================================

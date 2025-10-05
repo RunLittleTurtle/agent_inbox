@@ -120,18 +120,27 @@ CONFIG_SECTIONS = [
         'key': 'mcp_integration',
         'label': 'Rube MCP Server Configuration',
         'description': 'Universal MCP server providing access to 500+ applications',
-        'card_type': 'mcp',
         'fields': [
+            {
+                'key': 'mcp_env_var',
+                'label': 'Rube Environment Variable',
+                'type': 'text',
+                'readonly': True,
+                'default': 'RUBE_MCP_SERVER',
+                'description': 'Environment variable for Rube MCP server URL (read-only)',
+                'placeholder': 'RUBE_MCP_SERVER',
+                'required': False,
+                'note': 'Rube uses a single unified MCP server for all 500+ applications'
+            },
             {
                 'key': 'mcp_server_url',
                 'label': 'Rube MCP Server URL',
                 'type': 'text',
-                'envVar': 'RUBE_MCP_SERVER',
-                'default': 'https://rube.app/mcp',
-                'description': 'The Rube MCP server URL (read-only - set via environment variable)',
+                'description': 'The Rube MCP server URL (editable - updates .env file)',
                 'placeholder': 'https://rube.app/mcp',
-                'readonly': True,
-                'showCopyButton': True
+                'default': 'https://rube.app/mcp',
+                'required': True,
+                'note': 'Rube provides unified access to 500+ apps through OAuth 2.1'
             }
         ]
     }

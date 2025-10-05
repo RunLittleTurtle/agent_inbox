@@ -166,26 +166,14 @@ export function MCPConfigCard({
   // Load OAuth connection status
   const loadOAuthStatus = async () => {
     try {
-      if (isGlobal) {
-        // Global OAuth: check values[sectionKey].mcp_universal (from user_secrets)
-        const mcp_universal = values[sectionKey]?.mcp_universal;
-        if (mcp_universal?.oauth_tokens?.access_token) {
-          setOauthStatus('connected');
-          setConnectedApps([mcp_universal.provider || 'MCP Server']);
-        } else {
-          setOauthStatus('disconnected');
-        }
-      } else {
-        // Per-agent OAuth: check values[sectionKey].oauth_tokens (from agent_configs)
-        if (!agentId) return;
+      // SAME path for both global and per-agent: values[sectionKey].oauth_tokens
+      const oauth_tokens = values[sectionKey]?.oauth_tokens;
 
-        const mcpIntegration = values[sectionKey]?.oauth_tokens;
-        if (mcpIntegration && mcpIntegration.access_token) {
-          setOauthStatus('connected');
-          setConnectedApps(['Rube MCP']);
-        } else {
-          setOauthStatus('disconnected');
-        }
+      if (oauth_tokens && oauth_tokens.access_token) {
+        setOauthStatus('connected');
+        setConnectedApps(['Rube MCP']);
+      } else {
+        setOauthStatus('disconnected');
       }
     } catch (error) {
       console.error('Failed to load OAuth status:', error);

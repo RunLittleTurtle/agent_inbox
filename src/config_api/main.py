@@ -338,7 +338,7 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
 
         if agent_id == "global":
             # Global config: read from Supabase user_secrets table
-            # Return empty defaults if no data exists yet
+            # Return in SAME format as agent configs for consistency
             try:
                 result = supabase.table("user_secrets") \
                     .select("*") \
@@ -346,56 +346,36 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                     .maybe_single() \
                     .execute()
 
-                if result and result.data:
-                    data = result.data
-                    mcp_universal = data.get("mcp_universal", {})
-                    return {
-                        "user_preferences": {
-                            "user_timezone": data.get("timezone", "America/Toronto")
-                        },
-                        "ai_models": {
-                            "anthropic_api_key": data.get("anthropic_api_key", ""),
-                            "openai_api_key": data.get("openai_api_key", ""),
-                        },
-                        "langgraph_system": {
-                            "langsmith_api_key": data.get("langsmith_api_key", ""),
-                            "langchain_project": data.get("langchain_project", "ambient-email-agent"),
-                        },
-                        "google_workspace": {
-                            "google_client_id": data.get("google_client_id", ""),
-                            "google_client_secret": data.get("google_client_secret", ""),
-                            "google_refresh_token": data.get("google_refresh_token", ""),
-                        },
-                        "mcp_integration": {
-                            "mcp_server_url": mcp_universal.get("mcp_server_url", "https://rube.app/mcp"),
-                            "mcp_universal": mcp_universal  # For OAuth status
-                        }
+                user_data = result.data if result and result.data else {}
+                mcp_universal = user_data.get("mcp_universal", {})
+
+                # Extract OAuth tokens from mcp_universal if they exist
+                oauth_tokens = mcp_universal.get("oauth_tokens") if mcp_universal else None
+
+                return {
+                    "user_preferences": {
+                        "user_timezone": user_data.get("timezone", "America/Toronto")
+                    },
+                    "ai_models": {
+                        "anthropic_api_key": user_data.get("anthropic_api_key", ""),
+                        "openai_api_key": user_data.get("openai_api_key", ""),
+                    },
+                    "langgraph_system": {
+                        "langsmith_api_key": user_data.get("langsmith_api_key", ""),
+                        "langchain_project": user_data.get("langchain_project", "ambient-email-agent"),
+                    },
+                    "google_workspace": {
+                        "google_client_id": user_data.get("google_client_id", ""),
+                        "google_client_secret": user_data.get("google_client_secret", ""),
+                        "google_refresh_token": user_data.get("google_refresh_token", ""),
+                    },
+                    "mcp_integration": {
+                        "mcp_env_var": "RUBE_MCP_SERVER",
+                        "mcp_server_url": mcp_universal.get("mcp_server_url", "https://rube.app/mcp"),
+                        # Include oauth_tokens at same path as multi_tool for MCPConfigCard
+                        "oauth_tokens": oauth_tokens
                     }
-                else:
-                    # No data yet - return empty defaults
-                    print(f"[INFO] No user_secrets found for {user_id}, returning empty defaults")
-                    return {
-                        "user_preferences": {
-                            "user_timezone": "America/Toronto"
-                        },
-                        "ai_models": {
-                            "anthropic_api_key": "",
-                            "openai_api_key": "",
-                        },
-                        "langgraph_system": {
-                            "langsmith_api_key": "",
-                            "langchain_project": "ambient-email-agent",
-                        },
-                        "google_workspace": {
-                            "google_client_id": "",
-                            "google_client_secret": "",
-                            "google_refresh_token": "",
-                        },
-                        "mcp_integration": {
-                            "mcp_server_url": "https://rube.app/mcp",
-                            "mcp_universal": {}
-                        }
-                    }
+                }
             except Exception as e:
                 print(f"[ERROR] Supabase query failed for global config: {e}")
                 # Return empty defaults on error
@@ -417,8 +397,9 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                         "google_refresh_token": "",
                     },
                     "mcp_integration": {
+                        "mcp_env_var": "RUBE_MCP_SERVER",
                         "mcp_server_url": "https://rube.app/mcp",
-                        "mcp_universal": {}
+                        "oauth_tokens": None
                     }
                 }
 
@@ -515,7 +496,37 @@ async def update_config(request: UpdateConfigRequest):
     try:
         if request.agent_id == "global":
             # Update user_secrets table
-            # Map config keys to database columns
+
+            # Handle MCP integration fields (stored in mcp_universal JSONB)
+            if request.section_key == "mcp_integration":
+                # Read existing mcp_universal to preserve oauth_tokens
+                existing = supabase.table("user_secrets") \
+                    .select("mcp_universal") \
+                    .eq("clerk_id", request.user_id) \
+                    .maybe_single() \
+                    .execute()
+
+                mcp_universal = existing.data.get("mcp_universal", {}) if existing and existing.data else {}
+
+                # Update the specific field
+                if request.field_key == "mcp_server_url":
+                    mcp_universal["mcp_server_url"] = request.value
+                    mcp_universal["provider"] = "rube"  # Set provider if not already set
+                elif request.field_key == "mcp_env_var":
+                    # Read-only field, ignore updates
+                    return {"success": True, "message": "mcp_env_var is read-only"}
+
+                # Upsert into user_secrets
+                supabase.table("user_secrets") \
+                    .upsert({
+                        "clerk_id": request.user_id,
+                        "mcp_universal": mcp_universal
+                    }, on_conflict="clerk_id") \
+                    .execute()
+
+                return {"success": True, "updated": "mcp_universal"}
+
+            # Handle other global fields
             column_mapping = {
                 "user_timezone": "timezone",
                 "anthropic_api_key": "anthropic_api_key",

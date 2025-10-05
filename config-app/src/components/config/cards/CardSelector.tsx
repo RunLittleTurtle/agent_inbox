@@ -481,6 +481,7 @@ export function CardSelector({ section, values, onValueChange, agentId, onReset,
           isDirty={isDirty}
           isSaving={isSaving}
           agentId={agentId}
+          isGlobal={!agentId} // Global if no agentId (main environment)
         />
       );
 

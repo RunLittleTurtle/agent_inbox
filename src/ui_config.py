@@ -115,6 +115,25 @@ CONFIG_SECTIONS = [
                 'note': 'Generated during initial OAuth setup - allows persistent Google services access'
             }
         ]
+    },
+    {
+        'key': 'mcp_integration',
+        'label': 'Rube MCP Server Configuration',
+        'description': 'Universal MCP server providing access to 500+ applications',
+        'card_type': 'mcp',
+        'fields': [
+            {
+                'key': 'mcp_server_url',
+                'label': 'Rube MCP Server URL',
+                'type': 'text',
+                'envVar': 'RUBE_MCP_SERVER',
+                'default': 'https://rube.app/mcp',
+                'description': 'The Rube MCP server URL (editable - updates .env file)',
+                'placeholder': 'https://rube.app/mcp',
+                'readonly': False,
+                'showCopyButton': True
+            }
+        ]
     }
 ]
 

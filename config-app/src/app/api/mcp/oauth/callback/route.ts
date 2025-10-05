@@ -43,6 +43,13 @@ export async function GET(req: NextRequest) {
 
     const { code_verifier, clerk_id, agent_id, mcp_url, provider, client_id } = sessionData;
 
+    // Validate required fields for per-agent OAuth
+    if (!agent_id) {
+      return new NextResponse(renderErrorPage('No agent_id available (per-agent OAuth required)'), {
+        headers: { 'Content-Type': 'text/html' }
+      });
+    }
+
     // 3. Discover token endpoint
     const metadata = await discoverOAuthMetadata(mcp_url);
 

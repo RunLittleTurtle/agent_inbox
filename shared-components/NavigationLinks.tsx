@@ -62,6 +62,8 @@ export function NavigationLinks() {
         <a
           key={link.key}
           href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
           className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
         >
           {link.name}

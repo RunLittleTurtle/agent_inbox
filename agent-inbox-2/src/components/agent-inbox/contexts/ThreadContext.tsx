@@ -463,7 +463,7 @@ export function ThreadsProvider<
     const executeRun = async () => {
       try {
         // Fetch user-specific API keys from Supabase
-        let runConfig: any = userId ? { configurable: { user_id: userId } } : undefined;
+        const runConfig: any = userId ? { configurable: { user_id: userId } } : undefined;
 
         if (userId) {
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

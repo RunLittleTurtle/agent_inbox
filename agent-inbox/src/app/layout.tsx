@@ -10,6 +10,7 @@ import { AppSidebar, AppSidebarTrigger } from "@/components/app-sidebar";
 import { BreadCrumb } from "@/components/agent-inbox/components/breadcrumb";
 import { cn } from "@/lib/utils";
 import { ClerkProvider, SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { NavigationLinks } from "@/components/shared/NavigationLinks";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,7 +37,8 @@ export default function RootLayout({
                   <div className="flex flex-col gap-6 w-full min-h-full">
                     <div className="flex items-center justify-between pl-5">
                       <BreadCrumb />
-                      <div className="pr-6">
+                      <div className="pr-6 flex items-center gap-4">
+                        <NavigationLinks />
                         <SignedOut>
                           <SignInButton mode="modal">
                             <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">

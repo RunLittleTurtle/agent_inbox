@@ -128,9 +128,9 @@ CONFIG_SECTIONS = [
                 'type': 'text',
                 'envVar': 'RUBE_MCP_SERVER',
                 'default': 'https://rube.app/mcp',
-                'description': 'The Rube MCP server URL (editable - updates .env file)',
+                'description': 'The Rube MCP server URL (read-only - set via environment variable)',
                 'placeholder': 'https://rube.app/mcp',
-                'readonly': False,
+                'readonly': True,
                 'showCopyButton': True
             }
         ]

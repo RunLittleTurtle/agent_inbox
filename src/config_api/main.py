@@ -348,6 +348,7 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
 
                 if result and result.data:
                     data = result.data
+                    mcp_universal = data.get("mcp_universal", {})
                     return {
                         "user_preferences": {
                             "user_timezone": data.get("timezone", "America/Toronto")
@@ -364,6 +365,10 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                             "google_client_id": data.get("google_client_id", ""),
                             "google_client_secret": data.get("google_client_secret", ""),
                             "google_refresh_token": data.get("google_refresh_token", ""),
+                        },
+                        "mcp_integration": {
+                            "mcp_server_url": mcp_universal.get("mcp_server_url", "https://rube.app/mcp"),
+                            "mcp_universal": mcp_universal  # For OAuth status
                         }
                     }
                 else:
@@ -385,6 +390,10 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                             "google_client_id": "",
                             "google_client_secret": "",
                             "google_refresh_token": "",
+                        },
+                        "mcp_integration": {
+                            "mcp_server_url": "https://rube.app/mcp",
+                            "mcp_universal": {}
                         }
                     }
             except Exception as e:
@@ -406,6 +415,10 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                         "google_client_id": "",
                         "google_client_secret": "",
                         "google_refresh_token": "",
+                    },
+                    "mcp_integration": {
+                        "mcp_server_url": "https://rube.app/mcp",
+                        "mcp_universal": {}
                     }
                 }
 

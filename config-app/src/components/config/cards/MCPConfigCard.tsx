@@ -167,8 +167,8 @@ export function MCPConfigCard({
   const loadOAuthStatus = async () => {
     try {
       if (isGlobal) {
-        // Global OAuth: check values.mcp_universal (from user_secrets)
-        const mcp_universal = values.mcp_universal;
+        // Global OAuth: check values[sectionKey].mcp_universal (from user_secrets)
+        const mcp_universal = values[sectionKey]?.mcp_universal;
         if (mcp_universal?.oauth_tokens?.access_token) {
           setOauthStatus('connected');
           setConnectedApps([mcp_universal.provider || 'MCP Server']);

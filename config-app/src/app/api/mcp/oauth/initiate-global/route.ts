@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
       clerk_id: userId,
       mcp_url,
       provider,
-      client_id,
-      is_global: true // Mark as global OAuth (not agent-specific)
+      client_id
+      // Note: agent_id is omitted for global OAuth (stored in user_secrets)
     });
 
     // 10. Get default scopes for provider

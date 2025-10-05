@@ -237,25 +237,7 @@ async def multi_tool_rube_agent_node(
     api_keys = get_api_keys_from_config(config)
     user_id = api_keys["user_id"]
 
-    logger.info(f"[multi_tool_rube_agent_node] Loading for user: {user_id}")
-
-    # Load MCP URL from Supabase at runtime
-    from utils.config_utils import get_agent_config_from_supabase, get_user_secrets_from_supabase
-
-    agent_config = get_agent_config_from_supabase(user_id, "multi_tool_rube_agent")
-    mcp_integration = agent_config.get("mcp_integration", {})
-    mcp_url = mcp_integration.get("mcp_server_url")
-
-    # Load Rube auth token from user_secrets (global credentials)
-    user_secrets = get_user_secrets_from_supabase(user_id)
-    auth_token = user_secrets.get("rube_token")  # Rube auth token from Global Environment
-
-    logger.info(
-        f"[multi_tool_rube_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}"
-    )
-    logger.info(
-        f"[multi_tool_rube_agent_node] Rube auth token: {'Present' if auth_token else 'Missing'}"
-    )
+    logger.info(f"[multi_tool_rube_agent_node] Loading OAuth-enabled tools for user: {user_id}")
 
     # Create Rube model
     rube_model = ChatAnthropic(
@@ -265,63 +247,23 @@ async def multi_tool_rube_agent_node(
         streaming=False,
     )
 
-    # Load MCP tools dynamically
-    tools = []
-    if mcp_url:
-        try:
-            logger.info(
-                f"[multi_tool_rube_agent_node] Loading MCP tools from: {mcp_url}"
-            )
-
-            # Import MCP client
-            from langchain_mcp_adapters.client import MultiServerMCPClient
-
-            # Create MCP client with user-specific URL
-            mcp_config = {"rube": {"url": mcp_url, "transport": "streamable_http"}}
-
-            # Add auth token if provided
-            if auth_token:
-                mcp_config["rube"]["headers"] = {
-                    "Authorization": f"Bearer {auth_token}"
-                }
-
-            client = MultiServerMCPClient(mcp_config)
-            tools = await client.get_tools()
-
-            logger.info(
-                f"[multi_tool_rube_agent_node] Loaded {len(tools)} tools: {[t.name for t in tools]}"
-            )
-        except Exception as e:
-            logger.error(f"[multi_tool_rube_agent_node] Failed to load MCP tools: {e}")
-            import traceback
-
-            traceback.print_exc()
-            tools = []
-    else:
-        logger.warning(
-            f"[multi_tool_rube_agent_node] No MCP URL configured for user {user_id}"
-        )
-
-    # Filter to useful Rube tools (if we loaded any)
-    if tools:
-        useful_tools = [
-            tool
-            for tool in tools
-            if hasattr(tool, "name")
-            and tool.name
-            in {
-                "RUBE_SEARCH_TOOLS",
-                "RUBE_MULTI_EXECUTE_TOOL",
-                "RUBE_CREATE_PLAN",
-                "RUBE_MANAGE_CONNECTIONS",
-                "RUBE_REMOTE_WORKBENCH",
-                "RUBE_REMOTE_BASH_TOOL",
-            }
-        ]
+    # Load tools using OAuth-aware function (supports per-user tokens from Supabase)
+    try:
         logger.info(
-            f"[multi_tool_rube_agent_node] Filtered to {len(useful_tools)} useful tools"
+            f"[multi_tool_rube_agent_node] Loading tools with OAuth support for user: {user_id}"
         )
-    else:
+
+        from multi_tool_rube_agent.tools import get_agent_simple_tools
+
+        useful_tools = get_agent_simple_tools(user_id=user_id)
+
+        logger.info(
+            f"[multi_tool_rube_agent_node] Loaded {len(useful_tools)} tools: {[t.name for t in useful_tools]}"
+        )
+    except Exception as e:
+        logger.error(f"[multi_tool_rube_agent_node] Failed to load tools: {e}")
+        import traceback
+        traceback.print_exc()
         useful_tools = []
 
     # Create agent prompt

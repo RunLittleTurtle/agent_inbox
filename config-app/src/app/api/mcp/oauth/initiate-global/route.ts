@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generatePKCE, generateState, inferProvider, getDefaultScopes, discoverOAuthMetadata } from '@/lib/oauth-utils';
+import { generatePKCE, generateState, inferProvider, getDefaultScopes, discoverOAuthMetadata, registerClient } from '@/lib/oauth-utils';
 import { createClient } from '@supabase/supabase-js';
 import { auth } from '@clerk/nextjs/server';
 
@@ -47,17 +47,34 @@ export async function POST(request: NextRequest) {
     const metadata = await discoverOAuthMetadata(mcp_url);
     console.log('[Global OAuth Init] Discovered OAuth metadata:', metadata.authorization_endpoint);
 
-    // 7. Get client_id from environment
-    const client_id = process.env.MCP_CLIENT_ID;
+    // 7. Dynamic client registration (if registration endpoint exists)
+    let client_id = process.env.MCP_CLIENT_ID;
+
+    if (metadata.registration_endpoint && !client_id) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004';
+      const callback_url = `${appUrl}/api/mcp/oauth/callback-global`;
+
+      const registration = await registerClient(metadata.registration_endpoint, {
+        client_name: `Agent Inbox - Global MCP`,
+        redirect_uris: [callback_url],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none' // Public client with PKCE
+      });
+
+      client_id = registration.client_id;
+
+      console.log(`[Global OAuth] Registered client: ${client_id}`);
+    }
+
     if (!client_id) {
-      throw new Error('MCP_CLIENT_ID not configured');
+      throw new Error('No client_id available. Set MCP_CLIENT_ID in .env or enable dynamic registration');
     }
 
     // 8. Build callback URL (global endpoint)
     const callback_url = `${process.env.NEXT_PUBLIC_APP_URL}/api/mcp/oauth/callback-global`;
 
     // 9. Store PKCE state in Supabase for later verification
-    // We'll store this temporarily in a global_oauth_states table or session
     const { error: stateError } = await supabase
       .from('oauth_states')
       .upsert({
@@ -66,6 +83,7 @@ export async function POST(request: NextRequest) {
         code_verifier: pkceParams.code_verifier,
         mcp_url,
         provider,
+        client_id, // Store client_id for callback
         is_global: true, // Mark as global OAuth (not agent-specific)
         created_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 min expiry

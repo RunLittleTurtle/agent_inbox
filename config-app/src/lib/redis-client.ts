@@ -79,6 +79,7 @@ export interface OAuthState {
   agent_id: string;
   mcp_url: string;
   provider: string;
+  client_id: string;
 }
 
 export async function storeOAuthState(

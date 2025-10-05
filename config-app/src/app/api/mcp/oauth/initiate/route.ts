@@ -82,7 +82,8 @@ export async function POST(req: NextRequest) {
       clerk_id: userId,
       agent_id,
       mcp_url,
-      provider: inferredProvider
+      provider: inferredProvider,
+      client_id
     });
 
     // 9. Build authorization URL

@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const { code_verifier, clerk_id, agent_id, mcp_url, provider } = sessionData;
+    const { code_verifier, clerk_id, agent_id, mcp_url, provider, client_id } = sessionData;
 
     // 3. Discover token endpoint
     const metadata = await discoverOAuthMetadata(mcp_url);
@@ -49,9 +49,6 @@ export async function GET(req: NextRequest) {
     // 4. Exchange authorization code for tokens
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004';
     const callback_url = `${appUrl}/api/mcp/oauth/callback`;
-
-    // Get client_id (from env or dynamic registration)
-    const client_id = process.env.MCP_CLIENT_ID || searchParams.get('client_id');
 
     if (!client_id) {
       return new NextResponse(renderErrorPage('No client_id available'), {

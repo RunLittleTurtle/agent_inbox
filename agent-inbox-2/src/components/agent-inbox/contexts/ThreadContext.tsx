@@ -502,7 +502,7 @@ export function ThreadsProvider<
             runConfig.configurable.openai_api_key = userSecrets.openai_api_key;
             runConfig.configurable.anthropic_api_key = userSecrets.anthropic_api_key;
 
-            logger.info("Using user-specific API keys for agent execution");
+            logger.log("Using user-specific API keys for agent execution");
           }
         }
 

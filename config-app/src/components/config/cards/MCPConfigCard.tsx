@@ -272,7 +272,7 @@ export function MCPConfigCard({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* OAuth Connection Status */}
-        {sectionKey === 'mcp_integration' && agentId && (
+        {sectionKey === 'mcp_integration' && (
           <div className="space-y-3 pb-4 border-b border-green-200">
             {oauthStatus === 'connected' ? (
               <Alert className="bg-green-100 border-green-300">

@@ -1,136 +1,124 @@
 /**
  * Global MCP OAuth Callback (user_secrets)
  * Handles OAuth callback and stores tokens in user_secrets.mcp_universal
+ * EXACT same pattern as per-agent callback, but stores in user_secrets
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getOAuthState, deleteOAuthState } from '@/lib/redis-client';
+import { discoverOAuthMetadata } from '@/lib/oauth-utils';
+import { encrypt } from '@/lib/encryption';
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
 
-// Supabase client with service role key
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
-
-// Encryption utilities (same as Python mcp_auth.py)
-function getEncryptionKey(): Buffer {
-  const keyHex = process.env.ENCRYPTION_KEY;
-  if (!keyHex || keyHex.length !== 64) {
-    throw new Error('ENCRYPTION_KEY must be 64 hex characters (32 bytes)');
-  }
-  return Buffer.from(keyHex, 'hex');
-}
-
-function encryptToken(text: string): string {
-  const key = getEncryptionKey();
-  const iv = crypto.randomBytes(16); // 16 bytes for GCM
-
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-
-  // Format: iv:authTag:encrypted (all hex)
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
-}
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
+    // 1. Extract code and state from query parameters
+    const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
 
-    // 1. Handle OAuth errors
+    // Check for OAuth error
     if (error) {
-      console.error('[Global OAuth Callback] OAuth error:', error);
-      return new NextResponse(
-        `<html><body><script>window.opener.postMessage({type: 'mcp_oauth_error', error: '${error}'}, '*'); window.close();</script></body></html>`,
-        { headers: { 'Content-Type': 'text/html' } }
-      );
+      console.error(`[Global OAuth Callback] Error: ${error} - ${errorDescription}`);
+      return new NextResponse(renderErrorPage(errorDescription || error), {
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
 
     if (!code || !state) {
-      return NextResponse.json({ error: 'Missing code or state' }, { status: 400 });
+      return new NextResponse(renderErrorPage('Missing code or state parameter'), {
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
 
-    console.log('[Global OAuth Callback] Received code and state');
+    // 2. Retrieve and validate state from Redis (SAME as multi-tool)
+    const sessionData = await getOAuthState(state);
 
-    // 2. Retrieve stored PKCE state
-    const { data: storedState, error: stateError } = await supabase
-      .from('oauth_states')
-      .select('*')
-      .eq('state', state)
-      .eq('is_global', true)
-      .single();
-
-    if (stateError || !storedState) {
-      console.error('[Global OAuth Callback] Invalid state:', stateError);
-      return new NextResponse(
-        `<html><body><script>window.opener.postMessage({type: 'mcp_oauth_error', error: 'Invalid state'}, '*'); window.close();</script></body></html>`,
-        { headers: { 'Content-Type': 'text/html' } }
-      );
+    if (!sessionData) {
+      return new NextResponse(renderErrorPage('Invalid or expired state. Please try again.'), {
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
 
-    const { clerk_id, code_verifier, mcp_url, provider } = storedState;
+    const { code_verifier, clerk_id, mcp_url, provider, client_id } = sessionData;
 
     console.log(`[Global OAuth Callback] Found state for user ${clerk_id}`);
 
-    // 3. Discover token endpoint from MCP server
-    const metadataUrl = `${mcp_url.split('/mcp')[0]}/.well-known/oauth-authorization-server`;
-    const metadataResponse = await fetch(metadataUrl);
-    if (!metadataResponse.ok) {
-      throw new Error('Failed to fetch OAuth metadata');
+    // 3. Discover token endpoint
+    const metadata = await discoverOAuthMetadata(mcp_url);
+
+    // 4. Exchange authorization code for tokens
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004';
+    const callback_url = `${appUrl}/api/mcp/oauth/callback-global`;
+
+    if (!client_id) {
+      return new NextResponse(renderErrorPage('No client_id available'), {
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
-    const metadata = await metadataResponse.json();
-    const tokenEndpoint = metadata.token_endpoint;
 
-    // 4. Exchange authorization code for tokens (with PKCE)
-    const callback_url = `${process.env.NEXT_PUBLIC_APP_URL}/api/mcp/oauth/callback-global`;
-    const client_id = process.env.MCP_CLIENT_ID!;
-
-    const tokenResponse = await fetch(tokenEndpoint, {
+    const tokenResponse = await fetch(metadata.token_endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
         redirect_uri: callback_url,
-        client_id,
         code_verifier,
-        resource: mcp_url
+        client_id,
+        resource: mcp_url // Required by RFC 8707
       })
     });
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('[Global OAuth Callback] Token exchange failed:', errorText);
-      throw new Error(`Token exchange failed: ${errorText}`);
+      return new NextResponse(renderErrorPage('Token exchange failed'), {
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
 
     const tokens = await tokenResponse.json();
-    console.log('[Global OAuth Callback] Token exchange successful');
 
-    // 5. Encrypt tokens
-    const encryptedAccessToken = encryptToken(tokens.access_token);
-    const encryptedRefreshToken = encryptToken(tokens.refresh_token);
+    // 5. Encrypt tokens before storing (SAME as multi-tool)
+    const encryptedAccessToken = encrypt(tokens.access_token);
+    const encryptedRefreshToken = tokens.refresh_token
+      ? encrypt(tokens.refresh_token)
+      : null;
 
-    // 6. Calculate expiry
-    const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString();
+    // 6. Calculate token expiration
+    const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000));
 
-    // 7. Store in user_secrets.mcp_universal (GLOBAL)
+    // 7. Store encrypted tokens in Supabase user_secrets (GLOBAL)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!
+    );
+
+    // Build mcp_universal object
     const mcp_universal = {
       provider,
       mcp_server_url: mcp_url,
       oauth_tokens: {
         access_token: encryptedAccessToken,
         refresh_token: encryptedRefreshToken,
-        expires_at: expiresAt,
-        token_type: tokens.token_type || 'Bearer'
+        token_type: tokens.token_type || 'Bearer',
+        expires_at: expiresAt.toISOString(),
+        scopes: tokens.scope?.split(' ') || []
+      },
+      provider_metadata: {
+        provider,
+        connected_at: new Date().toISOString(),
+        issuer: metadata.issuer
       }
     };
 
-    const { error: updateError } = await supabase
+    // Upsert user_secrets
+    await supabase
       .from('user_secrets')
       .upsert({
         clerk_id,
@@ -139,27 +127,151 @@ export async function GET(request: NextRequest) {
         onConflict: 'clerk_id'
       });
 
-    if (updateError) {
-      console.error('[Global OAuth Callback] Error saving tokens:', updateError);
-      throw updateError;
-    }
+    // 8. Clean up state from Redis (SAME as multi-tool)
+    await deleteOAuthState(state);
 
-    console.log('[Global OAuth Callback] Tokens saved to user_secrets.mcp_universal');
+    console.log(`[Global OAuth] Successfully connected to ${provider}`);
 
-    // 8. Clean up state
-    await supabase.from('oauth_states').delete().eq('state', state);
-
-    // 9. Return success to popup
-    return new NextResponse(
-      `<html><body><script>window.opener.postMessage({type: 'mcp_oauth_complete'}, '*'); window.close();</script></body></html>`,
-      { headers: { 'Content-Type': 'text/html' } }
-    );
+    // 9. Return success page that closes popup
+    return new NextResponse(renderSuccessPage(), {
+      headers: { 'Content-Type': 'text/html' }
+    });
 
   } catch (error: any) {
     console.error('[Global OAuth Callback] Error:', error);
-    return new NextResponse(
-      `<html><body><script>window.opener.postMessage({type: 'mcp_oauth_error', error: '${error.message}'}, '*'); window.close();</script></body></html>`,
-      { headers: { 'Content-Type': 'text/html' } }
-    );
+
+    return new NextResponse(renderErrorPage(error.message), {
+      headers: { 'Content-Type': 'text/html' }
+    });
   }
+}
+
+/**
+ * Render success page that closes popup and notifies parent window
+ */
+function renderSuccessPage(): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Apps Connected</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+          .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          }
+          h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+          }
+          p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+          }
+          .checkmark {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="checkmark">✓</div>
+          <h1>Apps Connected Successfully!</h1>
+          <p>You can close this window now.</p>
+        </div>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({ type: 'mcp_oauth_complete' }, '*');
+            setTimeout(() => window.close(), 1500);
+          }
+        </script>
+      </body>
+    </html>
+  `;
+}
+
+/**
+ * Render error page that notifies parent window
+ */
+function renderErrorPage(error: string): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Connection Failed</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+          }
+          .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+          }
+          h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+          }
+          p {
+            font-size: 1rem;
+            opacity: 0.9;
+            word-wrap: break-word;
+          }
+          .error-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="error-icon">✗</div>
+          <h1>Connection Failed</h1>
+          <p>${error}</p>
+          <p style="margin-top: 1rem; font-size: 0.9rem;">This window will close automatically.</p>
+        </div>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'mcp_oauth_error',
+              error: '${error.replace(/'/g, "\\'")}'
+            }, '*');
+            setTimeout(() => window.close(), 3000);
+          }
+        </script>
+      </body>
+    </html>
+  `;
 }

@@ -5,14 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generatePKCE, generateState, inferProvider, getDefaultScopes, discoverOAuthMetadata, registerClient } from '@/lib/oauth-utils';
-import { createClient } from '@supabase/supabase-js';
+import { storeOAuthState } from '@/lib/redis-client';
 import { auth } from '@clerk/nextjs/server';
-
-// Supabase client with service role key (bypasses RLS for server operations)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,25 +68,15 @@ export async function POST(request: NextRequest) {
     // 8. Build callback URL (global endpoint)
     const callback_url = `${process.env.NEXT_PUBLIC_APP_URL}/api/mcp/oauth/callback-global`;
 
-    // 9. Store PKCE state in Supabase for later verification
-    const { error: stateError } = await supabase
-      .from('oauth_states')
-      .upsert({
-        state,
-        clerk_id: userId,
-        code_verifier: pkceParams.code_verifier,
-        mcp_url,
-        provider,
-        client_id, // Store client_id for callback
-        is_global: true, // Mark as global OAuth (not agent-specific)
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 min expiry
-      });
-
-    if (stateError) {
-      console.error('[Global OAuth Init] Error storing state:', stateError);
-      throw stateError;
-    }
+    // 9. Store PKCE state in Redis (10 min TTL) - SAME as multi-tool
+    await storeOAuthState(state, {
+      code_verifier: pkceParams.code_verifier,
+      clerk_id: userId,
+      mcp_url,
+      provider,
+      client_id,
+      is_global: true // Mark as global OAuth (not agent-specific)
+    });
 
     // 10. Get default scopes for provider
     const scopes = getDefaultScopes(provider);

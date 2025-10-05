@@ -12,17 +12,17 @@ export function NavigationLinks() {
   const links: NavigationLink[] = [
     {
       name: "Chat",
-      url: process.env.NEXT_PUBLIC_CHAT_URL || "https://agent-chat-ui-2.vercel.app",
+      url: process.env.NEXT_PUBLIC_CHAT_URL || "https://chat.mekanize.app",
       key: "chat",
     },
     {
       name: "Inbox",
-      url: process.env.NEXT_PUBLIC_INBOX_URL || "https://agent-inbox-2.vercel.app",
+      url: process.env.NEXT_PUBLIC_INBOX_URL || "https://inbox.mekanize.app",
       key: "inbox",
     },
     {
       name: "Config",
-      url: process.env.NEXT_PUBLIC_CONFIG_URL || "https://config-app.vercel.app",
+      url: process.env.NEXT_PUBLIC_CONFIG_URL || "https://config.mekanize.app",
       key: "config",
     },
   ];
@@ -32,15 +32,15 @@ export function NavigationLinks() {
     if (typeof window === "undefined") return null;
 
     const hostname = window.location.hostname;
-    const pathname = window.location.pathname;
 
-    if (hostname.includes("agent-chat") || hostname.includes("agentchat")) {
+    // Check for custom domains first (most specific)
+    if (hostname === "chat.mekanize.app" || hostname.includes("agent-chat")) {
       return "chat";
     }
-    if (hostname.includes("agent-inbox")) {
+    if (hostname === "inbox.mekanize.app" || hostname.includes("agent-inbox")) {
       return "inbox";
     }
-    if (hostname.includes("config")) {
+    if (hostname === "config.mekanize.app" || hostname.includes("config-app")) {
       return "config";
     }
 

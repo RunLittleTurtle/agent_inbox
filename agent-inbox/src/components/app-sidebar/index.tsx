@@ -10,7 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { FileText, UploadCloud, House } from "lucide-react";
+import { FileText, UploadCloud, House, Plus, RotateCcw } from "lucide-react";
 import { agentInboxSvg } from "../agent-inbox/components/agent-inbox-logo";
 import { SettingsPopover } from "../agent-inbox/components/settings-popover";
 import { PillButton } from "../ui/pill-button";
@@ -35,10 +35,17 @@ import { useLocalStorage } from "../agent-inbox/hooks/use-local-storage";
 import { DropdownDialogMenu } from "../agent-inbox/components/dropdown-and-dialog";
 
 export function AppSidebar() {
-  const { agentInboxes, changeAgentInbox, deleteAgentInbox } =
+  const { agentInboxes, changeAgentInbox, deleteAgentInbox, createDefaultInboxes } =
     useThreadsContext();
   const [langchainApiKey, setLangchainApiKey] = React.useState("");
   const { getItem, setItem } = useLocalStorage();
+
+  // Check if default inboxes exist
+  const defaultGraphIds = ["agent", "executive-ai-assistant"];
+  const hasDefaults = defaultGraphIds.every(graphId =>
+    agentInboxes.some(inbox => inbox.graphId === graphId)
+  );
+  const showDefaultsButton = agentInboxes.length === 0 || !hasDefaults;
 
   React.useEffect(() => {
     try {
@@ -75,6 +82,24 @@ export function AppSidebar() {
           <SidebarGroupContent className="h-full">
             <SidebarMenu className="flex flex-col gap-2 justify-between h-full">
               <div className="flex flex-col gap-2 pl-7">
+                {showDefaultsButton && (
+                  <button
+                    onClick={createDefaultInboxes}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                  >
+                    {agentInboxes.length === 0 ? (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        <span>Add Default Inboxes</span>
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="w-4 h-4" />
+                        <span>Restore Default Inboxes</span>
+                      </>
+                    )}
+                  </button>
+                )}
                 {agentInboxes.map((item, idx) => {
                   const label = item.name || prettifyText(item.graphId);
                   const isDeployed = isDeployedUrl(item.deploymentUrl);

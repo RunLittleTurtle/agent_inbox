@@ -335,6 +335,49 @@ export function useInboxes() {
     [router, toast, getAgentInboxes]
   );
 
+  /**
+   * Create default inboxes via Supabase API
+   * Called when user clicks "Add Default Inboxes" button
+   */
+  const createDefaultInboxes = useCallback(
+    async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_CONFIG_URL || 'http://localhost:8000'}/api/config/inboxes/defaults`, {
+          method: "POST",
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to create default inboxes");
+        }
+
+        const data = await response.json();
+        logger.log("Default inboxes created successfully:", data);
+
+        toast({
+          title: "Success",
+          description: data.message || "Default inboxes created successfully",
+          duration: 3000,
+        });
+
+        // Reload inboxes from Supabase
+        await getAgentInboxes();
+
+        router.refresh();
+      } catch (error) {
+        logger.error("Error creating default inboxes", error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to create default inboxes",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    },
+    [toast, getAgentInboxes, router]
+  );
+
   return {
     agentInboxes,
     getAgentInboxes,
@@ -342,5 +385,6 @@ export function useInboxes() {
     deleteAgentInbox,
     changeAgentInbox,
     updateAgentInbox,
+    createDefaultInboxes,
   };
 }

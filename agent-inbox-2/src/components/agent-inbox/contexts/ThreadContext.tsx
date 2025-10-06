@@ -50,6 +50,7 @@ type ThreadContentType<
     response: HumanResponse[],
     options?: {
       stream?: TStream;
+      clerkToken?: string | null;
     }
   ) => TStream extends true
     ?
@@ -97,6 +98,19 @@ const getClient = ({ agentInboxes, getItem, toast, clerkToken }: GetClientArgs) 
     return;
   }
 
+  // Validate that deploymentUrl is a valid URL
+  try {
+    new URL(deploymentUrl);
+  } catch (_error) {
+    toast({
+      title: "Error",
+      description: `Invalid deployment URL: ${deploymentUrl}. Please check your inbox configuration.`,
+      variant: "destructive",
+      duration: 5000,
+    });
+    return;
+  }
+
   const langchainApiKeyLS =
     getItem(LANGCHAIN_API_KEY_LOCAL_STORAGE_KEY) || undefined;
   // Only show this error if the deployment URL is for a deployed LangGraph instance.
@@ -123,7 +137,7 @@ export function ThreadsProvider<
 >({ children }: { children: React.ReactNode }): React.ReactElement {
   const { getItem } = useLocalStorage();
   const { toast } = useToast();
-  const { getToken, userId } = useAuth();
+  const { getToken, userId } = useAuth(); // Clerk JWT token + userId for config
 
   const { getSearchParam, searchParams } = useQueryParams();
   const [loading, setLoading] = React.useState(false);
@@ -138,6 +152,7 @@ export function ThreadsProvider<
     deleteAgentInbox,
     changeAgentInbox,
     updateAgentInbox,
+    createDefaultInboxes,
   } = useInboxes();
 
   const limitParam = searchParams.get(LIMIT_PARAM);
@@ -166,7 +181,9 @@ export function ThreadsProvider<
     async (inbox: ThreadStatusWithAll) => {
       setLoading(true);
 
+      // Get Clerk JWT token for LangGraph custom auth (2025)
       const clerkToken = await getToken();
+
       const client = getClient({
         agentInboxes,
         getItem,
@@ -313,12 +330,14 @@ export function ThreadsProvider<
       }
       setLoading(false);
     },
-    [agentInboxes, getItem, getSearchParam, toast, getToken]
+    [agentInboxes, getItem, getSearchParam, toast]
   );
 
   const fetchSingleThread = React.useCallback(
     async (threadId: string): Promise<ThreadData<ThreadValues> | undefined> => {
+      // Get Clerk JWT token for LangGraph custom auth (2025)
       const clerkToken = await getToken();
+
       const client = getClient({
         agentInboxes,
         getItem,
@@ -384,11 +403,13 @@ export function ThreadsProvider<
         invalidSchema: undefined,
       };
     },
-    [agentInboxes, getItem, getSearchParam, getToken]
+    [agentInboxes, getItem, getSearchParam]
   );
 
   const ignoreThread = async (threadId: string) => {
+    // Get Clerk JWT token for LangGraph custom auth (2025)
     const clerkToken = await getToken();
+
     const client = getClient({
       agentInboxes,
       getItem,
@@ -543,6 +564,7 @@ export function ThreadsProvider<
     changeAgentInbox,
     addAgentInbox,
     updateAgentInbox,
+    createDefaultInboxes,
     ignoreThread,
     sendHumanResponse,
     fetchThreads,

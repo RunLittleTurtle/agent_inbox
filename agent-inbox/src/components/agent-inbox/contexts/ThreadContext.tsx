@@ -152,6 +152,7 @@ export function ThreadsProvider<
     deleteAgentInbox,
     changeAgentInbox,
     updateAgentInbox,
+    createDefaultInboxes,
   } = useInboxes();
 
   const limitParam = searchParams.get(LIMIT_PARAM);
@@ -563,6 +564,7 @@ export function ThreadsProvider<
     changeAgentInbox,
     addAgentInbox,
     updateAgentInbox,
+    createDefaultInboxes,
     ignoreThread,
     sendHumanResponse,
     fetchThreads,

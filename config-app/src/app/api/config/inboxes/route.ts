@@ -38,18 +38,15 @@ const DEFAULT_INBOXES = [
 /**
  * GET /api/config/inboxes
  * Fetch user's inboxes from Supabase
- * Auto-creates default inboxes on first request
+ * No auto-creation - user must explicitly create defaults
  */
 export async function GET() {
   try {
-    const { userId, sessionClaims } = await auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    // Extract email from JWT for inbox tracking
-    const email = (sessionClaims?.email as string) || null;
 
     const supabase = createServerSupabaseClient(userId);
 
@@ -68,43 +65,10 @@ export async function GET() {
       );
     }
 
-    // If user has no inboxes, auto-create defaults
-    if (!existingInboxes || existingInboxes.length === 0) {
-      console.log(`[Auto-Create] Creating default inboxes for user ${userId}`);
-
-      const inboxesToCreate = DEFAULT_INBOXES.map((inbox) => ({
-        clerk_id: userId,
-        email,
-        ...inbox,
-      }));
-
-      const { data: createdInboxes, error: createError } = await supabase
-        .from("user_inboxes")
-        .insert(inboxesToCreate)
-        .select();
-
-      if (createError) {
-        console.error("Error creating default inboxes:", createError);
-        return NextResponse.json(
-          { error: "Failed to create default inboxes" },
-          { status: 500 }
-        );
-      }
-
-      console.log(`[Auto-Create] Created ${createdInboxes.length} default inboxes`);
-
-      return NextResponse.json({
-        success: true,
-        inboxes: createdInboxes,
-        isFirstTime: true,
-      });
-    }
-
-    // Return existing inboxes
+    // Return inboxes (empty array if none exist)
     return NextResponse.json({
       success: true,
-      inboxes: existingInboxes,
-      isFirstTime: false,
+      inboxes: existingInboxes || [],
     });
   } catch (error) {
     console.error("Error in GET /api/config/inboxes:", error);

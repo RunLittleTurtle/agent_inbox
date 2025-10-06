@@ -2,7 +2,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryParams } from "./use-query-params";
 import {
   AGENT_INBOX_PARAM,
-  NO_INBOXES_FOUND_PARAM,
   OFFSET_PARAM,
   LIMIT_PARAM,
   INBOX_PARAM,
@@ -359,7 +358,7 @@ export function useInboxes() {
           try {
             const errorJson = JSON.parse(errorText);
             errorMessage = errorJson.error || errorMessage;
-          } catch (e) {
+          } catch (_e) {
             // Not JSON, use the text
             errorMessage = errorText || errorMessage;
           }

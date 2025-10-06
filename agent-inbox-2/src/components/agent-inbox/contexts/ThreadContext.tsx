@@ -42,6 +42,7 @@ type ThreadContentType<
   changeAgentInbox: (graphId: string, replaceAll?: boolean) => void;
   addAgentInbox: (agentInbox: AgentInbox) => void;
   updateAgentInbox: (updatedInbox: AgentInbox) => void;
+  createDefaultInboxes: () => Promise<void>;
   ignoreThread: (threadId: string) => Promise<void>;
   fetchThreads: (inbox: ThreadStatusWithAll) => Promise<void>;
   clearThreadData: () => void;

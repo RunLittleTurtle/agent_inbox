@@ -65,10 +65,10 @@ CONFIG_SECTIONS = [
         'fields': [
             {
                 'key': 'langsmith_api_key',
-                'label': 'LangSmith API Key',
+                'label': 'LangSmith API Key (Developer Only)',
                 'type': 'password',
                 'envVar': 'LANGSMITH_API_KEY',
-                'description': 'API key for LangSmith monitoring and tracing',
+                'description': 'API key for LangSmith monitoring and tracing (for admin/developer use)',
                 'placeholder': 'lsv2_pt_...'
             },
             {
@@ -83,27 +83,64 @@ CONFIG_SECTIONS = [
         ]
     },
     {
+        'key': 'langfuse_system',
+        'label': 'LangFuse (User Tracing)',
+        'description': 'Per-user trace visibility and analytics - users see only their own traces',
+        'fields': [
+            {
+                'key': 'langfuse_public_key',
+                'label': 'LangFuse Public Key',
+                'type': 'text',
+                'envVar': 'LANGFUSE_PUBLIC_KEY',
+                'description': 'Public API key for LangFuse tracing (safe to expose)',
+                'placeholder': 'pk-lf-...',
+                'note': 'Get from LangFuse dashboard: Settings → API Keys'
+            },
+            {
+                'key': 'langfuse_secret_key',
+                'label': 'LangFuse Secret Key',
+                'type': 'password',
+                'envVar': 'LANGFUSE_SECRET_KEY',
+                'description': 'Secret API key for LangFuse tracing (keep secure)',
+                'placeholder': 'sk-lf-...',
+                'note': 'Keep this secret - stored encrypted in database'
+            },
+            {
+                'key': 'langfuse_host',
+                'label': 'LangFuse Host URL',
+                'type': 'text',
+                'envVar': 'LANGFUSE_HOST',
+                'default': 'https://cloud.langfuse.com',
+                'description': 'LangFuse server URL (cloud or self-hosted)',
+                'placeholder': 'https://cloud.langfuse.com',
+                'note': 'Use https://cloud.langfuse.com for cloud, or your Railway URL for self-hosted'
+            }
+        ]
+    },
+    {
         'key': 'google_workspace',
-        'label': 'Google Workspace Integration',
-        'description': 'OAuth credentials for Gmail, Calendar, and Google services (stored securely in user_secrets table)',
+        'label': 'Google Workspace OAuth (Admin)',
+        'description': 'Global OAuth credentials - configure once, all users authenticate through these credentials',
         'fields': [
             {
                 'key': 'google_client_id',
                 'label': 'Google Client ID',
                 'type': 'text',
-                'description': 'OAuth 2.0 client ID for Google services',
-                'placeholder': '443821363207-e017ea00dg7kt4g6tn3uqa54ctp18uf2.apps.googleusercontent.com',
+                'envVar': 'GOOGLE_CLIENT_ID',
+                'description': 'OAuth 2.0 client ID from your Google Cloud project',
+                'placeholder': 'xxx.apps.googleusercontent.com',
                 'required': True,
-                'note': 'From Google Cloud Console OAuth 2.0 client credentials'
+                'note': 'From Google Cloud Console → APIs & Services → Credentials'
             },
             {
                 'key': 'google_client_secret',
                 'label': 'Google Client Secret',
                 'type': 'password',
-                'description': 'OAuth 2.0 client secret for Google services',
+                'envVar': 'GOOGLE_CLIENT_SECRET',
+                'description': 'OAuth 2.0 client secret from your Google Cloud project',
                 'placeholder': 'GOCSPX-...',
                 'required': True,
-                'note': 'Keep this secret secure - stored encrypted in database'
+                'note': 'Keep this secret - only visible to administrators'
             }
         ]
     },
@@ -132,6 +169,37 @@ CONFIG_SECTIONS = [
                 'default': 'https://rube.app/mcp',
                 'required': True,
                 'note': 'Rube provides unified access to 500+ apps through OAuth 2.1'
+            }
+        ]
+    },
+    {
+        'key': 'langgraph_deployment',
+        'label': 'LangGraph Deployment URLs',
+        'description': 'Production deployment URLs for Agent Inbox integration',
+        'fields': [
+            {
+                'key': 'agent_inbox_deployment_url',
+                'label': 'Agent Inbox Deployment URL',
+                'type': 'text',
+                'envVar': 'AGENT_INBOX_DEPLOYMENT_URL',
+                'default': 'https://multi-agent-app-1d1e061875eb5640a47e3bb201edb076.us.langgraph.app',
+                'readonly': True,
+                'description': 'LangGraph deployment URL for agent inbox (read-only)',
+                'placeholder': 'https://multi-agent-app-xxx.us.langgraph.app',
+                'required': True,
+                'note': 'This URL is auto-populated in Agent Inbox UI for default inboxes'
+            },
+            {
+                'key': 'executive_deployment_url',
+                'label': 'Executive AI Deployment URL',
+                'type': 'text',
+                'envVar': 'EXECUTIVE_DEPLOYMENT_URL',
+                'default': 'https://multi-agent-app-1d1e061875eb5640a47e3bb201edb076.us.langgraph.app',
+                'readonly': True,
+                'description': 'LangGraph deployment URL for executive assistant (read-only)',
+                'placeholder': 'https://multi-agent-app-xxx.us.langgraph.app',
+                'required': True,
+                'note': 'This URL is auto-populated in Agent Inbox UI for default inboxes'
             }
         ]
     }

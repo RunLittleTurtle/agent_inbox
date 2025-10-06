@@ -1,0 +1,10 @@
+{
+  "dependencies": ["./pyproject.toml"],
+  "graphs": {
+    "main": "./eaia/app.py:app",
+    "cron": "./eaia/cron_graph.py:cron_app",
+    "general_reflection": "./eaia/reflection_graphs.py:general_reflection",
+    "multi_reflection": "./eaia/reflection_graphs.py:multi_reflection"
+  },
+  "env": ".env"
+}

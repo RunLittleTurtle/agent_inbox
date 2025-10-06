@@ -364,10 +364,15 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                         "langsmith_api_key": user_data.get("langsmith_api_key", ""),
                         "langchain_project": user_data.get("langchain_project", "ambient-email-agent"),
                     },
+                    "langfuse_system": {
+                        "langfuse_public_key": user_data.get("langfuse_public_key", ""),
+                        "langfuse_secret_key": user_data.get("langfuse_secret_key", ""),
+                        "langfuse_host": user_data.get("langfuse_host", "https://cloud.langfuse.com"),
+                    },
                     "google_workspace": {
                         "google_client_id": user_data.get("google_client_id", ""),
                         "google_client_secret": user_data.get("google_client_secret", ""),
-                        # google_refresh_token hidden from UI but accessible to agents via Supabase
+                        "google_refresh_token": user_data.get("google_refresh_token", ""),  # Accessible to agents
                     },
                     "mcp_integration": {
                         "mcp_env_var": "RUBE_MCP_SERVER",
@@ -391,10 +396,15 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                         "langsmith_api_key": "",
                         "langchain_project": "ambient-email-agent",
                     },
+                    "langfuse_system": {
+                        "langfuse_public_key": "",
+                        "langfuse_secret_key": "",
+                        "langfuse_host": "https://cloud.langfuse.com",
+                    },
                     "google_workspace": {
                         "google_client_id": "",
                         "google_client_secret": "",
-                        # google_refresh_token hidden from UI but accessible to agents via Supabase
+                        "google_refresh_token": "",  # Accessible to agents
                     },
                     "mcp_integration": {
                         "mcp_env_var": "RUBE_MCP_SERVER",
@@ -532,6 +542,9 @@ async def update_config(request: UpdateConfigRequest):
                 "anthropic_api_key": "anthropic_api_key",
                 "openai_api_key": "openai_api_key",
                 "langsmith_api_key": "langsmith_api_key",
+                "langfuse_public_key": "langfuse_public_key",
+                "langfuse_secret_key": "langfuse_secret_key",
+                "langfuse_host": "langfuse_host",
                 "google_client_id": "google_client_id",
                 "google_client_secret": "google_client_secret",
                 "google_refresh_token": "google_refresh_token",

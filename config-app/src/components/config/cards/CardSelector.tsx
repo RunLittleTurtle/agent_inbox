@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { PromptCard, LLMCard, MCPConfigCard, AgentIdentityCard, CredentialsCard } from './index';
+import { PromptCard, LLMCard, MCPConfigCard, GoogleWorkspaceCard, AgentIdentityCard, CredentialsCard } from './index';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -333,10 +333,12 @@ export function CardSelector({ section, values, onValueChange, agentId, onReset,
         sectionKey.includes('credentials') ||
         sectionKey.includes('ai_models') ||
         sectionKey.includes('langgraph_system') ||
+        sectionKey.includes('langfuse_system') ||
         sectionKey.includes('google_workspace') ||
         sectionLabel.includes('api keys') ||
         sectionLabel.includes('keys') ||
         sectionLabel.includes('auth') ||
+        sectionLabel.includes('tracing') ||
         section.fields.some(field => field.key.includes('api_key') || field.key.includes('token') || field.key.includes('secret') || field.type === 'password')) {
       return 'credentials';
     }
@@ -382,6 +384,20 @@ export function CardSelector({ section, values, onValueChange, agentId, onReset,
     if (sectionKey.includes('reflection')) return 'reflection';
     return 'general';
   };
+
+  // Special case: Google Workspace uses dedicated OAuth card
+  if (section.key === 'google_workspace') {
+    return (
+      <GoogleWorkspaceCard
+        values={values}
+        onValueChange={handleValueChange}
+        sectionKey={section.key}
+        onSave={handleSave}
+        isDirty={isDirty}
+        isSaving={isSaving}
+      />
+    );
+  }
 
   const cardType = getCardType(section);
 

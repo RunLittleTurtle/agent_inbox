@@ -76,7 +76,7 @@ export interface UserSecrets {
   // Google OAuth
   google_client_id: string | null;
   google_client_secret: string | null;
-  google_refresh_token: string | null;
+  google_refresh_token: string | null; // Hidden from UI but used by agents
 
   // MCP Integration Tokens
   rube_token: string | null;

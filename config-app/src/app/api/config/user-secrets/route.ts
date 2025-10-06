@@ -58,7 +58,6 @@ export async function GET() {
         // Google OAuth
         google_client_id: maskApiKey(secrets.google_client_id),
         google_client_secret: maskApiKey(secrets.google_client_secret),
-        google_refresh_token: maskApiKey(secrets.google_refresh_token),
 
         // MCP Tokens
         rube_token: maskApiKey(secrets.rube_token),
@@ -115,7 +114,7 @@ export async function POST(request: NextRequest) {
       "langsmith_api_key",
       "google_client_id",
       "google_client_secret",
-      "google_refresh_token",
+      "google_refresh_token", // Hidden from UI but accessible programmatically
       "rube_token",
       "composio_token",
       "pipedream_token",

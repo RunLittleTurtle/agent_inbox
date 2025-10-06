@@ -367,7 +367,7 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                     "google_workspace": {
                         "google_client_id": user_data.get("google_client_id", ""),
                         "google_client_secret": user_data.get("google_client_secret", ""),
-                        "google_refresh_token": user_data.get("google_refresh_token", ""),
+                        # google_refresh_token hidden from UI but accessible to agents via Supabase
                     },
                     "mcp_integration": {
                         "mcp_env_var": "RUBE_MCP_SERVER",
@@ -394,7 +394,7 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                     "google_workspace": {
                         "google_client_id": "",
                         "google_client_secret": "",
-                        "google_refresh_token": "",
+                        # google_refresh_token hidden from UI but accessible to agents via Supabase
                     },
                     "mcp_integration": {
                         "mcp_env_var": "RUBE_MCP_SERVER",

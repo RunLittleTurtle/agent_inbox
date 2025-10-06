@@ -104,15 +104,6 @@ CONFIG_SECTIONS = [
                 'placeholder': 'GOCSPX-...',
                 'required': True,
                 'note': 'Keep this secret secure - stored encrypted in database'
-            },
-            {
-                'key': 'google_refresh_token',
-                'label': 'Google Refresh Token',
-                'type': 'password',
-                'description': 'OAuth 2.0 refresh token for Gmail and Calendar access',
-                'placeholder': '1//05q29uIyfXcBKCgYIARA...',
-                'required': True,
-                'note': 'Generated during initial OAuth setup - allows persistent Google services access'
             }
         ]
     },

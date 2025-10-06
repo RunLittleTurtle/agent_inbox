@@ -11,10 +11,13 @@ import { auth } from '@clerk/nextjs/server';
 export async function POST(request: NextRequest) {
   try {
     // 1. Get authenticated user from Clerk
-    const { userId } = await auth();
+    const { userId, sessionClaims } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Extract email from JWT for debugging
+    const email = (sessionClaims?.email as string) || undefined;
 
     // 2. Parse request body
     const body = await request.json();
@@ -72,6 +75,7 @@ export async function POST(request: NextRequest) {
     await storeOAuthState(state, {
       code_verifier: pkceParams.code_verifier,
       clerk_id: userId,
+      email,
       mcp_url,
       provider,
       client_id

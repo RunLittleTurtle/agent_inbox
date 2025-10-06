@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const { code_verifier, clerk_id, agent_id, mcp_url, provider, client_id } = sessionData;
+    const { code_verifier, clerk_id, email, agent_id, mcp_url, provider, client_id } = sessionData;
 
     // Validate required fields for per-agent OAuth
     if (!agent_id) {
@@ -137,6 +137,7 @@ export async function GET(req: NextRequest) {
       .from('agent_configs')
       .upsert({
         clerk_id,
+        email,
         agent_id,
         agent_name: agent_id.replace('_agent', ''),
         config_data: updatedConfigData

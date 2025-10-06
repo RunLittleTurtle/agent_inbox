@@ -76,6 +76,7 @@ function cleanupInMemoryStore(): void {
 export interface OAuthState {
   code_verifier: string;
   clerk_id: string;
+  email?: string; // User email for easier debugging
   agent_id?: string; // Optional for global OAuth
   mcp_url: string;
   provider: string;

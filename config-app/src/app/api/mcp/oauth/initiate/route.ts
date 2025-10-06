@@ -18,7 +18,7 @@ import { storeOAuthState } from '@/lib/redis-client';
 export async function POST(req: NextRequest) {
   try {
     // 1. Authenticate user with Clerk
-    const { userId } = await auth();
+    const { userId, sessionClaims } = await auth();
 
     if (!userId) {
       return NextResponse.json(
@@ -26,6 +26,9 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Extract email from JWT for debugging
+    const email = (sessionClaims?.email as string) || undefined;
 
     // 2. Parse request body
     const { agent_id, mcp_url, provider } = await req.json();
@@ -80,6 +83,7 @@ export async function POST(req: NextRequest) {
     await storeOAuthState(state, {
       code_verifier,
       clerk_id: userId,
+      email,
       agent_id,
       mcp_url,
       provider: inferredProvider,

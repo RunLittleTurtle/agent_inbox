@@ -24,7 +24,7 @@ import {
  */
 export async function GET() {
   try {
-    const { userId } = await auth();
+    const { userId, sessionClaims } = await auth();
 
     if (!userId) {
       return NextResponse.json(
@@ -33,8 +33,11 @@ export async function GET() {
       );
     }
 
+    // Extract email from Clerk JWT (no extra API call needed)
+    const email = (sessionClaims?.email as string) || null;
+
     const supabase = createServerSupabaseClient(userId);
-    const secrets = await getOrCreateUserSecrets(supabase, userId);
+    const secrets = await getOrCreateUserSecrets(supabase, userId, email);
 
     if (!secrets) {
       return NextResponse.json(
@@ -47,6 +50,9 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
+        // User Info (not masked)
+        email: secrets.email,
+
         // AI Model Keys (masked for security)
         openai_api_key: maskApiKey(secrets.openai_api_key),
         anthropic_api_key: maskApiKey(secrets.anthropic_api_key),

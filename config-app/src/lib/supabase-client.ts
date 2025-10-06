@@ -64,6 +64,7 @@ export function createServerSupabaseClient(clerkUserId?: string | null) {
 export interface UserSecrets {
   id: string;
   clerk_id: string;
+  email: string | null;
 
   // AI Model API Keys
   openai_api_key: string | null;
@@ -100,10 +101,12 @@ export interface UserSecrets {
  * - If user_secrets row exists, return it
  * - If not, create a new row with defaults
  * - Uses UPSERT (INSERT ... ON CONFLICT DO UPDATE) for atomicity
+ * - Captures email from Clerk JWT during creation
  */
 export async function getOrCreateUserSecrets(
   supabase: ReturnType<typeof createServerSupabaseClient>,
-  clerkUserId: string
+  clerkUserId: string,
+  email?: string | null
 ): Promise<UserSecrets | null> {
   try {
     // Try to get existing secrets
@@ -122,6 +125,7 @@ export async function getOrCreateUserSecrets(
       .from("user_secrets")
       .insert({
         clerk_id: clerkUserId,
+        email: email || null,
         timezone: "America/Toronto",
         preferred_model: "claude-3-5-sonnet-20241022",
         temperature: 0.0,

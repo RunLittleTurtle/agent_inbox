@@ -187,20 +187,20 @@ CONFIG_SECTIONS = [
                 'label': 'MCP Environment Variable',
                 'type': 'text',
                 'readonly': True,
-                'default': 'PIPEDREAM_MCP_SERVER',
-                'description': 'Name of the environment variable containing the MCP server URL (read-only)',
-                'placeholder': 'PIPEDREAM_MCP_SERVER',
+                'default': 'RUBE_MCP_SERVER',
+                'description': 'Name of the environment variable containing the Rube MCP server URL (read-only)',
+                'placeholder': 'RUBE_MCP_SERVER',
                 'required': False,
                 'note': 'This shows which environment variable is used. Configured in agent code.'
             },
             {
                 'key': 'mcp_server_url',
-                'label': 'MCP Server URL',
+                'label': 'Rube MCP Server URL',
                 'type': 'text',
-                'description': 'The MCP server URL (editable - updates .env file)',
-                'placeholder': 'https://mcp.pipedream.net/xxx/google_calendar',
+                'description': 'The Rube MCP server URL with OAuth access to 500+ apps (editable - updates .env file)',
+                'placeholder': 'https://rube.app/mcp',
                 'required': False,
-                'note': 'Editing this updates the URL in your .env file'
+                'note': 'Editing this updates the URL in your .env file. Requires OAuth authentication.'
             }
         ]
     }

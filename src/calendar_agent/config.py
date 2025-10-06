@@ -23,9 +23,9 @@ MCP_SERVICE = "google_calendar"
 # Import prompts from prompt.py following LangGraph best practices
 from .prompt import AGENT_SYSTEM_PROMPT
 
-# MCP Environment Variable - use existing variable from .env
-# The calendar agent uses the generic PIPEDREAM_MCP_SERVER variable
-MCP_ENV_VAR = "PIPEDREAM_MCP_SERVER"
+# MCP Environment Variable - use Rube MCP for universal access to 500+ apps
+# Rube provides unified MCP server with OAuth 2.1 authentication
+MCP_ENV_VAR = "RUBE_MCP_SERVER"
 
 # LLM Configuration
 # NOTE: These values are updated by the config UI. Use literal values here.
@@ -37,8 +37,11 @@ LLM_CONFIG = {
 }
 
 # MCP Server Configuration
-# Uses the existing PIPEDREAM_MCP_SERVER from .env
+# Uses RUBE_MCP_SERVER from .env for universal MCP access
 MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '')
+
+# Rube Authentication Token - for Bearer token authentication
+RUBE_AUTH_TOKEN = os.getenv("RUBE_AUTH_TOKEN", "")
 
 # User Preferences
 # Agent-specific timezone setting (set via config UI)

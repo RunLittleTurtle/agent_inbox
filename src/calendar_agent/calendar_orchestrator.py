@@ -41,6 +41,14 @@ from .state import CalendarAgentState, RoutingDecision, BookingContext
 from .prompt import get_formatted_prompt_with_context, get_no_tools_prompt, get_routing_system_prompt
 from uuid import uuid4
 
+# Import OAuth token utilities
+try:
+    from utils.mcp_auth import get_mcp_oauth_tokens_dual
+    MCP_OAUTH_AVAILABLE = True
+except ImportError:
+    print("[Warning] utils.mcp_auth not available - OAuth tokens will not be loaded")
+    MCP_OAUTH_AVAILABLE = False
+
 
 class CalendarAgentWithMCP:
     """
@@ -54,7 +62,7 @@ class CalendarAgentWithMCP:
         mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None,
         user_id: Optional[str] = None
     ):
-        from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
+        from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION, RUBE_AUTH_TOKEN
 
         # Setup logging first
         self.logger = logging.getLogger(__name__)
@@ -68,26 +76,62 @@ class CalendarAgentWithMCP:
             temperature = LLM_CONFIG.get("temperature", 0.1)
             self.model = get_llm(model_name, temperature=temperature)
 
-        # MCP server configuration - Load from Supabase per-user config
-        pipedream_url = None
+        # MCP server configuration with OAuth token support
+        rube_url = None
+        auth_token = None
 
-        if user_id:
-            # Production: Load user-specific config from Supabase
+        # Try loading OAuth tokens first (new Rube MCP method)
+        if MCP_OAUTH_AVAILABLE and user_id:
+            try:
+                self.logger.info(f"[OAUTH] Attempting to load OAuth tokens for user_id={user_id}, agent_id=calendar_agent")
+                oauth_data = get_mcp_oauth_tokens_dual(user_id, "calendar_agent")
+                if oauth_data:
+                    auth_token = oauth_data.get("access_token")
+                    rube_url = oauth_data.get("mcp_url")
+                    token_preview = auth_token[:20] + "..." if auth_token and len(auth_token) > 20 else "NONE"
+                    self.logger.info(f"[OAUTH] Successfully loaded OAuth token for calendar_agent")
+                    self.logger.info(f"[OAUTH] Token length: {len(auth_token) if auth_token else 0} chars")
+                    self.logger.info(f"[OAUTH] Token preview: {token_preview}")
+                    self.logger.info(f"[OAUTH] MCP URL: {rube_url}")
+                else:
+                    self.logger.warning(f"[OAUTH] No OAuth tokens found, falling back to user config or .env")
+            except Exception as e:
+                self.logger.error(f"[OAUTH] Failed to load OAuth tokens: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # Fallback to user-specific config from Supabase
+        if not rube_url and user_id:
             user_config = self._load_user_config(user_id)
-            pipedream_url = user_config.get("mcp_server_url")
-            self.logger.info(f"Loaded user config for {user_id}: MCP URL = {pipedream_url[:50] if pipedream_url else 'None'}...")
-        else:
-            # Local dev fallback: Load from .env
-            from .config import MCP_SERVER_URL
-            pipedream_url = MCP_SERVER_URL
-            self.logger.info(f"No user_id provided, using .env MCP_SERVER_URL: {pipedream_url[:50] if pipedream_url else 'None'}...")
+            rube_url = user_config.get("mcp_server_url")
+            self.logger.info(f"Loaded user config for {user_id}: MCP URL = {rube_url[:50] if rube_url else 'None'}...")
 
-        if pipedream_url:
-            self.mcp_servers = mcp_servers or {
-                "pipedream_calendar": {
-                    "url": pipedream_url,
-                    "transport": "streamable_http"
+        # Fallback to .env if no user config
+        if not rube_url:
+            from .config import MCP_SERVER_URL
+            rube_url = MCP_SERVER_URL
+            auth_token = auth_token or RUBE_AUTH_TOKEN
+            self.logger.info(f"Using .env MCP_SERVER_URL: {rube_url[:50] if rube_url else 'None'}...")
+
+        # Configure MCP server with Bearer token authentication
+        if rube_url:
+            server_config = {
+                "url": rube_url,
+                "transport": "streamable_http"
+            }
+
+            # Add auth headers if token is available
+            if auth_token:
+                server_config["headers"] = {
+                    "Authorization": f"Bearer {auth_token}"
                 }
+                self.logger.info(f"[MCP] Configured Rube MCP with Bearer token authentication")
+                self.logger.info(f"[MCP] Server config: url={rube_url}, transport=streamable_http")
+            else:
+                self.logger.warning(f"[MCP] No Rube auth token found - MCP connection may fail")
+
+            self.mcp_servers = mcp_servers or {
+                "rube_calendar": server_config
             }
         else:
             # No MCP server configured
@@ -147,11 +191,11 @@ class CalendarAgentWithMCP:
             return self._mcp_tools
 
         # Use the configured MCP server URL
-        mcp_url = self.mcp_servers.get("pipedream_calendar", {}).get("url")
+        mcp_url = self.mcp_servers.get("rube_calendar", {}).get("url")
         if not mcp_url:
-            raise ValueError("Pipedream MCP server URL not configured")
+            raise ValueError("Rube MCP server URL not configured")
 
-        self.logger.info(f"Connecting to Pipedream MCP server: {mcp_url}")
+        self.logger.info(f"Connecting to Rube MCP server: {mcp_url}")
 
         # Reuse MCP client instance to prevent memory leaks
         # Creating new clients for each request can cause resource exhaustion

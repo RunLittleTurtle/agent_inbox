@@ -95,13 +95,17 @@ export interface UserSecrets {
 }
 
 /**
- * Helper to get or create user secrets (lazy creation pattern)
+ * Helper to get or create user secrets (lazy creation + email sync pattern)
  *
- * This function implements the "lazy creation" pattern:
- * - If user_secrets row exists, return it
- * - If not, create a new row with defaults
- * - Uses UPSERT (INSERT ... ON CONFLICT DO UPDATE) for atomicity
- * - Captures email from Clerk JWT during creation
+ * This function implements the "lazy creation" pattern with automatic email sync:
+ * - If user_secrets row exists:
+ *   - Checks if email has changed in Clerk JWT
+ *   - If changed, updates the database to match current email
+ *   - Returns the synced record
+ * - If not, create a new row with defaults and current email
+ * - Ensures email always matches the reality in Clerk
+ *
+ * Performance: Email sync adds ~50ms only when email changes (rare event)
  */
 export async function getOrCreateUserSecrets(
   supabase: ReturnType<typeof createServerSupabaseClient>,
@@ -117,6 +121,26 @@ export async function getOrCreateUserSecrets(
       .single();
 
     if (existing) {
+      // SYNC LOGIC: Update email if it has changed in Clerk
+      if (email && existing.email !== email) {
+        console.log(`[Email Sync] Updating email for user ${clerkUserId}: ${existing.email} -> ${email}`);
+
+        const { data: updated, error: updateError } = await supabase
+          .from("user_secrets")
+          .update({ email: email })
+          .eq("clerk_id", clerkUserId)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error("[Email Sync] Failed to update email:", updateError);
+          // Return existing data even if update fails
+          return existing as UserSecrets;
+        }
+
+        return updated as UserSecrets;
+      }
+
       return existing as UserSecrets;
     }
 

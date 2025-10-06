@@ -53,18 +53,7 @@ export function AddAgentInboxDialog({
 
   const noInboxesFoundParam = searchParams.get(NO_INBOXES_FOUND_PARAM);
 
-  React.useEffect(() => {
-    try {
-      if (typeof window === "undefined") {
-        return;
-      }
-      if (noInboxesFoundParam === "true") {
-        setOpen(true);
-      }
-    } catch (e) {
-      logger.error("Error getting/setting no inboxes found param", e);
-    }
-  }, [noInboxesFoundParam]);
+  // Removed auto-open logic - user must explicitly click "Add Default Inboxes" button or "Add Inbox" button
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

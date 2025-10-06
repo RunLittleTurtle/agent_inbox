@@ -76,7 +76,6 @@ export function useInboxes() {
         if (!response.ok) {
           logger.error("Failed to fetch inboxes from Supabase:", response.statusText);
           setAgentInboxes([]);
-          updateQueryParams(NO_INBOXES_FOUND_PARAM, "true");
           return;
         }
 
@@ -88,7 +87,6 @@ export function useInboxes() {
         if (!currentInboxes.length) {
           logger.log("No inboxes returned from Supabase");
           setAgentInboxes([]);
-          updateQueryParams(NO_INBOXES_FOUND_PARAM, "true");
           return;
         }
 
@@ -148,7 +146,6 @@ export function useInboxes() {
       } catch (error) {
         logger.error("Error fetching inboxes from Supabase:", error);
         setAgentInboxes([]);
-        updateQueryParams(NO_INBOXES_FOUND_PARAM, "true");
       }
     },
     [getSearchParam, updateQueryParams]
@@ -342,14 +339,32 @@ export function useInboxes() {
   const createDefaultInboxes = useCallback(
     async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_CONFIG_URL || 'http://localhost:8000'}/api/config/inboxes/defaults`, {
+        const configUrl = process.env.NEXT_PUBLIC_CONFIG_URL || 'http://localhost:8000';
+        const endpoint = `${configUrl}/api/config/inboxes/defaults`;
+
+        logger.log("Creating default inboxes at:", endpoint);
+
+        const response = await fetch(endpoint, {
           method: "POST",
           credentials: "include",
         });
 
+        logger.log("Create defaults response status:", response.status);
+
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to create default inboxes");
+          const errorText = await response.text();
+          logger.error("Create defaults failed with response:", errorText);
+
+          let errorMessage = "Failed to create default inboxes";
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.error || errorMessage;
+          } catch (e) {
+            // Not JSON, use the text
+            errorMessage = errorText || errorMessage;
+          }
+
+          throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -366,12 +381,21 @@ export function useInboxes() {
 
         router.refresh();
       } catch (error) {
-        logger.error("Error creating default inboxes", error);
+        logger.error("Error creating default inboxes:", error);
+
+        // More descriptive error message
+        let errorMessage = "Failed to create default inboxes";
+        if (error instanceof TypeError && error.message.includes("fetch")) {
+          errorMessage = "Unable to reach config server. Please check your connection.";
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to create default inboxes",
+          description: errorMessage,
           variant: "destructive",
-          duration: 3000,
+          duration: 5000,
         });
       }
     },

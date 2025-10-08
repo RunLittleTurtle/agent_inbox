@@ -17,13 +17,13 @@ const ALLOWED_ORIGINS = [
 
 export default clerkMiddleware(async (auth, req) => {
   const origin = req.headers.get("origin");
+  const isAllowedOrigin = origin && (ALLOWED_ORIGINS.includes(origin) || origin.includes("vercel.app"));
 
-  // Handle preflight requests
+  // Handle preflight requests - BYPASS AUTH
   if (req.method === "OPTIONS") {
     const response = NextResponse.json({}, { status: 200 });
 
-    // Add CORS headers if origin is allowed
-    if (origin && (ALLOWED_ORIGINS.includes(origin) || origin.includes("vercel.app"))) {
+    if (isAllowedOrigin) {
       response.headers.set("Access-Control-Allow-Origin", origin);
       response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
       response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -34,22 +34,40 @@ export default clerkMiddleware(async (auth, req) => {
     return response;
   }
 
-  // Protect all routes by default
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+  // For actual requests: Add CORS, then check auth
+  try {
+    // Protect all routes by default
+    if (!isPublicRoute(req)) {
+      await auth.protect();
+    }
+
+    // Success - add CORS and continue
+    const response = NextResponse.next();
+
+    if (isAllowedOrigin) {
+      response.headers.set("Access-Control-Allow-Origin", origin);
+      response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+      response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      response.headers.set("Access-Control-Allow-Credentials", "true");
+    }
+
+    return response;
+  } catch (error) {
+    // Auth failed - still add CORS to error response
+    const errorResponse = NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+
+    if (isAllowedOrigin) {
+      errorResponse.headers.set("Access-Control-Allow-Origin", origin);
+      errorResponse.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+      errorResponse.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      errorResponse.headers.set("Access-Control-Allow-Credentials", "true");
+    }
+
+    return errorResponse;
   }
-
-  // Add CORS headers to actual requests
-  const response = NextResponse.next();
-
-  if (origin && (ALLOWED_ORIGINS.includes(origin) || origin.includes("vercel.app"))) {
-    response.headers.set("Access-Control-Allow-Origin", origin);
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    response.headers.set("Access-Control-Allow-Credentials", "true");
-  }
-
-  return response;
 });
 
 export const config = {

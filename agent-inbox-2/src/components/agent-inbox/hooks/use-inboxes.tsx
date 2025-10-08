@@ -279,22 +279,18 @@ export function useInboxes() {
 
         logger.log("Inbox selection updated successfully:", id);
 
-        // Update URL parameters
-        if (!replaceAll) {
-          updateQueryParams(
-            [AGENT_INBOX_PARAM, OFFSET_PARAM, LIMIT_PARAM, INBOX_PARAM],
-            [id, "0", "10", "interrupted"]
-          );
-        } else {
-          const url = new URL(window.location.href);
-          const newParams = new URLSearchParams({
-            [AGENT_INBOX_PARAM]: id,
-            [OFFSET_PARAM]: "0",
-            [LIMIT_PARAM]: "10",
-            [INBOX_PARAM]: "interrupted",
-          });
-          const newUrl = url.pathname + "?" + newParams.toString();
-          window.location.href = newUrl;
+        // Reload inboxes to get fresh state from server
+        await getAgentInboxes();
+
+        // Update URL parameters (smooth transition, no reload)
+        updateQueryParams(
+          [AGENT_INBOX_PARAM, OFFSET_PARAM, LIMIT_PARAM, INBOX_PARAM],
+          [id, "0", "10", "interrupted"]
+        );
+
+        // Refresh UI if replaceAll flag is set
+        if (replaceAll) {
+          router.refresh();
         }
       } catch (error) {
         logger.error("Error changing selected inbox", error);

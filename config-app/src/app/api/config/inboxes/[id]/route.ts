@@ -29,7 +29,7 @@ export async function DELETE(
 
     const supabase = createServerSupabaseClient(userId);
 
-    // Fetch the inbox to check if it's a default inbox
+    // Fetch the inbox to check if it exists and belongs to user
     const { data: inbox, error: fetchError } = await supabase
       .from("user_inboxes")
       .select("*")
@@ -42,13 +42,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Inbox not found" }, { status: 404 });
     }
 
-    // Prevent deletion of default inboxes
-    if (inbox.is_default) {
-      return NextResponse.json(
-        { error: "Cannot delete default inboxes" },
-        { status: 403 }
-      );
-    }
+    // Allow deletion of any inbox (including defaults)
+    // User can restore defaults with "Add Default Inboxes" button
 
     // Delete the inbox
     const { error: deleteError } = await supabase

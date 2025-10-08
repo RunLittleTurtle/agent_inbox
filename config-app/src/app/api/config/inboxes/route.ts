@@ -50,11 +50,12 @@ export async function GET() {
 
     const supabase = createServerSupabaseClient(userId);
 
-    // Fetch existing inboxes
+    // Fetch existing inboxes with stable ordering (defaults first, then by creation date)
     const { data: existingInboxes, error: fetchError } = await supabase
       .from("user_inboxes")
       .select("*")
       .eq("clerk_id", userId)
+      .order("is_default", { ascending: false })
       .order("created_at", { ascending: true });
 
     if (fetchError) {

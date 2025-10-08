@@ -34,18 +34,29 @@ export function GoogleWorkspaceCard({
   const loadOAuthStatus = React.useCallback(async () => {
     try {
       setIsCheckingStatus(true);
-      // Check if refresh_token exists in values
-      const refreshToken = values[sectionKey]?.google_refresh_token;
-      const extracted = extractCurrentValue(refreshToken);
 
-      if (extracted && extracted.length > 0) {
-        setOauthStatus('connected');
+      // Try to fetch fresh status from API to check if refresh_token exists
+      const response = await fetch('/api/oauth/google/status');
+      if (response.ok) {
+        const { connected } = await response.json();
+        setOauthStatus(connected ? 'connected' : 'disconnected');
       } else {
-        setOauthStatus('disconnected');
+        // Fallback: check if refresh_token exists in local values
+        const refreshToken = values[sectionKey]?.google_refresh_token;
+        const extracted = extractCurrentValue(refreshToken);
+
+        if (extracted && extracted.length > 0) {
+          setOauthStatus('connected');
+        } else {
+          setOauthStatus('disconnected');
+        }
       }
     } catch (error) {
       console.error('Failed to load OAuth status:', error);
-      setOauthStatus('disconnected');
+      // Fallback: check local values
+      const refreshToken = values[sectionKey]?.google_refresh_token;
+      const extracted = extractCurrentValue(refreshToken);
+      setOauthStatus(extracted && extracted.length > 0 ? 'connected' : 'disconnected');
     } finally {
       setIsCheckingStatus(false);
     }
@@ -69,22 +80,30 @@ export function GoogleWorkspaceCard({
 
       const { authUrl } = await response.json();
 
-      // 2. Open OAuth popup
+      // 2. Open OAuth popup (centered and properly configured)
+      const popupWidth = 600;
+      const popupHeight = 700;
+      const left = (window.screen.width - popupWidth) / 2;
+      const top = (window.screen.height - popupHeight) / 2;
+
       const popup = window.open(
         authUrl,
-        'Google OAuth',
-        'width=600,height=700,left=100,top=100'
+        'GoogleOAuth',
+        `width=${popupWidth},height=${popupHeight},left=${left},top=${top},toolbar=no,menubar=no,location=no,status=no,resizable=yes,scrollbars=yes`
       );
 
-      if (!popup) {
+      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
         toast({
           variant: "destructive",
           title: "Popup Blocked",
-          description: "Please allow popups for this site"
+          description: "Please allow popups for this site to connect your Google account"
         });
         setIsConnecting(false);
         return;
       }
+
+      // Focus the popup
+      popup.focus();
 
       // 3. Listen for completion
       const handleMessage = (event: MessageEvent) => {

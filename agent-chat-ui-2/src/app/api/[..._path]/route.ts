@@ -127,12 +127,16 @@ async function handleRequest(request: NextRequest) {
       body: modifiedBody,
     });
 
-    // Return response with CORS headers for production domains
-    const data = await response.text();
-    return new NextResponse(data, {
+    // Stream response body directly without buffering (LangGraph 2025 best practice)
+    // This enables real-time SSE streaming for supervisor + sub-agent tool calls
+    return new NextResponse(response.body, {
       status: response.status,
       headers: {
-        "Content-Type": response.headers.get("Content-Type") || "application/json",
+        // Preserve SSE format from LangGraph Platform
+        "Content-Type": response.headers.get("Content-Type") || "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        // CORS headers for production domains
         "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",

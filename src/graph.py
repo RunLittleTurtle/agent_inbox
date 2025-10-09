@@ -676,15 +676,21 @@ async def post_model_hook(state, model_output=None):
             return state  # Return full state if no valid messages
 
         last_msg = messages[-1]
-        if isinstance(last_msg, AIMessage) and (
-            "recap" in last_msg.content.lower() or "summary" in last_msg.content.lower()
-        ):
-            return {"messages": messages}
+        # Handle both string and list content (multimodal messages with tool calls)
+        if isinstance(last_msg, AIMessage):
+            content = last_msg.content
+            if isinstance(content, str) and (
+                "recap" in content.lower() or "summary" in content.lower()
+            ):
+                return {"messages": messages}
 
         source_text = ""
         for m in reversed(messages):
             if isinstance(m, AIMessage) or isinstance(m, ToolMessage):
-                source_text = (m.content or "").strip()
+                # Type-safe content extraction for multimodal messages
+                content = m.content or ""
+                source_text = content if isinstance(content, str) else str(content)
+                source_text = source_text.strip()
                 if source_text:
                     break
 

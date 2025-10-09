@@ -118,9 +118,7 @@ const StreamSession = ({
     apiKey: apiKey ?? undefined,
     assistantId,
     threadId: threadId ?? null,
-    fetchStateHistory: false,  // LangGraph 2025: Disable legacy polling
-    streamMode: ["updates", "values", "debug"],  // Enable comprehensive streaming
-    streamSubgraphs: true,  // Critical for multi-agent supervisor-agent transitions
+    fetchStateHistory: false,  // LangGraph 2025: Disable legacy polling to prevent 404 errors
     // Pass Clerk JWT for authenticated streaming (fixes real-time message updates)
     defaultHeaders: clerkToken
       ? {

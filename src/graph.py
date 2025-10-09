@@ -823,7 +823,12 @@ When an agent completes their task, analyze if additional routing is needed."""
         supervisor_name="multi_agent_supervisor",
         output_mode="last_message",
         add_handoff_back_messages=True,
-        post_model_hook=post_model_hook,
+        # DISABLED: post_model_hook breaks Anthropic tool execution
+        # Issue: Hook appends recap AIMessage which violates Anthropic's requirement that
+        # tool_use blocks must be IMMEDIATELY followed by tool_result in next message.
+        # Error: "messages.3: tool_use ids were found without tool_result blocks immediately after"
+        # Can re-enable later with proper guards to skip recap when tool calls are pending.
+        # post_model_hook=post_model_hook,
     )
 
     # Compile the workflow

@@ -118,11 +118,16 @@ const StreamSession = ({
     },
     onCreated: (run) => {
       // Capture run_id for manual cancellation
+      console.log("[Cancel Debug] onCreated fired:", {
+        run_id: run.run_id,
+        thread_id: run.thread_id
+      });
       currentRunIdRef.current = run.run_id;
       currentThreadIdRef.current = run.thread_id;
     },
     onFinish: () => {
       // Clear run_id when stream finishes
+      console.log("[Cancel Debug] onFinish fired, clearing run metadata");
       currentRunIdRef.current = null;
       currentThreadIdRef.current = null;
     },
@@ -133,27 +138,39 @@ const StreamSession = ({
     const runId = currentRunIdRef.current;
     const threadId = currentThreadIdRef.current;
 
+    console.log("[Cancel Debug] cancelRun called:", {
+      runId,
+      threadId,
+      hasClient: !!clientRef.current,
+      apiUrl,
+      hasApiKey: !!apiKey
+    });
+
     if (runId && threadId && clientRef.current) {
       try {
+        console.log("[Cancel Debug] Calling streamValue.stop()...");
         // Call built-in stop first (best effort)
         streamValue.stop();
 
+        console.log("[Cancel Debug] Calling client.runs.cancel()...");
         // Then manually cancel via API to ensure it works in production
         await clientRef.current.runs.cancel(threadId, runId);
 
+        console.log("[Cancel Debug] Cancel successful!");
         // Clear refs after successful cancellation
         currentRunIdRef.current = null;
         currentThreadIdRef.current = null;
       } catch (error) {
-        console.error("Failed to cancel run:", error);
+        console.error("[Cancel Debug] Failed to cancel run:", error);
         // Still call stop as fallback
         streamValue.stop();
       }
     } else {
+      console.log("[Cancel Debug] Missing run metadata, using fallback stop()");
       // Fallback to built-in stop if we don't have run metadata
       streamValue.stop();
     }
-  }, [streamValue]);
+  }, [streamValue, apiUrl, apiKey]);
 
   useEffect(() => {
     checkGraphStatus(apiUrl, apiKey).then((ok) => {

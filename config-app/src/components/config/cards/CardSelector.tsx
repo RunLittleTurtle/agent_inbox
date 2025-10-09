@@ -333,12 +333,10 @@ export function CardSelector({ section, values, onValueChange, agentId, onReset,
         sectionKey.includes('credentials') ||
         sectionKey.includes('ai_models') ||
         sectionKey.includes('langgraph_system') ||
-        sectionKey.includes('langfuse_system') ||
         sectionKey.includes('google_workspace') ||
         sectionLabel.includes('api keys') ||
         sectionLabel.includes('keys') ||
         sectionLabel.includes('auth') ||
-        sectionLabel.includes('tracing') ||
         section.fields.some(field => field.key.includes('api_key') || field.key.includes('token') || field.key.includes('secret') || field.type === 'password')) {
       return 'credentials';
     }

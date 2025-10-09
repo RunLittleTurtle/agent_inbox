@@ -114,12 +114,6 @@ async def _fetch_from_supabase(config: dict) -> dict | None:
                     # Extract LangSmith key
                     if isinstance(section_value, dict):
                         flat_config["langsmith_api_key"] = section_value.get("langsmith_api_key", "")
-                elif section_key == "langfuse_system":
-                    # Extract LangFuse keys for user-scoped tracing
-                    if isinstance(section_value, dict):
-                        flat_config["langfuse_public_key"] = section_value.get("langfuse_public_key", "")
-                        flat_config["langfuse_secret_key"] = section_value.get("langfuse_secret_key", "")
-                        flat_config["langfuse_host"] = section_value.get("langfuse_host", "https://cloud.langfuse.com")
                 elif section_key == "google_workspace":
                     # Extract Google credentials
                     if isinstance(section_value, dict):
@@ -129,7 +123,6 @@ async def _fetch_from_supabase(config: dict) -> dict | None:
 
             print(f" DEBUG: Flattened config has {len(flat_config)} fields")
             print(f" DEBUG: Has API keys: anthropic={bool(flat_config.get('anthropic_api_key'))}, openai={bool(flat_config.get('openai_api_key'))}")
-            print(f" DEBUG: LangFuse configured: {bool(flat_config.get('langfuse_public_key'))}")
 
             return flat_config
 

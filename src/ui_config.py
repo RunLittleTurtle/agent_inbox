@@ -83,41 +83,6 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'langfuse_system',
-        'label': 'LangFuse (User Tracing)',
-        'description': 'Per-user trace visibility and analytics - users see only their own traces',
-        'fields': [
-            {
-                'key': 'langfuse_public_key',
-                'label': 'LangFuse Public Key',
-                'type': 'text',
-                'envVar': 'LANGFUSE_PUBLIC_KEY',
-                'description': 'Public API key for LangFuse tracing (safe to expose)',
-                'placeholder': 'pk-lf-...',
-                'note': 'Get from LangFuse dashboard: Settings → API Keys'
-            },
-            {
-                'key': 'langfuse_secret_key',
-                'label': 'LangFuse Secret Key',
-                'type': 'password',
-                'envVar': 'LANGFUSE_SECRET_KEY',
-                'description': 'Secret API key for LangFuse tracing (keep secure)',
-                'placeholder': 'sk-lf-...',
-                'note': 'Keep this secret - stored encrypted in database'
-            },
-            {
-                'key': 'langfuse_host',
-                'label': 'LangFuse Host URL',
-                'type': 'text',
-                'envVar': 'LANGFUSE_HOST',
-                'default': 'https://cloud.langfuse.com',
-                'description': 'LangFuse server URL (cloud or self-hosted)',
-                'placeholder': 'https://cloud.langfuse.com',
-                'note': 'Use https://cloud.langfuse.com for cloud, or your Railway URL for self-hosted'
-            }
-        ]
-    },
-    {
         'key': 'google_workspace',
         'label': 'Google Workspace OAuth (Admin)',
         'description': 'Global OAuth credentials - configure once, all users authenticate through these credentials',

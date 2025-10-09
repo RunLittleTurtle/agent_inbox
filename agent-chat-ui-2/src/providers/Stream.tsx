@@ -4,9 +4,11 @@ import React, {
   ReactNode,
   useState,
   useEffect,
+  useRef,
+  useCallback,
 } from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
-import { type Message } from "@langchain/langgraph-sdk";
+import { type Message, Client } from "@langchain/langgraph-sdk";
 import {
   uiMessageReducer,
   isUIMessage,
@@ -39,7 +41,9 @@ const useTypedStream = useStream<
   }
 >;
 
-type StreamContextType = ReturnType<typeof useTypedStream>;
+type StreamContextType = ReturnType<typeof useTypedStream> & {
+  cancelRun: () => Promise<void>;
+};
 const StreamContext = createContext<StreamContextType | undefined>(undefined);
 
 async function sleep(ms = 4000) {
@@ -79,6 +83,20 @@ const StreamSession = ({
 }) => {
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
+
+  // Create LangGraph client for manual run cancellation
+  const clientRef = useRef<Client | null>(null);
+  const currentRunIdRef = useRef<string | null>(null);
+  const currentThreadIdRef = useRef<string | null>(null);
+
+  // Initialize client
+  if (!clientRef.current) {
+    clientRef.current = new Client({
+      apiUrl,
+      apiKey: apiKey ?? undefined,
+    });
+  }
+
   const streamValue = useTypedStream({
     apiUrl,
     apiKey: apiKey ?? undefined,
@@ -98,7 +116,44 @@ const StreamSession = ({
       // Refetch threads list when thread ID changes.
       sleep().then(() => getThreads().then(setThreads).catch(console.error));
     },
+    onCreated: (run) => {
+      // Capture run_id for manual cancellation
+      currentRunIdRef.current = run.run_id;
+      currentThreadIdRef.current = run.thread_id;
+    },
+    onFinish: () => {
+      // Clear run_id when stream finishes
+      currentRunIdRef.current = null;
+      currentThreadIdRef.current = null;
+    },
   });
+
+  // Manual cancellation function using SDK client
+  const cancelRun = useCallback(async () => {
+    const runId = currentRunIdRef.current;
+    const threadId = currentThreadIdRef.current;
+
+    if (runId && threadId && clientRef.current) {
+      try {
+        // Call built-in stop first (best effort)
+        streamValue.stop();
+
+        // Then manually cancel via API to ensure it works in production
+        await clientRef.current.runs.cancel(threadId, runId);
+
+        // Clear refs after successful cancellation
+        currentRunIdRef.current = null;
+        currentThreadIdRef.current = null;
+      } catch (error) {
+        console.error("Failed to cancel run:", error);
+        // Still call stop as fallback
+        streamValue.stop();
+      }
+    } else {
+      // Fallback to built-in stop if we don't have run metadata
+      streamValue.stop();
+    }
+  }, [streamValue]);
 
   useEffect(() => {
     checkGraphStatus(apiUrl, apiKey).then((ok) => {
@@ -119,7 +174,7 @@ const StreamSession = ({
   }, [apiKey, apiUrl]);
 
   return (
-    <StreamContext.Provider value={streamValue}>
+    <StreamContext.Provider value={{ ...streamValue, cancelRun }}>
       {children}
     </StreamContext.Provider>
   );

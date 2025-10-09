@@ -554,7 +554,7 @@ export function Thread() {
                         {stream.isLoading ? (
                           <Button
                             key="stop"
-                            onClick={() => stream.stop()}
+                            onClick={() => stream.cancelRun()}
                             className="ml-auto"
                           >
                             <LoaderCircle className="h-4 w-4 animate-spin" />

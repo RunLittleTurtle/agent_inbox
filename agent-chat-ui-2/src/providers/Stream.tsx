@@ -221,9 +221,7 @@ const StreamSession = ({
     try {
       console.log("[History] Fetching state for thread:", threadId);
       // Use the correct endpoint with GET method
-      const state = await clientRef.current.threads.getState(threadId, {
-        subgraphs: true  // Include subgraph states for multi-agent systems
-      });
+      const state = await clientRef.current.threads.getState(threadId);
       console.log("[History] State fetched successfully");
       return state;
     } catch (error) {

@@ -638,19 +638,23 @@ You have verified access to these 89 tools and can perform real operations acros
     return rube_agent
 
 
-async def post_model_hook(messages, model_output=None):
+async def post_model_hook(state, model_output=None):
     """
     post_model_hook that ensures the supervisor ends with a recap message.
+
+    Per LangGraph 2025 best practices, this receives the full state dict.
     """
     try:
-        if not messages:
-            return messages
+        # Extract messages from state dictionary
+        messages = state.get("messages", [])
+        if not messages or not isinstance(messages, list):
+            return state  # Return full state if no valid messages
 
         last_msg = messages[-1]
         if isinstance(last_msg, AIMessage) and (
             "recap" in last_msg.content.lower() or "summary" in last_msg.content.lower()
         ):
-            return messages
+            return {"messages": messages}
 
         source_text = ""
         for m in reversed(messages):
@@ -668,11 +672,11 @@ async def post_model_hook(messages, model_output=None):
             recap_content = f"Recap: {short_snippet}"
 
         messages.append(AIMessage(content=recap_content))
-        return messages
+        return {"messages": messages}  # Return state update dict
 
     except Exception as e:
-        logger.exception("post_model_hook failed -- returning original messages.")
-        return messages
+        logger.exception("post_model_hook failed -- returning original state.")
+        return state  # Return original state on error
 
 
 def validate_environment():

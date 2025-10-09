@@ -153,14 +153,17 @@ const StreamSession = ({
       console.error("[Stream Error]", error);
 
       // Ignore 404 on legacy history endpoint - expected with fetchStateHistory:false
-      if (error.message?.includes('/history') && error.status === 404) {
-        console.log("[Stream] Ignoring legacy history 404 (expected behavior)");
-        return; // Don't propagate this error
-      }
+      if (error && typeof error === 'object' && 'message' in error && 'status' in error) {
+        const err = error as { message?: string; status?: number };
+        if (err.message?.includes('/history') && err.status === 404) {
+          console.log("[Stream] Ignoring legacy history 404 (expected behavior)");
+          return; // Don't propagate this error
+        }
 
-      // For other stream errors, log for debugging
-      if (error.message?.includes('stream')) {
-        console.warn("[Stream] Stream connection error, may attempt reconnection");
+        // For other stream errors, log for debugging
+        if (err.message?.includes('stream')) {
+          console.warn("[Stream] Stream connection error, may attempt reconnection");
+        }
       }
     },
     // NOTE: Don't clear run metadata in onFinish - it fires when the stream connection

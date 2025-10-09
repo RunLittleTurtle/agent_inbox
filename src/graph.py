@@ -179,26 +179,44 @@ async def calendar_agent_node(
 
     logger.info(f"[calendar_agent_node] Loading for user: {user_id}")
 
-    # Load MCP URL from Supabase at runtime
+    # Load full agent config from Supabase at runtime
     from utils.config_utils import get_agent_config_from_supabase
+    from utils.llm_utils import get_llm
 
     agent_config = get_agent_config_from_supabase(user_id, "calendar_agent")
+
+    # Extract LLM configuration from user's saved settings
+    llm_config = agent_config.get("llm", {})
+    model_name = llm_config.get("model", DEFAULT_LLM_MODEL)
+
+    # Ensure temperature is a float (Supabase may return as string)
+    temp_value = llm_config.get("temperature", 0.0)
+    try:
+        temperature = float(temp_value) if temp_value is not None else 0.0
+    except (ValueError, TypeError):
+        temperature = 0.0
+        logger.warning(f"[CONFIG] Invalid temperature value '{temp_value}', using default 0.0")
+
+    # Log configuration details
+    logger.info(f"[CONFIG] Calendar agent config for user {user_id}:")
+    logger.info(f"[CONFIG]   Model: {model_name} (from Supabase: {bool(llm_config.get('model'))})")
+    logger.info(f"[CONFIG]   Temperature: {temperature}")
+
+    # Extract MCP URL
     mcp_integration = agent_config.get("mcp_integration", {})
     mcp_url = mcp_integration.get("mcp_server_url")
-
-    logger.info(
-        f"[calendar_agent_node] MCP URL from Supabase: {mcp_url or 'Not configured'}"
-    )
+    logger.info(f"[CONFIG]   MCP URL: {mcp_url or 'Not configured'}")
 
     # Delegate to existing CalendarAgentWithMCP implementation
     # CalendarAgentWithMCP will load MCP tools using the user_id
     from calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
 
-    # Create calendar model
-    calendar_model = ChatAnthropic(
-        model=DEFAULT_LLM_MODEL,
-        temperature=0,
-        anthropic_api_key=api_keys["anthropic_api_key"],
+    # Create calendar model with user-specific settings using cross-provider utility
+    calendar_model = get_llm(
+        model_name,
+        temperature=temperature,
+        anthropic_api_key=api_keys.get("anthropic_api_key"),
+        openai_api_key=api_keys.get("openai_api_key"),
         streaming=False,
     )
 
@@ -240,14 +258,38 @@ async def multi_tool_rube_agent_node(
     logger.info(f"[multi_tool_rube_agent_node] Starting execution for user: {user_id}")
     logger.info(f"[multi_tool_rube_agent_node] Input state keys: {list(state.keys())}")
 
-    # Create Rube model
-    rube_model = ChatAnthropic(
-        model=DEFAULT_LLM_MODEL,
-        temperature=0,
-        anthropic_api_key=api_keys["anthropic_api_key"],
+    # Load full agent config from Supabase at runtime
+    from utils.config_utils import get_agent_config_from_supabase
+    from utils.llm_utils import get_llm
+
+    agent_config = get_agent_config_from_supabase(user_id, "multi_tool_rube_agent")
+
+    # Extract LLM configuration from user's saved settings
+    llm_config = agent_config.get("llm", {})
+    model_name = llm_config.get("model", DEFAULT_LLM_MODEL)
+
+    # Ensure temperature is a float (Supabase may return as string)
+    temp_value = llm_config.get("temperature", 0.0)
+    try:
+        temperature = float(temp_value) if temp_value is not None else 0.0
+    except (ValueError, TypeError):
+        temperature = 0.0
+        logger.warning(f"[CONFIG] Invalid temperature value '{temp_value}', using default 0.0")
+
+    # Log configuration details
+    logger.info(f"[CONFIG] Multi-tool Rube agent config for user {user_id}:")
+    logger.info(f"[CONFIG]   Model: {model_name} (from Supabase: {bool(llm_config.get('model'))})")
+    logger.info(f"[CONFIG]   Temperature: {temperature}")
+
+    # Create Rube model with user-specific settings using cross-provider utility
+    rube_model = get_llm(
+        model_name,
+        temperature=temperature,
+        anthropic_api_key=api_keys.get("anthropic_api_key"),
+        openai_api_key=api_keys.get("openai_api_key"),
         streaming=False,
     )
-    logger.info(f"[multi_tool_rube_agent_node] Created model: {DEFAULT_LLM_MODEL}")
+    logger.info(f"[multi_tool_rube_agent_node] Created model: {model_name}")
 
     # Load tools using OAuth-aware function (supports per-user tokens from Supabase)
     try:

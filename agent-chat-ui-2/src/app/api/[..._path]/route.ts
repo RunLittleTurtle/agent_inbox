@@ -10,6 +10,20 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY!;
 
 async function handleRequest(request: NextRequest) {
+  // Handle CORS preflight requests for production domains
+  if (request.method === "OPTIONS") {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "86400", // 24 hours
+      },
+    });
+  }
+
   try {
     // Get Clerk user ID
     const { userId, getToken } = await auth();
@@ -113,12 +127,16 @@ async function handleRequest(request: NextRequest) {
       body: modifiedBody,
     });
 
-    // Return response
+    // Return response with CORS headers for production domains
     const data = await response.text();
     return new NextResponse(data, {
       status: response.status,
       headers: {
         "Content-Type": response.headers.get("Content-Type") || "application/json",
+        "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
+        "Access-Control-Allow-Credentials": "true",
       },
     });
   } catch (error) {

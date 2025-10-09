@@ -199,6 +199,8 @@ async def calendar_agent_node(
 
     # Log configuration details
     logger.info(f"[CONFIG] Calendar agent config for user {user_id}:")
+    logger.info(f"[CONFIG]   Raw agent_config keys: {list(agent_config.keys())}")
+    logger.info(f"[CONFIG]   llm_config contents: {llm_config}")
     logger.info(f"[CONFIG]   Model: {model_name} (from Supabase: {bool(llm_config.get('model'))})")
     logger.info(f"[CONFIG]   Temperature: {temperature}")
 
@@ -211,14 +213,25 @@ async def calendar_agent_node(
     # CalendarAgentWithMCP will load MCP tools using the user_id
     from calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
 
+    # Determine correct API key based on model provider
+    # CRITICAL: Only pass the API key that matches the model provider
+    # ChatOpenAI doesn't accept anthropic_api_key, ChatAnthropic doesn't accept api_key
+    if model_name.startswith('claude') or model_name.startswith('opus'):
+        model_kwargs = {"anthropic_api_key": api_keys.get("anthropic_api_key")}
+        logger.info(f"[CONFIG] Using Anthropic model: {model_name}")
+    else:
+        model_kwargs = {"api_key": api_keys.get("openai_api_key")}
+        logger.info(f"[CONFIG] Using OpenAI model: {model_name}")
+
     # Create calendar model with user-specific settings using cross-provider utility
+    logger.info(f"[CONFIG] Creating calendar model with: model={model_name}, temp={temperature}, streaming=False")
     calendar_model = get_llm(
         model_name,
         temperature=temperature,
-        anthropic_api_key=api_keys.get("anthropic_api_key"),
-        openai_api_key=api_keys.get("openai_api_key"),
+        **model_kwargs,
         streaming=False,
     )
+    logger.info(f"[CONFIG] Successfully created calendar model: {type(calendar_model).__name__}")
 
     # Create calendar agent instance with runtime user_id
     #  KEY CHANGE: Pass user_id from request config, not fallback "local_dev_user"
@@ -278,18 +291,30 @@ async def multi_tool_rube_agent_node(
 
     # Log configuration details
     logger.info(f"[CONFIG] Multi-tool Rube agent config for user {user_id}:")
+    logger.info(f"[CONFIG]   Raw agent_config keys: {list(agent_config.keys())}")
+    logger.info(f"[CONFIG]   llm_config contents: {llm_config}")
     logger.info(f"[CONFIG]   Model: {model_name} (from Supabase: {bool(llm_config.get('model'))})")
     logger.info(f"[CONFIG]   Temperature: {temperature}")
 
+    # Determine correct API key based on model provider
+    # CRITICAL: Only pass the API key that matches the model provider
+    # ChatOpenAI doesn't accept anthropic_api_key, ChatAnthropic doesn't accept api_key
+    if model_name.startswith('claude') or model_name.startswith('opus'):
+        model_kwargs = {"anthropic_api_key": api_keys.get("anthropic_api_key")}
+        logger.info(f"[CONFIG] Using Anthropic model: {model_name}")
+    else:
+        model_kwargs = {"api_key": api_keys.get("openai_api_key")}
+        logger.info(f"[CONFIG] Using OpenAI model: {model_name}")
+
     # Create Rube model with user-specific settings using cross-provider utility
+    logger.info(f"[CONFIG] Creating Rube model with: model={model_name}, temp={temperature}, streaming=False")
     rube_model = get_llm(
         model_name,
         temperature=temperature,
-        anthropic_api_key=api_keys.get("anthropic_api_key"),
-        openai_api_key=api_keys.get("openai_api_key"),
+        **model_kwargs,
         streaming=False,
     )
-    logger.info(f"[multi_tool_rube_agent_node] Created model: {model_name}")
+    logger.info(f"[CONFIG] Successfully created Rube model: {type(rube_model).__name__}")
 
     # Load tools using OAuth-aware function (supports per-user tokens from Supabase)
     try:

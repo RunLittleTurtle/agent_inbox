@@ -689,7 +689,20 @@ async def post_model_hook(state, model_output=None):
             if isinstance(m, AIMessage) or isinstance(m, ToolMessage):
                 # Type-safe content extraction for multimodal messages
                 content = m.content or ""
-                source_text = content if isinstance(content, str) else str(content)
+                if isinstance(content, str):
+                    source_text = content
+                elif isinstance(content, list):
+                    # Multimodal content: [{"type": "text", "text": "..."}, {"type": "image", ...}]
+                    text_parts = [
+                        block.get("text", "")
+                        for block in content
+                        if isinstance(block, dict) and block.get("type") == "text"
+                    ]
+                    source_text = " ".join(text_parts)
+                else:
+                    # Fallback for unknown content types
+                    source_text = str(content)
+
                 source_text = source_text.strip()
                 if source_text:
                     break

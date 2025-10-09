@@ -132,8 +132,10 @@ async function handleRequest(request: NextRequest) {
     return new NextResponse(response.body, {
       status: response.status,
       headers: {
-        // Preserve SSE format from LangGraph Platform
-        "Content-Type": response.headers.get("Content-Type") || "text/event-stream",
+        // Preserve original Content-Type from LangGraph Platform
+        // - Streaming requests (/runs/stream) return text/event-stream
+        // - Regular requests (/threads, /history) return application/json
+        "Content-Type": response.headers.get("Content-Type") || "application/json",
         "Cache-Control": "no-cache, no-transform",
         "Connection": "keep-alive",
         // CORS headers for production domains

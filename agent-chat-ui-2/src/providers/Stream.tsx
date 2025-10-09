@@ -139,19 +139,18 @@ const StreamSession = ({
     },
     onCreated: (run) => {
       // Capture run_id for manual cancellation
+      // Always store new run metadata, replacing any previous run
       console.log("[Cancel Debug] onCreated fired:", {
         run_id: run.run_id,
-        thread_id: run.thread_id
+        thread_id: run.thread_id,
+        replacing_previous: !!currentRunIdRef.current
       });
       currentRunIdRef.current = run.run_id;
       currentThreadIdRef.current = run.thread_id;
     },
-    onFinish: () => {
-      // Clear run_id when stream finishes
-      console.log("[Cancel Debug] onFinish fired, clearing run metadata");
-      currentRunIdRef.current = null;
-      currentThreadIdRef.current = null;
-    },
+    // NOTE: Don't clear run metadata in onFinish - it fires when the stream connection
+    // closes, not when the run actually finishes. Clearing here would prevent cancellation
+    // of long-running agents. Metadata is replaced when a new run starts (onCreated).
   });
 
   // Manual cancellation function using SDK client
@@ -230,20 +229,16 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   const envAssistantId: string | undefined =
     process.env.NEXT_PUBLIC_ASSISTANT_ID;
 
-  // Build dynamic API URL from current origin (works with any production domain)
-  const [dynamicApiUrl, setDynamicApiUrl] = useState<string>("");
+  // Helper function to get API URL from current domain (2025 Next.js pattern)
+  // Works with any production domain: chat.mekanize.app, agent-chat-ui-2.vercel.app, localhost
+  const getApiUrl = () => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}/api`;
+  };
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Construct full URL from current domain: https://chat.mekanize.app/api
-      // Works automatically with all domains: chat/inbox/config.mekanize.app, localhost
-      setDynamicApiUrl(`${window.location.origin}/api`);
-    }
-  }, []);
-
-  // Use URL params with env var fallbacks, prioritize dynamic URL
+  // Use URL params with env var fallbacks, prioritize dynamic URL over hardcoded env
   const [apiUrl, setApiUrl] = useQueryState("apiUrl", {
-    defaultValue: dynamicApiUrl || envApiUrl || "",
+    defaultValue: envApiUrl || getApiUrl() || "",
   });
   const [assistantId, setAssistantId] = useQueryState("assistantId", {
     defaultValue: envAssistantId || "",
@@ -261,7 +256,7 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   // Determine final values to use, prioritizing URL params then dynamic URL then env vars
-  const finalApiUrl = apiUrl || dynamicApiUrl || envApiUrl;
+  const finalApiUrl = apiUrl || getApiUrl() || envApiUrl;
   const finalAssistantId = assistantId || envAssistantId;
 
   // Show the form if we: don't have an API URL, or don't have an assistant ID

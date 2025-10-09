@@ -230,9 +230,20 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   const envAssistantId: string | undefined =
     process.env.NEXT_PUBLIC_ASSISTANT_ID;
 
-  // Use URL params with env var fallbacks
+  // Build dynamic API URL from current origin (works with any production domain)
+  const [dynamicApiUrl, setDynamicApiUrl] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Construct full URL from current domain: https://chat.mekanize.app/api
+      // Works automatically with all domains: chat/inbox/config.mekanize.app, localhost
+      setDynamicApiUrl(`${window.location.origin}/api`);
+    }
+  }, []);
+
+  // Use URL params with env var fallbacks, prioritize dynamic URL
   const [apiUrl, setApiUrl] = useQueryState("apiUrl", {
-    defaultValue: envApiUrl || "",
+    defaultValue: dynamicApiUrl || envApiUrl || "",
   });
   const [assistantId, setAssistantId] = useQueryState("assistantId", {
     defaultValue: envAssistantId || "",
@@ -249,8 +260,8 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
     _setApiKey(key);
   };
 
-  // Determine final values to use, prioritizing URL params then env vars
-  const finalApiUrl = apiUrl || envApiUrl;
+  // Determine final values to use, prioritizing URL params then dynamic URL then env vars
+  const finalApiUrl = apiUrl || dynamicApiUrl || envApiUrl;
   const finalAssistantId = assistantId || envAssistantId;
 
   // Show the form if we: don't have an API URL, or don't have an assistant ID

@@ -44,6 +44,7 @@ const useTypedStream = useStream<
 
 type StreamContextType = ReturnType<typeof useTypedStream> & {
   cancelRun: () => Promise<void>;
+  fetchHistoryOnDemand: (threadId: string) => Promise<any>;
 };
 const StreamContext = createContext<StreamContextType | undefined>(undefined);
 
@@ -117,7 +118,9 @@ const StreamSession = ({
     apiKey: apiKey ?? undefined,
     assistantId,
     threadId: threadId ?? null,
-    fetchStateHistory: true,
+    fetchStateHistory: false,  // LangGraph 2025: Disable legacy polling
+    streamMode: ["updates", "values", "debug"],  // Enable comprehensive streaming
+    streamSubgraphs: true,  // Critical for multi-agent supervisor-agent transitions
     // Pass Clerk JWT for authenticated streaming (fixes real-time message updates)
     defaultHeaders: clerkToken
       ? {
@@ -147,6 +150,20 @@ const StreamSession = ({
       });
       currentRunIdRef.current = run.run_id;
       currentThreadIdRef.current = run.thread_id;
+    },
+    onError: (error) => {
+      console.error("[Stream Error]", error);
+
+      // Ignore 404 on legacy history endpoint - expected with fetchStateHistory:false
+      if (error.message?.includes('/history') && error.status === 404) {
+        console.log("[Stream] Ignoring legacy history 404 (expected behavior)");
+        return; // Don't propagate this error
+      }
+
+      // For other stream errors, log for debugging
+      if (error.message?.includes('stream')) {
+        console.warn("[Stream] Stream connection error, may attempt reconnection");
+      }
     },
     // NOTE: Don't clear run metadata in onFinish - it fires when the stream connection
     // closes, not when the run actually finishes. Clearing here would prevent cancellation
@@ -192,6 +209,28 @@ const StreamSession = ({
     }
   }, [streamValue, apiUrl, apiKey]);
 
+  // On-demand history fetching for components that need full state
+  // LangGraph 2025: Use GET /state/history instead of legacy polling
+  const fetchHistoryOnDemand = useCallback(async (threadId: string) => {
+    if (!clientRef.current) {
+      console.warn("[History] Client not initialized");
+      return null;
+    }
+
+    try {
+      console.log("[History] Fetching state for thread:", threadId);
+      // Use the correct endpoint with GET method
+      const state = await clientRef.current.threads.getState(threadId, {
+        subgraphs: true  // Include subgraph states for multi-agent systems
+      });
+      console.log("[History] State fetched successfully");
+      return state;
+    } catch (error) {
+      console.error("[History] Failed to fetch state:", error);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     checkGraphStatus(apiUrl, apiKey).then((ok) => {
       if (!ok) {
@@ -211,7 +250,7 @@ const StreamSession = ({
   }, [apiKey, apiUrl]);
 
   return (
-    <StreamContext.Provider value={{ ...streamValue, cancelRun }}>
+    <StreamContext.Provider value={{ ...streamValue, cancelRun, fetchHistoryOnDemand }}>
       {children}
     </StreamContext.Provider>
   );

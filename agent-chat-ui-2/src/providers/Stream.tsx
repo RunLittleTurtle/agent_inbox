@@ -118,7 +118,7 @@ const StreamSession = ({
     apiKey: apiKey ?? undefined,
     assistantId,
     threadId: threadId ?? null,
-    fetchStateHistory: false,  // LangGraph 2025: Disable legacy polling to prevent 404 errors
+    fetchStateHistory: true,  // Required by SDK - 404 errors handled by onError callback below
     // Pass Clerk JWT for authenticated streaming (fixes real-time message updates)
     defaultHeaders: clerkToken
       ? {

@@ -26,6 +26,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { getApiKey } from "@/lib/api-key";
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
+import { useAuth } from "@clerk/nextjs";
 
 export type StateType = { messages: Message[]; ui?: UIMessage[] };
 
@@ -84,16 +85,30 @@ const StreamSession = ({
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
 
+  // Get Clerk JWT for LangGraph custom auth (2025)
+  const { getToken } = useAuth();
+  const [clerkToken, setClerkToken] = useState<string | null>(null);
+
+  // Fetch Clerk token on mount and when it changes
+  useEffect(() => {
+    getToken().then((token) => {
+      setClerkToken(token);
+    });
+  }, [getToken]);
+
   // Create LangGraph client for manual run cancellation
   const clientRef = useRef<Client | null>(null);
   const currentRunIdRef = useRef<string | null>(null);
   const currentThreadIdRef = useRef<string | null>(null);
 
-  // Initialize client
-  if (!clientRef.current) {
+  // Initialize client with Clerk JWT authentication
+  if (!clientRef.current && clerkToken) {
     clientRef.current = new Client({
       apiUrl,
       apiKey: apiKey ?? undefined,
+      defaultHeaders: {
+        Authorization: `Bearer ${clerkToken}`,
+      },
     });
   }
 
@@ -103,6 +118,12 @@ const StreamSession = ({
     assistantId,
     threadId: threadId ?? null,
     fetchStateHistory: true,
+    // Pass Clerk JWT for authenticated streaming (fixes real-time message updates)
+    defaultHeaders: clerkToken
+      ? {
+          Authorization: `Bearer ${clerkToken}`,
+        }
+      : undefined,
     onCustomEvent: (event, options) => {
       if (isUIMessage(event) || isRemoveUIMessage(event)) {
         options.mutate((prev) => {

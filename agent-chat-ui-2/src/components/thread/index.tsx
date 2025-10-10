@@ -197,8 +197,19 @@ export function Thread() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if ((input.trim().length === 0 && contentBlocks.length === 0) || isLoading)
-      return;
+
+    // Check if there's any input to send
+    const hasInput = input.trim().length > 0 || contentBlocks.length > 0;
+    if (!hasInput) return;
+
+    // Allow submission if it's the user's turn (even if stream is still "loading")
+    // This fixes the issue where calendar agent returns to supervisor but supervisor
+    // hasn't responded yet, keeping isLoading=true and blocking the next user message
+    const lastMessage = messages[messages.length - 1];
+    const isUserTurn = !isLoading || lastMessage?.type === 'ai' || lastMessage?.type === 'tool';
+
+    if (!isUserTurn) return;
+
     setFirstTokenReceived(false);
 
     const newHumanMessage: Message = {

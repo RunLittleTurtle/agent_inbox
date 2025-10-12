@@ -62,6 +62,7 @@ export function MCPConfigCard({
   const [oauthStatus, setOauthStatus] = React.useState<'connected' | 'disconnected' | 'loading'>('disconnected');
   const [connectedApps, setConnectedApps] = React.useState<string[]>([]);
   const [isConnecting, setIsConnecting] = React.useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = React.useState(true);
 
   const togglePasswordVisibility = (fieldKey: string) => {
     setShowPasswords(prev => ({
@@ -169,6 +170,8 @@ export function MCPConfigCard({
   // Load OAuth connection status
   const loadOAuthStatus = React.useCallback(async () => {
     try {
+      setIsCheckingStatus(true);
+
       // SAME path for both global and per-agent: values[sectionKey].oauth_tokens
       const oauth_tokens = values[sectionKey]?.oauth_tokens;
 
@@ -187,6 +190,8 @@ export function MCPConfigCard({
       console.error('Failed to load OAuth status:', error);
       setOauthStatus('disconnected');
       setConnectedApps([]);
+    } finally {
+      setIsCheckingStatus(false);
     }
   }, [values, sectionKey]);
 
@@ -313,7 +318,7 @@ export function MCPConfigCard({
 
             <Button
               onClick={handleConnectMCP}
-              disabled={isConnecting || !getCurrentValue(fields.find(f => f.key === 'mcp_server_url') || fields[0])}
+              disabled={isConnecting || isCheckingStatus || !getCurrentValue(fields.find(f => f.key === 'mcp_server_url') || fields[0])}
               className="w-full bg-green-600 hover:bg-green-700"
             >
               {isConnecting ? (

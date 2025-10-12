@@ -144,9 +144,12 @@ export function MCPConfigCard({
           window.removeEventListener('message', handleMessage);
           setIsConnecting(false);
           setOauthStatus('connected');
-          toast({ title: "Success", description: "Apps connected successfully!" });
-          // Reload OAuth status
-          loadOAuthStatus();
+          toast({
+            title: "Success!",
+            description: "Apps connected successfully!"
+          });
+          // Reload page to fetch updated values with oauth_tokens
+          window.location.reload();
         } else if (event.data.type === 'mcp_oauth_error') {
           popup?.close();
           window.removeEventListener('message', handleMessage);
@@ -164,26 +167,33 @@ export function MCPConfigCard({
   };
 
   // Load OAuth connection status
-  const loadOAuthStatus = async () => {
+  const loadOAuthStatus = React.useCallback(async () => {
     try {
       // SAME path for both global and per-agent: values[sectionKey].oauth_tokens
       const oauth_tokens = values[sectionKey]?.oauth_tokens;
 
-      if (oauth_tokens && oauth_tokens.access_token) {
+      // Also check for extracted value in case it's wrapped
+      const extractedTokens = extractCurrentValue(oauth_tokens);
+      const tokensToCheck = extractedTokens || oauth_tokens;
+
+      if (tokensToCheck && (tokensToCheck.access_token || tokensToCheck.refresh_token)) {
         setOauthStatus('connected');
         setConnectedApps(['Rube MCP']);
       } else {
         setOauthStatus('disconnected');
+        setConnectedApps([]);
       }
     } catch (error) {
       console.error('Failed to load OAuth status:', error);
+      setOauthStatus('disconnected');
+      setConnectedApps([]);
     }
-  };
+  }, [values, sectionKey]);
 
-  // Load OAuth status on mount
+  // Load OAuth status on mount and when values change
   React.useEffect(() => {
     loadOAuthStatus();
-  }, [values]);
+  }, [loadOAuthStatus]);
 
   const getCurrentValue = (field: MCPField) => {
     // Handle environment variable fields (flat structure from API)

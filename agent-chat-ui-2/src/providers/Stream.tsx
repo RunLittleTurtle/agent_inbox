@@ -126,10 +126,11 @@ const StreamSession = ({
   const currentRunIdRef = useRef<string | null>(null);
   const currentThreadIdRef = useRef<string | null>(null);
 
-  // Re-initialize client when token changes to ensure fresh authentication
+  // Initialize client ONCE on mount with initial token
+  // Client doesn't need token updates - API route handles auth validation
   useEffect(() => {
-    if (clerkToken && apiUrl) {
-      console.log("[Client] Reinitializing client with fresh token");
+    if (clerkToken && apiUrl && !clientRef.current) {
+      console.log("[Client] Initializing client (one-time setup)");
       clientRef.current = new Client({
         apiUrl,
         apiKey: apiKey ?? undefined,

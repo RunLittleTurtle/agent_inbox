@@ -10,6 +10,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { AgentInbox } from "../types";
 import { useRouter } from "next/navigation";
 import { logger } from "../utils/logger";
+import { useAuth } from "@clerk/nextjs";
 
 /**
  * Hook for managing agent inboxes
@@ -29,6 +30,7 @@ export function useInboxes() {
   const { getSearchParam, updateQueryParams } = useQueryParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { getToken, isLoaded, isSignedIn } = useAuth(); // Get Clerk JWT token for cross-domain auth
   const [agentInboxes, setAgentInboxes] = useState<AgentInbox[]>([]);
   const initialLoadComplete = useRef(false);
 
@@ -38,6 +40,15 @@ export function useInboxes() {
    */
   useEffect(() => {
     if (typeof window === "undefined") {
+      return;
+    }
+    // Wait for Clerk to be loaded before fetching
+    if (!isLoaded) {
+      logger.log("Waiting for Clerk to load...");
+      return;
+    }
+    if (!isSignedIn) {
+      logger.log("User not signed in, skipping inbox fetch");
       return;
     }
     const initializeInboxes = async () => {
@@ -51,9 +62,9 @@ export function useInboxes() {
       }
     };
     initializeInboxes();
-    // Run only once on mount
+    // Run when Clerk auth state changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   /**
    * Load agent inboxes from Supabase and set up proper selection state
@@ -66,9 +77,15 @@ export function useInboxes() {
       }
 
       try {
+        // Get JWT token for cross-domain authentication
+        const token = await getToken();
+
         // Fetch inboxes from Supabase (auto-creates defaults if needed)
         const response = await fetch(`${process.env.NEXT_PUBLIC_CONFIG_URL || 'http://localhost:8000'}/api/config/inboxes`, {
           method: "GET",
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
           credentials: "include",
         });
 
@@ -147,7 +164,7 @@ export function useInboxes() {
         setAgentInboxes([]);
       }
     },
-    [getSearchParam, updateQueryParams]
+    [getSearchParam, updateQueryParams, getToken]
   );
 
   /**
@@ -157,10 +174,14 @@ export function useInboxes() {
   const addAgentInbox = useCallback(
     async (agentInbox: AgentInbox) => {
       try {
+        // Get JWT token for cross-domain authentication
+        const token = await getToken();
+
         const response = await fetch(`${process.env.NEXT_PUBLIC_CONFIG_URL || 'http://localhost:8000'}/api/config/inboxes`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
           credentials: "include",
           body: JSON.stringify({
@@ -202,7 +223,7 @@ export function useInboxes() {
         });
       }
     },
-    [updateQueryParams, router, toast, getAgentInboxes]
+    [updateQueryParams, router, toast, getAgentInboxes, getToken]
   );
 
   /**
@@ -212,8 +233,14 @@ export function useInboxes() {
   const deleteAgentInbox = useCallback(
     async (id: string) => {
       try {
+        // Get JWT token for cross-domain authentication
+        const token = await getToken();
+
         const response = await fetch(`${process.env.NEXT_PUBLIC_CONFIG_URL || 'http://localhost:8000'}/api/config/inboxes/${id}`, {
           method: "DELETE",
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
           credentials: "include",
         });
 
@@ -244,7 +271,7 @@ export function useInboxes() {
         });
       }
     },
-    [router, toast, getAgentInboxes]
+    [router, toast, getAgentInboxes, getToken]
   );
 
   /**
@@ -263,11 +290,15 @@ export function useInboxes() {
           }))
         );
 
+        // Get JWT token for cross-domain authentication
+        const token = await getToken();
+
         // Update selection in Supabase
         const response = await fetch(`${process.env.NEXT_PUBLIC_CONFIG_URL || 'http://localhost:8000'}/api/config/inboxes`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
           credentials: "include",
           body: JSON.stringify({ inbox_id: id }),
@@ -279,8 +310,8 @@ export function useInboxes() {
 
         logger.log("Inbox selection updated successfully:", id);
 
-        // Reload inboxes to get fresh state from server
-        await getAgentInboxes();
+        // Don't reload inboxes on success - the optimistic update handles it
+        // This prevents sidebar jumping/reordering
 
         // Update URL parameters (smooth transition, no reload)
         updateQueryParams(
@@ -294,11 +325,11 @@ export function useInboxes() {
         }
       } catch (error) {
         logger.error("Error changing selected inbox", error);
-        // Revert optimistic update on error
+        // Revert optimistic update on error - reload from server
         await getAgentInboxes();
       }
     },
-    [updateQueryParams, getAgentInboxes]
+    [updateQueryParams, getAgentInboxes, getToken, router]
   );
 
   /**
@@ -339,8 +370,14 @@ export function useInboxes() {
 
         logger.log("Creating default inboxes at:", endpoint);
 
+        // Get JWT token for cross-domain authentication
+        const token = await getToken();
+
         const response = await fetch(endpoint, {
           method: "POST",
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
           credentials: "include",
         });
 
@@ -394,7 +431,7 @@ export function useInboxes() {
         });
       }
     },
-    [toast, getAgentInboxes, router]
+    [toast, getAgentInboxes, router, getToken]
   );
 
   return {

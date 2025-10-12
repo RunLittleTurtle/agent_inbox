@@ -1,13 +1,28 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-
-// Define public routes (none for this app - everything requires auth)
-const isPublicRoute = createRouteMatcher([]);
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
 export default clerkMiddleware(async (auth, req) => {
-  // Protect all routes by default
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+  // Bypass Clerk auth for LangGraph SDK internal endpoints
+  // Note: LangGraph Platform auth.py handles authentication and owner filtering
+  const pathname = req.nextUrl.pathname;
+
+  // Skip Clerk auth for ALL LangGraph SDK internal endpoints:
+  // - /api/threads/{id}/history - State history endpoint
+  // - /api/threads/{id}/runs/stream - Streaming runs endpoint
+  // - /api/threads/{id}/state - State management endpoint
+  // - /api/threads - Thread management
+  // - /api/assistants/* - Assistant endpoints
+  const isLangGraphEndpoint =
+    pathname.match(/^\/api\/threads\/[^/]+\/(history|runs\/stream|state)$/) ||
+    pathname.match(/^\/api\/threads$/) ||
+    pathname.match(/^\/api\/assistants/);
+
+  if (isLangGraphEndpoint) {
+    // Skip Clerk auth - LangGraph Platform will validate JWT and enforce ownership
+    return;
   }
+
+  // Protect all other routes
+  await auth.protect();
 });
 
 export const config = {

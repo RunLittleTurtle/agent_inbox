@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -25,11 +25,55 @@ async function handleRequest(request: NextRequest) {
   }
 
   try {
-    // Get Clerk user ID
-    const { userId, getToken } = await auth();
-    const clerkToken = await getToken();
+    // Dual-mode authentication to support both regular requests and SDK requests
+    let userId: string | null = null;
+    let clerkToken: string | null = null;
 
+    // Primary method: Get from Clerk auth context (when middleware runs)
+    const authResult = await auth();
+    userId = authResult?.userId || null;
+
+    // Only try to get token if we have an auth result
+    if (authResult?.getToken) {
+      clerkToken = await authResult.getToken();
+    }
+
+    // Fallback method: Use authenticateRequest for SDK requests (when middleware is bypassed)
+    if (!userId && request.headers.get("authorization")) {
+      console.log("[API Route] No Clerk context, trying authenticateRequest for SDK request");
+
+      const client = await clerkClient();
+
+      // Build authorized parties list with proper type safety
+      const authorizedParties: string[] = [
+        'https://chat.mekanize.app',
+        'https://agent-chat-ui-2.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:3001',
+      ];
+
+      // Add NEXT_PUBLIC_APP_URL if it exists
+      if (process.env.NEXT_PUBLIC_APP_URL) {
+        authorizedParties.push(process.env.NEXT_PUBLIC_APP_URL);
+      }
+
+      const { isAuthenticated, toAuth } = await client.authenticateRequest(request, {
+        // Security: Only accept requests from our known domains
+        authorizedParties
+      });
+
+      if (isAuthenticated) {
+        const authData = toAuth();
+        userId = authData.userId;
+        // Use the token from the Authorization header since we already have it
+        clerkToken = request.headers.get("authorization")?.substring(7) || null;
+        console.log("[API Route] Authenticated via authenticateRequest, userId:", userId);
+      }
+    }
+
+    // Final check - if still no user ID, return unauthorized
     if (!userId) {
+      console.error("[API Route] No user ID found via auth() or authenticateRequest()");
       return NextResponse.json(
         { error: "Unauthorized - No user ID" },
         { status: 401 }

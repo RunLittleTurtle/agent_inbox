@@ -87,31 +87,58 @@ const StreamSession = ({
   const { getThreads, setThreads } = useThreads();
 
   // Get Clerk JWT for LangGraph custom auth (2025)
-  const { getToken } = useAuth();
+  const { getToken, isLoaded } = useAuth();
   const [clerkToken, setClerkToken] = useState<string | null>(null);
 
-  // Fetch Clerk token on mount and when it changes
+  // Fetch and auto-refresh Clerk token (tokens expire after 60 seconds)
+  // Keep refresh in background without forcing re-initialization
   useEffect(() => {
+    if (!isLoaded) return; // Wait for Clerk to load
+
+    // Initial token fetch
+    console.log("[Token] Fetching initial token...");
     getToken().then((token) => {
+      console.log("[Token] Initial token received");
       setClerkToken(token);
     });
-  }, [getToken]);
+
+    // Refresh token every 50 seconds (before the 60-second expiry)
+    // Token refresh happens silently in the background
+    const interval = setInterval(() => {
+      console.log("[Token] Background token refresh (50s interval)...");
+      getToken({ skipCache: true }).then((token) => {
+        console.log("[Token] Token refreshed silently");
+        setClerkToken(token);
+        // NOTE: No re-initialization - API route handles auth validation
+      }).catch((error) => {
+        console.error("[Token] Failed to refresh token:", error);
+      });
+    }, 50000); // 50 seconds
+
+    return () => {
+      console.log("[Token] Cleaning up token refresh interval");
+      clearInterval(interval);
+    };
+  }, [getToken, isLoaded]);
 
   // Create LangGraph client for manual run cancellation
   const clientRef = useRef<Client | null>(null);
   const currentRunIdRef = useRef<string | null>(null);
   const currentThreadIdRef = useRef<string | null>(null);
 
-  // Initialize client with Clerk JWT authentication
-  if (!clientRef.current && clerkToken) {
-    clientRef.current = new Client({
-      apiUrl,
-      apiKey: apiKey ?? undefined,
-      defaultHeaders: {
-        Authorization: `Bearer ${clerkToken}`,
-      },
-    });
-  }
+  // Re-initialize client when token changes to ensure fresh authentication
+  useEffect(() => {
+    if (clerkToken && apiUrl) {
+      console.log("[Client] Reinitializing client with fresh token");
+      clientRef.current = new Client({
+        apiUrl,
+        apiKey: apiKey ?? undefined,
+        defaultHeaders: {
+          Authorization: `Bearer ${clerkToken}`,
+        },
+      });
+    }
+  }, [clerkToken, apiUrl, apiKey]);
 
   const streamValue = useTypedStream({
     apiUrl,
@@ -119,7 +146,8 @@ const StreamSession = ({
     assistantId,
     threadId: threadId ?? null,
     fetchStateHistory: true,  // Required by SDK - 404 errors handled by onError callback below
-    // Pass Clerk JWT for authenticated streaming (fixes real-time message updates)
+    // Pass Clerk JWT for authenticated streaming
+    // Note: Token refreshes in background, API route handles validation
     defaultHeaders: clerkToken
       ? {
           Authorization: `Bearer ${clerkToken}`,
@@ -152,12 +180,32 @@ const StreamSession = ({
     onError: (error) => {
       console.error("[Stream Error]", error);
 
-      // Ignore 404 on legacy history endpoint - expected with fetchStateHistory:false
+      // Handle different types of streaming errors
       if (error && typeof error === 'object' && 'message' in error && 'status' in error) {
         const err = error as { message?: string; status?: number };
+
+        // Ignore 404 on legacy history endpoint - expected with fetchStateHistory:true
         if (err.message?.includes('/history') && err.status === 404) {
           console.log("[Stream] Ignoring legacy history 404 (expected behavior)");
           return; // Don't propagate this error
+        }
+
+        // Handle 404 on runs/stream endpoint - indicates routing issue
+        if (err.status === 404 && err.message?.includes('/runs/stream')) {
+          console.error("[Stream] Critical: API route not found for /runs/stream");
+          console.error("[Stream] This indicates the API proxy route is not properly configured");
+          toast.error("Connection Error", {
+            description: "Failed to connect to the streaming endpoint. The application will reload to reset the connection.",
+            duration: 5000,
+          });
+          // Force reload after a delay to reset hydration state
+          setTimeout(() => {
+            if (typeof window !== 'undefined') {
+              console.log("[Stream] Reloading page to reset connection...");
+              window.location.reload();
+            }
+          }, 3000);
+          return;
         }
 
         // For other stream errors, log for debugging

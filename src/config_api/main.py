@@ -433,6 +433,7 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
 
             merged[section_key] = {}
 
+            # First, process all fields from Python defaults
             for field_key, default_value in section_defaults.items():
                 user_value = user_overrides.get(section_key, {}).get(field_key) if isinstance(user_overrides.get(section_key), dict) else None
 
@@ -442,6 +443,19 @@ async def get_config_values(agent_id: Optional[str] = None, user_id: Optional[st
                     "current": user_value if user_value is not None else default_value,
                     "is_overridden": user_value is not None
                 }
+
+            # Then, add any additional fields from Supabase that aren't in Python defaults
+            # (e.g., oauth_tokens added by OAuth callback, credentials, etc.)
+            user_section = user_overrides.get(section_key, {})
+            if isinstance(user_section, dict):
+                for field_key, user_value in user_section.items():
+                    if field_key not in merged[section_key]:
+                        merged[section_key][field_key] = {
+                            "default": None,  # No default in Python code
+                            "user_override": user_value,
+                            "current": user_value,
+                            "is_overridden": True
+                        }
 
         # Also include sections from user_overrides that don't have defaults
         # (e.g., credentials saved in Supabase but not defined in config.py)

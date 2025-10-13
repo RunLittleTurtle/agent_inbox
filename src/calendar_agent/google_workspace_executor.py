@@ -1,9 +1,9 @@
 """
 Google Workspace Calendar Executor - Direct Google API Integration
-Implements the same interface as MCPToolExecutor for seamless provider swapping.
+Direct Google Calendar API access for calendar operations.
 
-This executor provides direct Google Calendar API access as the primary workflow,
-with Rube MCP as fallback when Google OAuth is not configured.
+This executor provides Google Calendar API integration through OAuth credentials
+stored in Supabase. Handles READ and WRITE operations for calendar events.
 """
 import time
 import asyncio
@@ -13,7 +13,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from .execution_result import MCPToolResult, ExecutionStatus, BookingExecutionResult
+from .execution_result import GoogleCalendarToolResult, ExecutionStatus, BookingExecutionResult
 from .state import BookingRequest
 
 
@@ -50,7 +50,7 @@ class GoogleWorkspaceExecutor:
     ) -> BookingExecutionResult:
         """
         Execute a complete booking request with proper error handling.
-        Matches MCPToolExecutor interface for seamless swapping.
+        Handles Google Calendar API operations with comprehensive error reporting.
 
         Args:
             booking_request: BookingRequest with event details
@@ -73,7 +73,7 @@ class GoogleWorkspaceExecutor:
         if booking_request.requires_event_id:
             event_id = event_data.get('event_id') or booking_request.original_args.get('event_id')
             if not event_id:
-                error_result = MCPToolResult(
+                error_result = GoogleCalendarToolResult(
                     tool_name=booking_request.tool_name,
                     status=ExecutionStatus.FAILED,
                     raw_result="Missing required event_id",
@@ -86,7 +86,7 @@ class GoogleWorkspaceExecutor:
             event_data['event_id'] = event_id
 
         # Get tools to execute
-        tools_to_execute = booking_request.mcp_tools_to_use or [booking_request.tool_name]
+        tools_to_execute = booking_request.tools_to_use or [booking_request.tool_name]
 
         # Execute each tool
         for tool_name in tools_to_execute:
@@ -103,17 +103,17 @@ class GoogleWorkspaceExecutor:
         self,
         tool_name: str,
         event_data: Dict[str, Any]
-    ) -> MCPToolResult:
+    ) -> GoogleCalendarToolResult:
         """
         Execute a single Google Calendar API operation.
-        Maps MCP tool names to Google API methods.
+        Maps Google Calendar tool names to Google API methods.
 
         Args:
-            tool_name: MCP-style tool name (e.g., 'google_calendar-create-event')
+            tool_name: Google Calendar tool name (e.g., 'google_calendar-create-event')
             event_data: Event data prepared for Google API
 
         Returns:
-            MCPToolResult with execution status
+            GoogleCalendarToolResult with execution status
         """
         start_time = time.time()
 
@@ -130,7 +130,7 @@ class GoogleWorkspaceExecutor:
             elif tool_name == 'google_calendar-quick-add-event':
                 result = await self._quick_add_event(event_data)
             else:
-                return MCPToolResult(
+                return GoogleCalendarToolResult(
                     tool_name=tool_name,
                     status=ExecutionStatus.FAILED,
                     raw_result=f"Unknown tool: {tool_name}",
@@ -141,8 +141,8 @@ class GoogleWorkspaceExecutor:
 
             execution_time = time.time() - start_time
 
-            # Parse result into MCPToolResult
-            return MCPToolResult(
+            # Parse result into GoogleCalendarToolResult
+            return GoogleCalendarToolResult(
                 tool_name=tool_name,
                 status=ExecutionStatus.SUCCESS,
                 raw_result=result,
@@ -151,7 +151,7 @@ class GoogleWorkspaceExecutor:
             )
 
         except HttpError as e:
-            return MCPToolResult(
+            return GoogleCalendarToolResult(
                 tool_name=tool_name,
                 status=ExecutionStatus.FAILED,
                 raw_result=str(e),
@@ -160,7 +160,7 @@ class GoogleWorkspaceExecutor:
                 execution_time=time.time() - start_time
             )
         except Exception as e:
-            return MCPToolResult(
+            return GoogleCalendarToolResult(
                 tool_name=tool_name,
                 status=ExecutionStatus.FAILED,
                 raw_result=str(e),

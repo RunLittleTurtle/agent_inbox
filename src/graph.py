@@ -204,14 +204,9 @@ async def calendar_agent_node(
     logger.info(f"[CONFIG]   Model: {model_name} (from Supabase: {bool(llm_config.get('model'))})")
     logger.info(f"[CONFIG]   Temperature: {temperature}")
 
-    # Extract MCP URL
-    mcp_integration = agent_config.get("mcp_integration", {})
-    mcp_url = mcp_integration.get("mcp_server_url")
-    logger.info(f"[CONFIG]   MCP URL: {mcp_url or 'Not configured'}")
-
-    # Delegate to existing CalendarAgentWithMCP implementation
-    # CalendarAgentWithMCP will load MCP tools using the user_id
-    from calendar_agent.calendar_orchestrator import CalendarAgentWithMCP
+    # Delegate to new simplified calendar agent implementation
+    # Uses create_react_agent with Google Workspace tools
+    from calendar_agent.calendar_orchestrator import create_calendar_agent
 
     # Determine correct API key based on model provider
     # CRITICAL: Only pass the API key that matches the model provider
@@ -233,14 +228,13 @@ async def calendar_agent_node(
     )
     logger.info(f"[CONFIG] Successfully created calendar model: {type(calendar_model).__name__}")
 
-    # Create calendar agent instance with runtime user_id
-    #  KEY CHANGE: Pass user_id from request config, not fallback "local_dev_user"
-    calendar_agent_instance = CalendarAgentWithMCP(
-        model=calendar_model, user_id=user_id
+    # Create calendar agent using simplified factory function
+    # This handles Google Workspace executor initialization and tool loading
+    agent = await create_calendar_agent(
+        model=calendar_model,
+        user_id=user_id,
+        agent_config=agent_config
     )
-    await calendar_agent_instance.initialize()
-
-    agent = await calendar_agent_instance.get_agent()
 
     # Invoke agent with current state
     result = await agent.ainvoke(state)

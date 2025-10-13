@@ -1,2 +1,2 @@
 # Calendar Agent Module
-# Modern LangGraph calendar agent with official langchain-mcp-adapters integration.
+# Modern LangGraph calendar agent with Google Workspace API integration.

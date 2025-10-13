@@ -56,7 +56,7 @@ class CalendarAnalysis(BaseModel):
     success: bool = Field(default=True, description="Whether operation succeeded")
     error_message: Optional[str] = Field(default=None, description="Error message if failed")
     execution_time: Optional[float] = Field(default=None, description="Execution time in seconds")
-    tools_used: List[str] = Field(default_factory=list, description="MCP tools used")
+    tools_used: List[str] = Field(default_factory=list, description="Google Calendar tools used")
 
 
 class RoutingDecision(BaseModel):
@@ -70,7 +70,6 @@ class RoutingDecision(BaseModel):
     booking_context: Optional[str] = Field(default=None, description="Full booking context from conversation")
     original_request: str = Field(..., description="Original user request that triggered routing")
     timestamp: datetime = Field(default_factory=datetime.now, description="When routing decision was made")
-    mcp_tools_to_use: Optional[List[str]] = Field(default=None, description="List of MCP tools to use for completing booking tasks")
 
 
 class BookingContext(BaseModel):
@@ -83,11 +82,10 @@ class BookingContext(BaseModel):
     previous_attempts: List[str] = Field(default_factory=list, description="Previous booking attempts")
     calendar_constraints: List[str] = Field(default_factory=list, description="Calendar availability constraints")
     extracted_details: Optional[Dict[str, Any]] = Field(default=None, description="Extracted booking details")
-    mcp_tools_to_use: Optional[List[str]] = Field(default=None, description="List of MCP tools to use for completing booking tasks")
 
 
 class BookingRequest(BaseModel):
-    """Structured booking request for MCP tool execution."""
+    """Structured booking request for Google Calendar tool execution."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
     title: str = Field(default="Untitled Event", description="Event title/summary")
@@ -96,7 +94,7 @@ class BookingRequest(BaseModel):
     description: Optional[str] = Field(default=None, description="Event description")
     location: Optional[str] = Field(default=None, description="Event location")
     attendees: List[str] = Field(default_factory=list, description="List of attendee emails")
-    tool_name: str = Field(..., description="MCP tool to execute")
+    tool_name: str = Field(..., description="Google Calendar tool to execute")
     requires_event_id: bool = Field(default=False, description="Whether operation requires existing event ID")
     color_id: Optional[str] = Field(default=None, description="Calendar color ID (1-11)")
     transparency: str = Field(default="opaque", description="Event transparency for availability")
@@ -106,8 +104,8 @@ class BookingRequest(BaseModel):
     reminders: Dict[str, Any] = Field(default_factory=lambda: {"useDefault": True}, description="Event reminders")
     recurrence: Optional[List[str]] = Field(default=None, description="Recurrence rules")
     conference_data: Optional[Dict[str, Any]] = Field(default=None, description="Video conference data")
-    mcp_tools_to_use: Optional[List[str]] = Field(default=None, description="List of MCP tools needed for complete operation")
-    original_args: Dict[str, Any] = Field(default_factory=dict, description="Original MCP tool arguments")
+    tools_to_use: Optional[List[str]] = Field(default=None, description="List of Google Calendar tools needed for complete operation")
+    original_args: Dict[str, Any] = Field(default_factory=dict, description="Original tool arguments")
 
 
 class AgentOutput(BaseModel):
@@ -195,16 +193,6 @@ class CalendarAgentState(BaseModel):
     timezone: str = Field(
         default="America/Toronto",
         description="User's timezone"
-    )
-
-    # MCP connection state
-    mcp_tools_loaded: bool = Field(
-        default=False,
-        description="Whether MCP tools are loaded"
-    )
-    mcp_session_active: bool = Field(
-        default=False,
-        description="Whether MCP session is active"
     )
 
     # Human-in-the-loop support

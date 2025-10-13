@@ -1,19 +1,14 @@
 """
-Tool Executor Factory - Provider Selection Logic
-Selects appropriate calendar executor based on available credentials.
+Tool Executor Factory - Google Workspace Only
+Creates Google Workspace executor with OAuth credentials from Supabase.
 
-This factory implements the Strategy pattern to abstract provider selection:
-- Google Workspace API (primary): Direct Google Calendar API access
-- Rube MCP (fallback): Universal MCP server with OAuth to 500+ apps
-
-The factory makes it easy to add more providers in the future
+This factory implements the Strategy pattern for future provider additions
 (Microsoft Graph, Apple Calendar, etc.) without changing booking_node or calendar_orchestrator.
 """
 import logging
-from typing import Optional, Union, List, Tuple
+from typing import Optional, List, Tuple
 from langchain_core.tools import BaseTool
 
-from .mcp_executor import MCPToolExecutor
 from .google_workspace_executor import GoogleWorkspaceExecutor
 
 # Import tool wrapper utility
@@ -37,84 +32,43 @@ logger = logging.getLogger(__name__)
 
 
 class ExecutorFactory:
-    """Factory for creating the appropriate tool executor based on credential availability"""
+    """Factory for creating Google Workspace calendar executor"""
 
     @staticmethod
     async def create_executor(
-        user_id: Optional[str] = None,
-        mcp_tools: Optional[List[BaseTool]] = None,
-        provider_preference: str = "auto"
-    ) -> Tuple[Union[GoogleWorkspaceExecutor, MCPToolExecutor], List[BaseTool]]:
+        user_id: str
+    ) -> Tuple[GoogleWorkspaceExecutor, List[BaseTool]]:
         """
-        Create executor AND read-only tools based on credential availability.
-
-        Priority (when provider_preference="auto"):
-        1. Google Workspace API (if OAuth credentials available)
-        2. Rube MCP (if MCP tools available)
-        3. Raise error if neither available
+        Create Google Workspace executor AND read-only tools.
 
         Args:
-            user_id: Clerk user ID for loading credentials
-            mcp_tools: List of MCP tools (for Rube MCP fallback)
-            provider_preference: Provider selection strategy:
-                - "auto": Try Google first, fallback to Rube MCP
-                - "google_only": Only use Google Workspace API
-                - "rube_only": Only use Rube MCP
+            user_id: Clerk user ID for loading OAuth credentials from Supabase
 
         Returns:
             Tuple of (executor, read_tools):
-            - executor: GoogleWorkspaceExecutor or MCPToolExecutor for WRITE operations
+            - executor: GoogleWorkspaceExecutor for WRITE operations (bookings)
             - read_tools: List of READ-ONLY tools for calendar_agent node
 
         Raises:
-            ValueError: If no executor can be created with available credentials
+            ValueError: If Google OAuth credentials not available
         """
-        logger.info(f"Creating executor for user_id={user_id}, preference={provider_preference}")
+        logger.info(f"Creating Google Workspace executor for user_id={user_id}")
 
-        # Handle preference-based selection
-        if provider_preference == "google_only":
-            executor = await ExecutorFactory._create_google_executor(user_id, required=True)
-            read_tools = await ExecutorFactory._get_read_tools(executor)
-            return executor, read_tools
+        # Create Google Workspace executor (required - no fallback)
+        executor = await ExecutorFactory._create_google_executor(user_id, required=True)
 
-        elif provider_preference == "rube_only":
-            executor = await ExecutorFactory._create_mcp_executor(mcp_tools, required=True)
-            # MCP tools are handled separately in calendar_orchestrator
-            return executor, []
+        # Get read-only tools from executor
+        read_tools = await ExecutorFactory._get_read_tools(executor)
 
-        # Auto selection: Try Google first, fallback to Rube MCP
-        elif provider_preference == "auto":
-            # Try Google Workspace first
-            google_executor = await ExecutorFactory._create_google_executor(user_id, required=False)
-            if google_executor:
-                logger.info("Using Google Workspace API executor (primary workflow)")
-                read_tools = await ExecutorFactory._get_read_tools(google_executor)
-                return google_executor, read_tools
-
-            # Fallback to Rube MCP
-            logger.info("Google OAuth not configured, falling back to Rube MCP")
-            mcp_executor = await ExecutorFactory._create_mcp_executor(mcp_tools, required=False)
-            if mcp_executor:
-                logger.info("Using Rube MCP executor (fallback workflow)")
-                # MCP tools are handled separately in calendar_orchestrator
-                return mcp_executor, []
-
-            # Neither available
-            raise ValueError(
-                "No calendar executor available. "
-                "Configure Google OAuth or Rube MCP server to enable calendar operations."
-            )
-
-        else:
-            raise ValueError(f"Unknown provider_preference: {provider_preference}")
+        return executor, read_tools
 
     @staticmethod
     async def _create_google_executor(
-        user_id: Optional[str],
-        required: bool = False
+        user_id: str,
+        required: bool = True
     ) -> Optional[GoogleWorkspaceExecutor]:
         """
-        Try to create Google Workspace executor.
+        Create Google Workspace executor with OAuth credentials.
 
         Args:
             user_id: Clerk user ID
@@ -126,12 +80,13 @@ class ExecutorFactory:
         Raises:
             ValueError: If required=True and credentials not available
         """
-        print(f"\n[EXECUTOR_FACTORY] _create_google_executor for user: {user_id}")
+        print(f"\n[EXECUTOR_FACTORY] Creating Google Workspace executor for user: {user_id}")
 
         if not GOOGLE_OAUTH_AVAILABLE:
             print(f"[EXECUTOR_FACTORY] ❌ Google OAuth utilities not available")
+            error_msg = "Google OAuth utilities not available. Install google-auth and google-api-python-client."
             if required:
-                raise ValueError("Google OAuth utilities not available")
+                raise ValueError(error_msg)
             return None
 
         if not user_id:
@@ -155,8 +110,9 @@ class ExecutorFactory:
                 return executor
             else:
                 print(f"[EXECUTOR_FACTORY] ❌ No Google OAuth credentials in Supabase for user {user_id}")
+                error_msg = f"No Google OAuth credentials found for user {user_id}. Please connect Google Calendar in the config app."
                 if required:
-                    raise ValueError(f"No Google OAuth credentials found for user {user_id}")
+                    raise ValueError(error_msg)
                 logger.info(f"No Google OAuth credentials for user {user_id}")
                 return None
 
@@ -170,148 +126,39 @@ class ExecutorFactory:
             return None
 
     @staticmethod
-    async def _create_mcp_executor(
-        mcp_tools: Optional[List[BaseTool]],
-        required: bool = False
-    ) -> Optional[MCPToolExecutor]:
+    async def _get_read_tools(executor: GoogleWorkspaceExecutor) -> List[BaseTool]:
         """
-        Try to create Rube MCP executor.
+        Get READ-ONLY tools from Google Workspace executor.
 
         Args:
-            mcp_tools: List of MCP tools
-            required: If True, raise error if tools not available
-
-        Returns:
-            MCPToolExecutor or None
-
-        Raises:
-            ValueError: If required=True and tools not available
-        """
-        if not mcp_tools or len(mcp_tools) == 0:
-            if required:
-                raise ValueError("No MCP tools available for Rube MCP executor")
-            logger.info("No MCP tools provided, skipping Rube MCP executor")
-            return None
-
-        logger.info(f"Creating Rube MCP executor with {len(mcp_tools)} tools")
-        return MCPToolExecutor(mcp_tools)
-
-    @staticmethod
-    async def _get_read_tools(executor) -> List[BaseTool]:
-        """
-        Get READ-ONLY tools from executor for calendar_agent node.
-
-        Args:
-            executor: GoogleWorkspaceExecutor or MCPToolExecutor
+            executor: GoogleWorkspaceExecutor instance
 
         Returns:
             List of READ-ONLY LangChain tools (list-events, get-event, list-calendars)
         """
-        print(f"\n[EXECUTOR_FACTORY] _get_read_tools called")
+        print(f"\n[EXECUTOR_FACTORY] Getting READ tools from executor")
         print(f"[EXECUTOR_FACTORY] Executor type: {type(executor).__name__}")
-        print(f"[EXECUTOR_FACTORY] Is GoogleWorkspaceExecutor: {isinstance(executor, GoogleWorkspaceExecutor)}")
 
-        if isinstance(executor, GoogleWorkspaceExecutor):
-            if not GOOGLE_WORKSPACE_TOOLS_AVAILABLE:
-                print(f"[EXECUTOR_FACTORY] ❌ google_workspace_tools module not available!")
-                logger.warning("google_workspace_tools not available - returning empty tool list")
-                return []
-
-            try:
-                print(f"[EXECUTOR_FACTORY] Creating Google Workspace READ tools...")
-                read_tools = create_google_workspace_read_tools(executor)
-                print(f"[EXECUTOR_FACTORY] ✅ Created {len(read_tools)} Google Workspace READ tools:")
-                for tool in read_tools:
-                    print(f"[EXECUTOR_FACTORY]    - {tool.name}")
-                logger.info(f"Created {len(read_tools)} Google Workspace READ tools")
-                return read_tools
-            except Exception as e:
-                print(f"[EXECUTOR_FACTORY] ❌ EXCEPTION creating Google Workspace tools:")
-                logger.error(f"Error creating Google Workspace tools: {e}")
-                import traceback
-                traceback.print_exc()
-                return []
-        else:
-            # For MCP executors, tools are handled separately in calendar_orchestrator
-            print(f"[EXECUTOR_FACTORY] Not GoogleWorkspaceExecutor (is {type(executor).__name__})")
+        if not isinstance(executor, GoogleWorkspaceExecutor):
+            print(f"[EXECUTOR_FACTORY] ❌ Expected GoogleWorkspaceExecutor, got {type(executor).__name__}")
             return []
 
-    @staticmethod
-    async def get_provider_status(
-        user_id: Optional[str] = None,
-        mcp_tools: Optional[List[BaseTool]] = None
-    ) -> dict:
-        """
-        Get status of available calendar providers.
+        if not GOOGLE_WORKSPACE_TOOLS_AVAILABLE:
+            print(f"[EXECUTOR_FACTORY] ❌ google_workspace_tools module not available!")
+            logger.warning("google_workspace_tools not available - returning empty tool list")
+            return []
 
-        This is useful for UI display to show which providers are configured.
-
-        Args:
-            user_id: Clerk user ID
-            mcp_tools: List of MCP tools
-
-        Returns:
-            Dict with provider availability:
-            {
-                'google_workspace': {'available': bool, 'reason': str},
-                'rube_mcp': {'available': bool, 'reason': str},
-                'recommended': str  # Which provider would be used with "auto"
-            }
-        """
-        status = {
-            'google_workspace': {'available': False, 'reason': ''},
-            'rube_mcp': {'available': False, 'reason': ''},
-            'recommended': None
-        }
-
-        # Check Google Workspace
-        if GOOGLE_OAUTH_AVAILABLE and user_id:
-            try:
-                has_google = await check_google_credentials_available(user_id)
-                if has_google:
-                    status['google_workspace'] = {
-                        'available': True,
-                        'reason': 'OAuth credentials configured'
-                    }
-                else:
-                    status['google_workspace'] = {
-                        'available': False,
-                        'reason': 'OAuth not configured'
-                    }
-            except Exception as e:
-                status['google_workspace'] = {
-                    'available': False,
-                    'reason': f'Error: {str(e)}'
-                }
-        elif not GOOGLE_OAUTH_AVAILABLE:
-            status['google_workspace'] = {
-                'available': False,
-                'reason': 'OAuth utilities not installed'
-            }
-        else:
-            status['google_workspace'] = {
-                'available': False,
-                'reason': 'No user_id provided'
-            }
-
-        # Check Rube MCP
-        if mcp_tools and len(mcp_tools) > 0:
-            status['rube_mcp'] = {
-                'available': True,
-                'reason': f'{len(mcp_tools)} MCP tools loaded'
-            }
-        else:
-            status['rube_mcp'] = {
-                'available': False,
-                'reason': 'MCP server not configured'
-            }
-
-        # Determine recommended provider
-        if status['google_workspace']['available']:
-            status['recommended'] = 'google_workspace'
-        elif status['rube_mcp']['available']:
-            status['recommended'] = 'rube_mcp'
-        else:
-            status['recommended'] = None
-
-        return status
+        try:
+            print(f"[EXECUTOR_FACTORY] Creating Google Workspace READ tools...")
+            read_tools = create_google_workspace_read_tools(executor)
+            print(f"[EXECUTOR_FACTORY] ✅ Created {len(read_tools)} Google Workspace READ tools:")
+            for tool in read_tools:
+                print(f"[EXECUTOR_FACTORY]    - {tool.name}")
+            logger.info(f"Created {len(read_tools)} Google Workspace READ tools")
+            return read_tools
+        except Exception as e:
+            print(f"[EXECUTOR_FACTORY] ❌ EXCEPTION creating Google Workspace tools:")
+            logger.error(f"Error creating Google Workspace tools: {e}")
+            import traceback
+            traceback.print_exc()
+            return []

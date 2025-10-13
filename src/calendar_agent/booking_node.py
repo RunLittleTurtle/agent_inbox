@@ -30,10 +30,8 @@ from shared_utils import DEFAULT_LLM_MODEL
 
 from .state import BookingRequest
 from .execution_result import ExecutionStatus
-from .mcp_executor import MCPToolExecutor
 from .google_workspace_executor import GoogleWorkspaceExecutor
 from .prompt import get_booking_extraction_prompt
-from typing import Union
 
 
 
@@ -51,14 +49,14 @@ class BookingNode:
 
     def __init__(
         self,
-        executor: Union[GoogleWorkspaceExecutor, MCPToolExecutor],
+        executor: GoogleWorkspaceExecutor,
         model: Optional[ChatAnthropic] = None
     ):
         """
-        Initialize BookingNode with provider-agnostic executor.
+        Initialize BookingNode with Google Workspace executor.
 
         Args:
-            executor: Calendar executor (Google Workspace or Rube MCP)
+            executor: Google Workspace Calendar executor
             model: LLM model for extraction and analysis
         """
         from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
@@ -141,7 +139,7 @@ class BookingNode:
                 action = validation_result["action"]
 
                 if action == "approve":
-                    # Execute the booking using the configured executor (Google or MCP)
+                    # Execute the booking using the Google Workspace executor
                     execution_result = await self.executor.execute_booking_request(
                         booking_request,
                         validation_result.get("modifications", {})
@@ -299,14 +297,14 @@ class BookingNode:
                 json_str = content_str[start:end]
                 result = json.loads(json_str)
 
-                # Handle tool_name as list (convert to mcp_tools_to_use)
+                # Handle tool_name as list (convert to tools_to_use)
                 if 'tool_name' in result and isinstance(result['tool_name'], list):
-                    # Multiple tools needed - move to mcp_tools_to_use
-                    result['mcp_tools_to_use'] = result['tool_name']
+                    # Multiple tools needed - move to tools_to_use
+                    result['tools_to_use'] = result['tool_name']
                     result['tool_name'] = result['tool_name'][0] if result['tool_name'] else None
                 elif 'tool_name' in result and isinstance(result['tool_name'], str):
-                    # Single tool - also add to mcp_tools_to_use for consistency
-                    result['mcp_tools_to_use'] = [result['tool_name']]
+                    # Single tool - also add to tools_to_use for consistency
+                    result['tools_to_use'] = [result['tool_name']]
 
                 # Add event_id to original_args if found
                 if event_id and 'original_args' in result:
@@ -444,4 +442,4 @@ class BookingNode:
             print(f"Error processing modifications: {e}")
             return None
 
-    # REMOVED: Old _execute_booking method replaced by MCPToolExecutor for better reliability
+    # REMOVED: Old _execute_booking method replaced by GoogleWorkspaceExecutor for better reliability

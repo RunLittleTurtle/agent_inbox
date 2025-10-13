@@ -1,6 +1,6 @@
 """
 Execution Result Management for Calendar Operations
-Single source of truth for MCP tool execution results and state management.
+Single source of truth for Google Calendar tool execution results and state management.
 """
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Union
@@ -10,7 +10,7 @@ from uuid import uuid4
 
 
 class ExecutionStatus(str, Enum):
-    """Status of MCP tool execution"""
+    """Status of Google Calendar tool execution"""
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     SUCCESS = "success"
@@ -19,11 +19,11 @@ class ExecutionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class MCPToolResult(BaseModel):
-    """Structured result from a single MCP tool execution"""
-    tool_name: str = Field(..., description="Name of the MCP tool")
+class GoogleCalendarToolResult(BaseModel):
+    """Structured result from a single Google Calendar tool execution"""
+    tool_name: str = Field(..., description="Name of the Google Calendar tool")
     status: ExecutionStatus = Field(..., description="Execution status")
-    raw_result: Any = Field(..., description="Raw result from MCP tool")
+    raw_result: Any = Field(..., description="Raw result from Google Calendar tool")
     success: bool = Field(..., description="Whether the operation succeeded")
     error_message: Optional[str] = Field(default=None, description="Error message if failed")
     api_restrictions: List[str] = Field(default_factory=list, description="API restrictions encountered")
@@ -44,14 +44,14 @@ class MCPToolResult(BaseModel):
 
 
 class BookingExecutionResult(BaseModel):
-    """Complete result of a booking operation (may involve multiple MCP tools)"""
+    """Complete result of a booking operation (may involve multiple Google Calendar tools)"""
     execution_id: str = Field(default_factory=lambda: str(uuid4()), description="Unique execution ID")
     booking_title: str = Field(..., description="Title of the booking")
     user_request: str = Field(..., description="Original user request")
     overall_status: ExecutionStatus = Field(..., description="Overall execution status")
 
-    # MCP tool results
-    tool_results: List[MCPToolResult] = Field(default_factory=list, description="Results from all MCP tools")
+    # Google Calendar tool results
+    tool_results: List[GoogleCalendarToolResult] = Field(default_factory=list, description="Results from all Google Calendar tools")
 
     # Metadata
     started_at: datetime = Field(default_factory=datetime.now, description="When execution started")
@@ -67,7 +67,7 @@ class BookingExecutionResult(BaseModel):
     error_message: str = Field(default="", description="Message for errors")
     info_message: str = Field(default="", description="Additional information for user")
 
-    def add_tool_result(self, result: MCPToolResult):
+    def add_tool_result(self, result: GoogleCalendarToolResult):
         """Add a tool result and update overall status"""
         self.tool_results.append(result)
 

@@ -7,14 +7,12 @@ Following LangChain v1 Multi-Agent Pattern:
 - Standalone async functions that close over the executor instance
 - Ensures tools survive serialization through LangGraph node transitions
 
-These tools maintain the same naming convention as Rube MCP tools:
+Google Calendar READ-ONLY tools:
 - google_calendar-list-events
 - google_calendar-get-event
 - google_calendar-list-calendars
 
-This allows the calendar agent to work seamlessly with either:
-- Google Workspace API (direct, fast, cheap)
-- Rube MCP (fallback, universal access)
+The calendar agent uses Google Workspace API for direct, fast calendar access.
 """
 
 from typing import List, Optional
@@ -67,7 +65,7 @@ def create_google_workspace_read_tools(executor) -> List[BaseTool]:
         executor: GoogleWorkspaceExecutor instance with READ methods
 
     Returns:
-        List of LangChain Tools matching MCP tool naming convention
+        List of LangChain Tools for Google Calendar API operations
 
     Design Pattern (LangChain v1):
         Per multi-agent docs, tools should be standalone functions, not bound methods.

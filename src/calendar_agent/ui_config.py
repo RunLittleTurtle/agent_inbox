@@ -178,33 +178,6 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'mcp_integration',
-        'label': 'MCP Server Configuration',
-        'description': 'API connection settings for external services',
-        'fields': [
-            {
-                'key': 'mcp_env_var',
-                'label': 'MCP Environment Variable',
-                'type': 'text',
-                'readonly': True,
-                'default': 'RUBE_MCP_SERVER',
-                'description': 'Name of the environment variable containing the Rube MCP server URL (read-only)',
-                'placeholder': 'RUBE_MCP_SERVER',
-                'required': False,
-                'note': 'This shows which environment variable is used. Configured in agent code.'
-            },
-            {
-                'key': 'mcp_server_url',
-                'label': 'Rube MCP Server URL',
-                'type': 'text',
-                'description': 'The Rube MCP server URL with OAuth access to 500+ apps (editable - updates .env file)',
-                'placeholder': 'https://rube.app/mcp',
-                'required': False,
-                'note': 'Editing this updates the URL in your .env file. Requires OAuth authentication.'
-            }
-        ]
-    },
-    {
         'key': 'google_workspace_integration',
         'label': 'Google Workspace Authentication',
         'description': 'Direct Google Calendar API access (primary workflow for faster, cheaper operations)',
@@ -225,20 +198,6 @@ CONFIG_SECTIONS = [
                 'action': 'initiate_google_oauth',
                 'description': 'Start Google OAuth flow to grant calendar access',
                 'note': 'Opens OAuth consent screen in new window. You\'ll be asked to grant calendar permissions.'
-            },
-            {
-                'key': 'calendar_provider',
-                'label': 'Provider Priority',
-                'type': 'select',
-                'default': 'auto',
-                'description': 'Choose which calendar provider to use for operations',
-                'options': [
-                    'auto',
-                    'google_only',
-                    'rube_only'
-                ],
-                'placeholder': 'auto',
-                'note': 'auto: Try Google first, fallback to Rube MCP (recommended) | google_only: Only use Google Workspace | rube_only: Only use Rube MCP'
             },
             {
                 'key': 'google_client_id',

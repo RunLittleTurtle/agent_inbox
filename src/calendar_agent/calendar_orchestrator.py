@@ -1,753 +1,292 @@
 """
-Calendar Agent using official langchain-mcp-adapters patterns
-Implementation following the latest langchain-mcp-adapters from GitHub.
-Reference: https://github.com/langchain-ai/langchain-mcp-adapters
+Calendar Agent - Google Workspace Only (Simplified)
+Uses create_react_agent prebuilt with Google Calendar API integration.
+
+Following LangGraph 2025 best practices:
+- Prebuilt create_react_agent for agent logic
+- Google Workspace API via ExecutorFactory
+- User-editable prompts from Supabase
+- Human-in-the-loop via booking_node with interrupt()
+- Simple, maintainable architecture (KISS principle)
 """
 import os
-import asyncio
 import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import BaseMessage
 from langchain_core.tools import BaseTool
-from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
-
-# Local dev only - uses git submodules from library/
-# In deployment, these packages come from requirements.txt (pip-installed from PyPI)
-# import sys
-# import os
-# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langgraph'))
-# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../library/langchain-mcp-adapters'))
-
-from utils.llm_utils import get_llm
-from shared_utils import DEFAULT_LLM_MODEL
-
-
-# Local LangGraph imports
+from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph, MessagesState, START, END
-from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent
-from langgraph.checkpoint.memory import MemorySaver
 
-# Local langchain-mcp-adapters imports
-from langchain_mcp_adapters.client import MultiServerMCPClient
-
-from .state import CalendarAgentState, RoutingDecision, BookingContext
-from .prompt import get_formatted_prompt_with_context, get_no_tools_prompt, get_routing_system_prompt
+from shared_utils import DEFAULT_LLM_MODEL
+from .prompt import get_formatted_prompt_with_context, get_no_tools_prompt
 from .executor_factory import ExecutorFactory
-from uuid import uuid4
+from .booking_node import BookingNode
 
-# Import OAuth token utilities
-try:
-    from utils.mcp_auth import get_mcp_oauth_tokens_dual
-    MCP_OAUTH_AVAILABLE = True
-except ImportError:
-    print("[Warning] utils.mcp_auth not available - OAuth tokens will not be loaded")
-    MCP_OAUTH_AVAILABLE = False
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
-class CalendarAgentWithMCP:
+class CalendarAgent:
     """
-    Calendar agent using official langchain-mcp-adapters patterns.
-    Updated to follow latest GitHub implementation patterns with caching and timeout protection.
+    Simplified Calendar Agent using Google Workspace API only.
+
+    Architecture:
+    - READ operations: Google Workspace API via create_react_agent tools
+    - WRITE operations: booking_node with human-in-the-loop approval
+    - Prompts: User-editable from Supabase config
+    - State: MessagesState (simple, standard)
     """
 
     def __init__(
         self,
         model: Optional[ChatAnthropic] = None,
-        mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None,
         user_id: Optional[str] = None
     ):
-        from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION, RUBE_AUTH_TOKEN
+        """
+        Initialize calendar agent with Google Workspace integration.
 
-        # Setup logging first
+        Args:
+            model: LLM model for agent reasoning
+            user_id: Clerk user ID for loading user-specific config
+        """
+        from .config import LLM_CONFIG, USER_TIMEZONE
+
+        # Setup logging
         self.logger = logging.getLogger(__name__)
         self.user_id = user_id
+        self.timezone = USER_TIMEZONE
 
         # Use centralized get_llm for cross-provider support
         if model:
             self.model = model
         else:
+            from utils.llm_utils import get_llm
             model_name = LLM_CONFIG.get("model", DEFAULT_LLM_MODEL)
             temperature = LLM_CONFIG.get("temperature", 0.1)
             self.model = get_llm(model_name, temperature=temperature)
 
-        # MCP server configuration with OAuth token support
-        rube_url = None
-        auth_token = None
+        # Agent components (initialized async)
+        self.executor = None
+        self.tools = []
+        self.agent_graph = None
+        self._initialized = False
 
-        # Try loading OAuth tokens first (new Rube MCP method)
-        if MCP_OAUTH_AVAILABLE and user_id:
-            try:
-                self.logger.info(f"[OAUTH] Attempting to load OAuth tokens for user_id={user_id}, agent_id=calendar_agent")
-                oauth_data = get_mcp_oauth_tokens_dual(user_id, "calendar_agent")
-                if oauth_data:
-                    auth_token = oauth_data.get("access_token")
-                    rube_url = oauth_data.get("mcp_url")
-                    token_preview = auth_token[:20] + "..." if auth_token and len(auth_token) > 20 else "NONE"
-                    self.logger.info(f"[OAUTH] Successfully loaded OAuth token for calendar_agent")
-                    self.logger.info(f"[OAUTH] Token length: {len(auth_token) if auth_token else 0} chars")
-                    self.logger.info(f"[OAUTH] Token preview: {token_preview}")
-                    self.logger.info(f"[OAUTH] MCP URL: {rube_url}")
-                else:
-                    self.logger.warning(f"[OAUTH] No OAuth tokens found, falling back to user config or .env")
-            except Exception as e:
-                self.logger.error(f"[OAUTH] Failed to load OAuth tokens: {e}")
-                import traceback
-                traceback.print_exc()
-
-        # Fallback to user-specific config from Supabase
-        if not rube_url and user_id:
-            user_config = self._load_user_config(user_id)
-            rube_url = user_config.get("mcp_server_url")
-            self.logger.info(f"Loaded user config for {user_id}: MCP URL = {rube_url[:50] if rube_url else 'None'}...")
-
-        # Fallback to .env if no user config
-        if not rube_url:
-            from .config import MCP_SERVER_URL
-            rube_url = MCP_SERVER_URL
-            auth_token = auth_token or RUBE_AUTH_TOKEN
-            self.logger.info(f"Using .env MCP_SERVER_URL: {rube_url[:50] if rube_url else 'None'}...")
-
-        # Configure MCP server with Bearer token authentication
-        if rube_url:
-            server_config = {
-                "url": rube_url,
-                "transport": "streamable_http"
-            }
-
-            # Add auth headers if token is available
-            if auth_token:
-                server_config["headers"] = {
-                    "Authorization": f"Bearer {auth_token}"
-                }
-                self.logger.info(f"[MCP] Configured Rube MCP with Bearer token authentication")
-                self.logger.info(f"[MCP] Server config: url={rube_url}, transport=streamable_http")
-            else:
-                self.logger.warning(f"[MCP] No Rube auth token found - MCP connection may fail")
-
-            self.mcp_servers = mcp_servers or {
-                "rube_calendar": server_config
-            }
-        else:
-            # No MCP server configured
-            self.mcp_servers = mcp_servers or {}
-            self.logger.warning("No MCP server URL configured - calendar agent will have no tools")
-
-        # MCP client and tools (initialized async) with caching
-        self._mcp_client: Optional[MultiServerMCPClient] = None
-        self._mcp_tools: List[BaseTool] = []
-        self._tools_cache_time: Optional[datetime] = None
-        self.tools: List[BaseTool] = []
-        self.graph = None
-
-    def _load_user_config(self, user_id: str) -> Dict[str, Any]:
-        """
-        Load user-specific configuration from Supabase agent_configs table.
-
-        Args:
-            user_id: Clerk user ID
-
-        Returns:
-            Dict with mcp_server_url or empty dict if not found
-        """
-        try:
-            # Import here to avoid circular dependencies
-            import sys
-            import os
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-            from utils.config_utils import get_agent_config_from_supabase
-
-            # Load agent-specific config from Supabase
-            agent_config = get_agent_config_from_supabase(user_id, "calendar_agent")
-
-            # Extract MCP URL from config
-            mcp_integration = agent_config.get("mcp_integration", {})
-            mcp_url = mcp_integration.get("mcp_server_url")
-
-            if mcp_url:
-                self.logger.info(f"Found MCP URL in Supabase for user {user_id}")
-                return {"mcp_server_url": mcp_url}
-            else:
-                self.logger.info(f"No MCP URL configured in Supabase for user {user_id}")
-                return {}
-
-        except Exception as e:
-            self.logger.error(f"Error loading user config from Supabase: {e}")
-            self.logger.info("Falling back to .env configuration")
-            return {}
-
-    async def _get_mcp_tools(self):
-        """Get MCP tools with aggressive connection reuse and caching to prevent memory leaks"""
-
-        # Cache tools for 5 minutes to prevent excessive MCP server connections
-        # This reduces load on the external MCP server and improves performance
-        if (self._mcp_tools and self._tools_cache_time and
-            datetime.now() - self._tools_cache_time < timedelta(minutes=5)):
-            return self._mcp_tools
-
-        # Use the configured MCP server URL
-        mcp_url = self.mcp_servers.get("rube_calendar", {}).get("url")
-        if not mcp_url:
-            raise ValueError("Rube MCP server URL not configured")
-
-        self.logger.info(f"Connecting to Rube MCP server: {mcp_url}")
-
-        # Reuse MCP client instance to prevent memory leaks
-        # Creating new clients for each request can cause resource exhaustion
-        if self._mcp_client is None:
-            self._mcp_client = MultiServerMCPClient(self.mcp_servers)
-
-        # Add timeout to prevent hanging connections
-        try:
-            tools = await asyncio.wait_for(
-                self._mcp_client.get_tools(),
-                timeout=30.0  # 30 second timeout
-            )
-            self.logger.info(f"Loaded {len(tools)} MCP tools: {[t.name for t in tools]}")
-        except asyncio.TimeoutError:
-            self.logger.error("MCP tools loading timed out")
-            raise Exception("MCP server connection timed out")
-
-        # Cache results
-        self._mcp_tools = tools
-        self._tools_cache_time = datetime.now()
-        return tools
+        self.logger.info(f"[CalendarAgent] Created for user_id={user_id}")
 
     async def initialize(self):
-        """Initialize MCP client and load tools using official patterns"""
+        """
+        Initialize Google Workspace executor and tools.
+        Must be called before using the agent.
+        """
+        if self._initialized:
+            return
+
+        self.logger.info(f"[CalendarAgent] Initializing Google Workspace integration...")
+
         try:
-            # Use improved MCP connection with caching and timeout
-            all_tools = await self._get_mcp_tools()
+            # Create Google Workspace executor and READ tools
+            self.executor, self.tools = await ExecutorFactory.create_executor(self.user_id)
 
-            # Filter tools: separate booking tools from read-only tools
-            booking_tool_names = {
-                'google_calendar-quick-add-event',
-                'google_calendar-create-event',
-                'google_calendar-delete-event',
-                'google_calendar-add-attendees-to-event',
-                'google_calendar-update-event'
-            }
-
-            # Tools that don't work properly and should be excluded
-            excluded_tool_names = {
-                'google_calendar-query-free-busy-calendars'  # This tool doesn't work, use list-events instead
-            }
-
-            booking_tools = []
-            self.tools = []
-
-            for tool in all_tools:
-                if tool.name in excluded_tool_names:
-                    print(f"   EXCLUDED: {tool.name} (doesn't work properly)")
-                    continue
-                elif tool.name in booking_tool_names:
-                    booking_tools.append(tool)
-                else:
-                    self.tools.append(tool)
-
-            print(f"Loaded {len(self.tools)} read-only calendar tools")
+            self.logger.info(f"[CalendarAgent] ✅ Loaded {len(self.tools)} Google Workspace READ tools")
             for tool in self.tools:
-                print(f"   {tool.name}: {tool.description}")
+                self.logger.info(f"[CalendarAgent]    - {tool.name}")
 
-            print(f"Separated {len(booking_tools)} booking tools for approval workflow")
-            for tool in booking_tools:
-                print(f"   {tool.name}: [REQUIRES APPROVAL]")
-
-            # Create executor using factory pattern AND get read-only tools
-            # Priority: Google Workspace (primary) -> Rube MCP (fallback)
-            print(f"\n[CALENDAR_AGENT] Calling ExecutorFactory for user {self.user_id}")
-            print(f"[CALENDAR_AGENT] Available MCP booking tools: {len(booking_tools)}")
-
-            self.executor, google_read_tools = await ExecutorFactory.create_executor(
-                user_id=self.user_id,
-                mcp_tools=booking_tools,
-                provider_preference="auto"  # Try Google first, fallback to Rube MCP
+            # Create booking node for WRITE operations
+            self.booking_node_instance = BookingNode(
+                executor=self.executor,
+                model=self.model
             )
 
-            # Get executor type for logging
-            executor_type = type(self.executor).__name__
-            print(f"\n[CALENDAR_AGENT] ===== ExecutorFactory Results =====")
-            print(f"[CALENDAR_AGENT] Executor type: {executor_type}")
-            print(f"[CALENDAR_AGENT] google_read_tools returned: {len(google_read_tools)} tools")
-            print(f"[CALENDAR_AGENT] google_read_tools is empty: {len(google_read_tools) == 0}")
-
-            # Use Google Workspace READ tools if available, otherwise use MCP tools
-            if google_read_tools:
-                print(f"[CALENDAR_AGENT] ✅ Using {len(google_read_tools)} Google Workspace READ tools")
-                self.tools = google_read_tools
-                for tool in self.tools:
-                    print(f"[CALENDAR_AGENT]    - {tool.name}: Google Workspace API")
-            else:
-                print(f"[CALENDAR_AGENT] Using {len(self.tools)} Rube MCP READ tools (fallback)")
-                for tool in self.tools:
-                    print(f"[CALENDAR_AGENT]    - {tool.name}: Rube MCP")
-
-            print(f"[CALENDAR_AGENT] Final self.tools count: {len(self.tools)}")
-            print(f"[CALENDAR_AGENT] =====================================\n")
-
-            # Create the graph
-            self.graph = await self._create_calendar_graph()
+            self._initialized = True
+            self.logger.info(f"[CalendarAgent] ✅ Initialization complete")
 
         except Exception as e:
-            print(f"Failed to initialize MCP client: {e}")
-            # Try Google Workspace as fallback even if MCP fails
+            self.logger.error(f"[CalendarAgent] ❌ Initialization failed: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def _get_agent_prompt(self) -> str:
+        """
+        Get agent system prompt with dynamic context.
+        Loads user-edited prompt from Supabase if available.
+        """
+        # Get current time context
+        try:
+            timezone_zone = ZoneInfo(self.timezone)
+            current_time = datetime.now(timezone_zone)
+            tomorrow = current_time + timedelta(days=1)
+
+            current_time_iso = current_time.isoformat()
+            today_str = f"{current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A')})"
+            tomorrow_str = f"{tomorrow.strftime('%Y-%m-%d')} ({tomorrow.strftime('%A')})"
+        except Exception as e:
+            self.logger.error(f"[CalendarAgent] Error getting timezone context: {e}")
+            # Fallback to UTC
+            current_time = datetime.now(ZoneInfo("UTC"))
+            tomorrow = current_time + timedelta(days=1)
+            current_time_iso = current_time.isoformat()
+            today_str = current_time.strftime('%Y-%m-%d')
+            tomorrow_str = tomorrow.strftime('%Y-%m-%d')
+
+        # Try loading user-edited prompt from Supabase
+        if self.user_id:
             try:
-                self.executor, google_read_tools = await ExecutorFactory.create_executor(
-                    user_id=self.user_id,
-                    mcp_tools=None,
-                    provider_preference="google_only"
-                )
-                executor_type = type(self.executor).__name__
-                print(f"Using {executor_type} as fallback after MCP failure")
+                from utils.config_utils import get_agent_config_from_supabase
+                agent_config = get_agent_config_from_supabase(self.user_id, "calendar_agent")
 
-                # Use Google Workspace READ tools
-                if google_read_tools:
-                    self.tools = google_read_tools
-                    print(f"Loaded {len(self.tools)} Google Workspace READ tools as fallback")
-                else:
-                    self.tools = []
-                    print("WARNING: No read-only tools available (no MCP and no Google tools)")
+                # Get user-edited system prompt
+                prompt_templates = agent_config.get("prompt_templates", {})
+                user_prompt = prompt_templates.get("agent_system_prompt")
 
-                self.graph = await self._create_calendar_graph()
-            except Exception as fallback_error:
-                print(f"Google Workspace fallback also failed: {fallback_error}")
-                # No executor available - create graph without booking support
-                self.tools = []
-                self.executor = None
-                self.graph = await self._create_calendar_graph()
-
-    async def _create_calendar_graph(self):
-        """Create calendar agent - Google uses editable prompts, Rube uses hardcoded"""
-
-        # Create enhanced prompt for calendar operations
-        if not self.tools:
-            # SAFETY: No tools available (both Google and Rube failed)
-            prompt = get_no_tools_prompt()
-            print(f"[PROMPT] Using NO_TOOLS prompt - no Google OAuth, no Rube MCP")
-        else:
-            # Tools available - check if we're using Google or Rube
-            executor_type = type(self.executor).__name__ if hasattr(self, 'executor') and self.executor else "Unknown"
-
-            if executor_type == "GoogleWorkspaceExecutor":
-                # GOOGLE PATH: Load user-editable prompt from Supabase
-                print(f"[PROMPT] Google Workspace detected - loading user-editable prompt")
-                user_prompt = None
-                if self.user_id:
-                    try:
-                        from utils.config_utils import get_agent_config_from_supabase
-                        agent_config = get_agent_config_from_supabase(self.user_id, "calendar_agent")
-                        user_prompt = agent_config.get("agent_system_prompt")
-                        if user_prompt:
-                            print(f"[PROMPT] ✅ Loaded user-edited prompt from Supabase")
-                        else:
-                            print(f"[PROMPT] No user-edited prompt, using default Google prompt")
-                    except Exception as e:
-                        print(f"[PROMPT] Error loading user prompt: {e}, using default")
-
-                # Format prompt with dynamic context
-                from .config import get_current_context
-                context = get_current_context()
                 if user_prompt:
-                    try:
-                        prompt = user_prompt.format(
-                            current_time=context["current_time"],
-                            timezone_name=context["timezone_name"],
-                            today=context["today"],
-                            tomorrow=context["tomorrow"]
-                        )
-                        print(f"[PROMPT] Using user-edited Google prompt")
-                    except KeyError as e:
-                        print(f"[PROMPT] User prompt missing placeholder {e}, using default")
-                        prompt = get_formatted_prompt_with_context(
-                            timezone_name=context["timezone_name"],
-                            current_time_iso=context["current_time"],
-                            today_str=context["today"],
-                            tomorrow_str=context["tomorrow"]
-                        )
-                else:
-                    prompt = get_formatted_prompt_with_context(
-                        timezone_name=context["timezone_name"],
-                        current_time_iso=context["current_time"],
-                        today_str=context["today"],
-                        tomorrow_str=context["tomorrow"]
+                    self.logger.info("[CalendarAgent] ✅ Using user-edited prompt from Supabase")
+                    # Format with dynamic context
+                    return user_prompt.format(
+                        current_time=current_time_iso,
+                        timezone_name=self.timezone,
+                        today=today_str,
+                        tomorrow=tomorrow_str
                     )
-            else:
-                # RUBE PATH: Use hardcoded prompt (WORKING - DON'T CHANGE!)
-                print(f"[PROMPT] Rube MCP or other executor ({executor_type}) - using hardcoded prompt")
-                from .config import get_current_context
-                context = get_current_context()
-                prompt = get_formatted_prompt_with_context(
-                    timezone_name=context["timezone_name"],
-                    current_time_iso=context["current_time"],
-                    today_str=context["today"],
-                    tomorrow_str=context["tomorrow"]
-                )
+                else:
+                    self.logger.info("[CalendarAgent] No user-edited prompt found, using default")
+            except Exception as e:
+                self.logger.warning(f"[CalendarAgent] Could not load user prompt from Supabase: {e}")
 
-        # Create the main calendar agent (read-only operations)
-        calendar_agent = create_react_agent(
-            model=self.model,
-            tools=self.tools,
-            name="calendar_agent",
-            prompt=prompt
+        # Fallback to default prompt from prompt.py
+        return get_formatted_prompt_with_context(
+            timezone_name=self.timezone,
+            current_time_iso=current_time_iso,
+            today_str=today_str,
+            tomorrow_str=tomorrow_str
         )
 
+    async def get_agent(self):
+        """
+        Get the compiled calendar agent graph.
 
+        Returns:
+            Compiled LangGraph agent ready for invocation
+        """
+        if not self._initialized:
+            await self.initialize()
 
+        if self.agent_graph:
+            return self.agent_graph
 
+        # Get agent prompt (with user edits if available)
+        agent_prompt = self._get_agent_prompt()
 
+        # Create agent based on tool availability
+        if not self.tools:
+            self.logger.warning("[CalendarAgent] ⚠️  No tools available - creating no-tools agent")
+            # Agent with no tools - just explain limitations
+            no_tools_prompt = get_no_tools_prompt()
+            agent = create_react_agent(
+                model=self.model,
+                tools=[],
+                prompt=no_tools_prompt
+            )
+        else:
+            # Agent with Google READ tools + booking node for WRITEs
+            self.logger.info(f"[CalendarAgent] Creating agent with {len(self.tools)} tools")
+            agent = create_react_agent(
+                model=self.model,
+                tools=self.tools,
+                prompt=agent_prompt
+            )
 
-
-
-
-
-
-
-
-        # If no executor, just return the simple agent
-        if not hasattr(self, 'executor') or self.executor is None:
-            return calendar_agent
-
-        # Create StateGraph wrapper for routing to booking node
-        from langgraph.graph import StateGraph, START, END
-        from .booking_node import BookingNode
-
+        # Build graph with booking node for write operations
         workflow = StateGraph(MessagesState)
 
-        # Initialize booking node with executor
-        booking_node = BookingNode(self.executor, self.model)
+        # Add calendar agent node (handles READ operations)
+        workflow.add_node("calendar_agent", agent)
 
-        # Add nodes - SIMPLIFIED: Only 2 nodes needed for 3-button UI
-        workflow.add_node("calendar_agent", calendar_agent)
-        workflow.add_node("booking_approval", booking_node.booking_approval_node)
+        # Add booking node (handles WRITE operations with human approval)
+        workflow.add_node("booking_approval", self.booking_node_instance.booking_approval_node)
 
-        # Smart LLM-based routing with conversation context analysis
-        def route_intent(state: MessagesState):
-            """Route all calendar requests to calendar_agent first"""
-            return "calendar_agent"
-
-        def route_after_calendar(state: MessagesState):
-            """Smart LLM-based routing after calendar agent completes"""
-            from langchain_core.prompts import ChatPromptTemplate
-            from pydantic import BaseModel, Field
-            from typing import Literal
-
-            # Use RoutingDecision from state module
-
-            # Get conversation context
+        # Routing logic
+        def should_route_to_booking(state: MessagesState) -> str:
+            """Route to booking node if agent mentions booking approval needed"""
             messages = state.get("messages", [])
             if not messages:
                 return END
 
-            # Use state messages directly - no manual extraction needed
-            # thread_id + MemorySaver already manages conversation history
-            context_str = "\n".join([f"{getattr(msg, 'type', 'message')}: {msg.content}" for msg in messages[-6:] if hasattr(msg, 'content')])
+            last_message = messages[-1]
+            content = getattr(last_message, 'content', '')
 
-            # Get available tools for dynamic prompt generation
-            # Note: Tool descriptions are based on MCP tool names, even when using Google Workspace API
-            # The executor handles mapping these tool names to the appropriate API calls
-            booking_tool_names = [
-                'google_calendar-create-event',
-                'google_calendar-update-event',
-                'google_calendar-add-attendees-to-event',
-                'google_calendar-delete-event',
-                'google_calendar-quick-add-event'
+            # Check if agent explicitly mentioned booking approval
+            booking_keywords = [
+                "booking approval",
+                "approval workflow",
+                "requires approval",
+                "requires booking approval"
             ]
-            available_tools_list = [f"- {name}: Calendar operation" for name in booking_tool_names]
-            available_tools_text = "\n".join(available_tools_list)
 
-            # Use centralized routing prompt from prompt.py
-            routing_system_prompt = get_routing_system_prompt().format(available_tools=available_tools_text)
-            routing_prompt = ChatPromptTemplate.from_messages([
-                ("system", routing_system_prompt),
-                ("user", "Conversation context:\n{context}\n\nAnalyze this conversation. Does the calendar agent explicitly mention booking approval is needed? Or does the user intent require booking operations? Return the appropriate next_action.")
-            ])
-
-
-            try:
-                # Use the existing model from calendar agent
-                llm = self.model.with_structured_output(RoutingDecision)
-
-                decision = llm.invoke(routing_prompt.format_messages(
-                    context=context_str,
-                    available_tools=available_tools_text
-                ))
-
-                # Log routing decision for debugging
-                print(f"Smart Router Decision: {decision.next_action}")
-                print(f"Reasoning: {decision.reasoning}")
-                print(f"User Intent: {decision.user_intent}")
-                print(f"MCP tools to use: {decision.mcp_tools_to_use}")
-
-                # **CRITICAL**: Preserve routing decision in state
-                if decision.needs_booking_approval:
-                    # Create enriched booking context
-                    booking_context = BookingContext(
-                        original_intent=decision.user_intent,
-                        routing_analysis=decision,
-                        conversation_context=context_str,
-                        previous_attempts=[],
-                        calendar_constraints=[],
-                        extracted_details=None,
-                        mcp_tools_to_use=decision.mcp_tools_to_use
-                    )
-
-                    # Add routing decision and booking context to messages
-                    from langchain_core.messages import AIMessage
-                    context_message = AIMessage(
-                        content=f"ROUTING CONTEXT: {decision.reasoning}",
-                        additional_kwargs={
-                            "routing_decision": decision.dict(),
-                            "booking_context": booking_context.dict(),
-                            "user_intent": decision.user_intent,
-                            "conversation_context": context_str,
-                            "mcp_tools_to_use": decision.mcp_tools_to_use
-                        }
-                    )
-
-                    # Add routing decision to messages with additional_kwargs for context preservation
-                    from langchain_core.messages import AIMessage
-                    context_message = AIMessage(
-                        content=f"ROUTING CONTEXT: {decision.reasoning}",
-                        additional_kwargs={
-                            "routing_decision": decision.dict(),
-                            "booking_context": booking_context.dict(),
-                            "user_intent": decision.user_intent,
-                            "conversation_context": context_str,
-                            "mcp_tools_to_use": decision.mcp_tools_to_use
-                        }
-                    )
-
-                    # Update state with preserved context
-                    state["messages"] = state.get("messages", []) + [context_message]
-
-                    # **FIXED**: Return the specific next action, not just a boolean check
-                    print(f"Routing to: {decision.next_action}")
-                    return decision.next_action
-                else:
-                    print("Routing to: END (no booking approval needed)")
-                    return END
-
-            except Exception as e:
-                print(f"Smart routing failed, using fallback: {e}")
-                # Fallback to keyword detection if LLM fails
-                last_msg = messages[-1] if messages else None
-                if last_msg and hasattr(last_msg, 'content'):
-                    content = str(last_msg.content).lower()
-                    # Look for explicit booking approval mentions
-                    if ("booking approval" in content or
-                        "approval workflow" in content or
-                        "requires booking" in content):
-                        print("Fallback: Detected booking approval needed")
-                        return "booking_approval"
-
-                print("Fallback: Routing to END")
-                return END
-
-        def route_after_booking(state: MessagesState):
-            """Route after booking node completes - use real execution results for routing"""
-            messages = state.get("messages", [])
-            if not messages:
-                return END
-
-            # Check for execution result from booking node
-            booking_execution_result = state.get("booking_execution_result")
-            last_tool_output = state.get("last_tool_output")
-
-            # If we have a booking execution result, use it for routing decisions
-            if booking_execution_result:
-                from .execution_result import ExecutionStatus
-
-                if booking_execution_result.overall_status in [ExecutionStatus.SUCCESS, ExecutionStatus.PARTIAL_SUCCESS]:
-                    print(f"Booking completed successfully: {booking_execution_result.overall_status}")
-
-                    # Add the real tool output to state for supervisor visibility
-                    if last_tool_output:
-                        # Update the last message with clean tool output
-                        if messages and hasattr(messages[-1], 'content'):
-                            messages[-1].content = last_tool_output
-
-                    return END
-
-                elif booking_execution_result.overall_status == ExecutionStatus.FAILED:
-                    print(f"Booking failed: {booking_execution_result.get_primary_error()}")
-                    return END
-
-            # Handle user cancellation
-            if last_tool_output == "Booking cancelled by user":
-                print("Booking cancelled by user")
-                return END
-
-            # Check if there's human feedback that needs processing
-            human_msgs = [msg for msg in messages[-3:] if isinstance(msg, HumanMessage)]
-            if human_msgs:
-                last_human_msg = human_msgs[-1]
-                response = last_human_msg.content.strip()
-
-                # If it's accept/reject, stay in booking flow
-                if response in ["accept", "reject"]:
-                    print("Accept/reject detected - staying in booking flow")
-                    return "booking_approval"
-                else:
-                    # It's feedback - route back to calendar_agent with preserved context
-                    print("User feedback detected - routing back to calendar_agent")
-                    return "calendar_agent"
-
-            # Fallback to message content analysis for backward compatibility
-            last_msg = messages[-1]
-            if hasattr(last_msg, 'content'):
-                content = str(last_msg.content)
-
-                # Check for completion indicators
-                if ("successfully updated" in content.lower() or
-                    "booking cancelled by user" in content or
-                    "completed successfully" in content.lower()):
-                    print("Operation completed - ending flow")
-                    return END
+            if any(keyword in content.lower() for keyword in booking_keywords):
+                self.logger.info("[CalendarAgent] Routing to booking_approval node")
+                return "booking_approval"
 
             return END
 
-        # Set up SIMPLIFIED routing flow - only 2 nodes needed
-        workflow.add_conditional_edges(START, route_intent,
-                                     {"calendar_agent": "calendar_agent"})
-
-        # Simplified: Only route between calendar_agent and booking_approval
+        # Define edges
+        workflow.add_edge(START, "calendar_agent")
         workflow.add_conditional_edges(
             "calendar_agent",
-            route_after_calendar,
+            should_route_to_booking,
             {
                 "booking_approval": "booking_approval",
-                "end": END,
                 END: END
             }
         )
+        workflow.add_edge("booking_approval", END)
 
-        workflow.add_conditional_edges(
-            "booking_approval",
-            route_after_booking,
-            {
-                "booking_approval": "booking_approval",  # Stay for accept/reject
-                "calendar_agent": "calendar_agent",       # Route feedback back
-                END: END
-            }
-        )
+        # Compile graph
+        self.agent_graph = workflow.compile()
+        self.logger.info("[CalendarAgent] ✅ Agent graph compiled successfully")
 
-        return workflow.compile(
-            checkpointer=MemorySaver(),
-            name="calendar_agent"
-        )
+        return self.agent_graph
 
 
-    async def get_agent(self):
-        """Get the LangGraph agent for supervisor integration"""
-        if not self.graph:
-            await self.initialize()
-        return self.graph
+# ============================================================================
+# Factory function for supervisor integration
+# ============================================================================
 
-    def create_thread_id(self, user_id: Optional[str] = None) -> str:
-        """Create a simple thread ID for conversation memory"""
-        if user_id:
-            # Simple deterministic thread for same user
-            from hashlib import md5
-            return f"user_{md5(user_id.encode()).hexdigest()[:8]}"
-        else:
-            # Random thread ID
-            return f"thread_{str(uuid4())[:8]}"
-
-    def build_config(self, thread_id: str) -> Dict[str, Any]:
-        """Build LangGraph config with thread ID"""
-        return {"configurable": {"thread_id": thread_id}}
-
-    async def get_available_tools(self) -> List[Dict[str, str]]:
-        """Get list of available tools"""
-        if not self.tools:
-            await self.initialize()
-
-        return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": str(tool.args) if hasattr(tool, 'args') else "Unknown"
-            }
-            for tool in self.tools
-        ]
-
-    async def cleanup(self):
-        """Clean up MCP client resources"""
-        if self._mcp_client:
-            try:
-                await self._mcp_client.cleanup()
-            except Exception as e:
-                self.logger.warning(f"Error during cleanup: {e}")
-
-
-async def create_calendar_agent_with_mcp(
-    model: Optional[ChatAnthropic] = None,
-    mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None
-) -> CalendarAgentWithMCP:
+async def create_calendar_agent(
+    model: ChatAnthropic,
+    user_id: str,
+    agent_config: Optional[Dict[str, Any]] = None
+) -> Any:
     """
-    Factory function to create and initialize calendar agent with MCP.
+    Factory function to create and initialize calendar agent.
+    Used by supervisor's calendar_agent_node wrapper.
 
     Args:
-        model: ChatAnthropic model instance
-        mcp_servers: MCP server configurations
+        model: LLM model configured with user settings
+        user_id: Clerk user ID for Google OAuth credential loading
+        agent_config: Optional agent configuration from Supabase
 
     Returns:
-        Initialized CalendarAgentWithMCP instance
+        Compiled calendar agent graph ready for invocation
     """
-    agent = CalendarAgentWithMCP(model=model, mcp_servers=mcp_servers)
-    await agent.initialize()
-    return agent
+    logger.info(f"[create_calendar_agent] Creating agent for user_id={user_id}")
 
+    # Create agent instance
+    calendar_agent = CalendarAgent(model=model, user_id=user_id)
 
+    # Initialize (loads Google credentials and tools)
+    await calendar_agent.initialize()
 
-if __name__ == "__main__":
-    async def test_calendar_agent():
-        """Test the calendar agent with proper MCP integration"""
-        print("Testing Calendar Agent with langchain-mcp-adapters...")
+    # Get compiled graph
+    agent_graph = await calendar_agent.get_agent()
 
-        agent = await create_calendar_agent_with_mcp()
-        graph = await agent.get_agent()
-
-        test_requests = [
-            "What's on my calendar today?",
-            "Schedule a meeting for tomorrow at 2 PM with John",
-            "Check my availability next week",
-            "Cancel the meeting at 3 PM today"
-        ]
-
-        for request in test_requests:
-            print(f"\nRequest: {request}")
-
-            try:
-                # Use the LangGraph agent with thread ID
-                thread_id = agent.create_thread_id("test-user")
-                config = agent.build_config(thread_id)
-                result = await graph.ainvoke(
-                    {"messages": [{"role": "user", "content": request}]},
-                    config=config
-                )
-
-                if result and "messages" in result:
-                    last_message = result["messages"][-1]
-                    print(f"Response: {last_message.content}")
-                else:
-                    print("No response received")
-
-            except Exception as e:
-                print(f"Error processing request: {e}")
-
-        # Show available tools
-        tools = await agent.get_available_tools()
-        print(f"\nAvailable tools: {len(tools)}")
-        for tool in tools:
-            print(f"   - {tool['name']}: {tool['description']}")
-
-        await agent.cleanup()
-
-    asyncio.run(test_calendar_agent())
+    logger.info(f"[create_calendar_agent] ✅ Agent ready for user_id={user_id}")
+    return agent_graph

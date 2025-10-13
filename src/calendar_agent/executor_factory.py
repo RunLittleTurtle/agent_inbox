@@ -16,8 +16,19 @@ from .google_workspace_executor import GoogleWorkspaceExecutor
 try:
     from .google_workspace_tools import create_google_workspace_read_tools
     GOOGLE_WORKSPACE_TOOLS_AVAILABLE = True
-except ImportError:
-    logging.warning("google_workspace_tools not available - READ tools disabled")
+    print("[EXECUTOR_FACTORY] ✅ google_workspace_tools imported successfully")
+except ImportError as e:
+    print(f"[EXECUTOR_FACTORY] ❌ ImportError for google_workspace_tools: {e}")
+    print(f"[EXECUTOR_FACTORY] Import traceback:")
+    import traceback
+    traceback.print_exc()
+    logging.warning(f"google_workspace_tools not available - READ tools disabled. Error: {e}")
+    GOOGLE_WORKSPACE_TOOLS_AVAILABLE = False
+except Exception as e:
+    print(f"[EXECUTOR_FACTORY] ❌ Unexpected error importing google_workspace_tools: {type(e).__name__}: {e}")
+    import traceback
+    traceback.print_exc()
+    logging.error(f"Unexpected error importing google_workspace_tools: {e}")
     GOOGLE_WORKSPACE_TOOLS_AVAILABLE = False
 
 # Import OAuth utilities

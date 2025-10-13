@@ -43,6 +43,18 @@ MCP_SERVER_URL = os.getenv(MCP_ENV_VAR, '')
 # Rube Authentication Token - for Bearer token authentication
 RUBE_AUTH_TOKEN = os.getenv("RUBE_AUTH_TOKEN", "")
 
+# Google Workspace OAuth Configuration (loaded from Supabase user_secrets table)
+# These are global defaults - actual credentials are stored per-user in Supabase
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:3000/api/auth/google/callback")
+
+# Provider Selection: which calendar provider to use
+# - "auto": Try Google Workspace first, fallback to Rube MCP (recommended)
+# - "google_only": Only use Google Workspace API (requires OAuth)
+# - "rube_only": Only use Rube MCP server
+CALENDAR_PROVIDER = os.getenv("CALENDAR_PROVIDER", "auto")
+
 # User Preferences
 # Agent-specific timezone setting (set via config UI)
 # 'global' means use the system-wide USER_TIMEZONE from main .env
@@ -125,5 +137,11 @@ DEFAULTS = {
     "mcp_integration": {
         "mcp_env_var": MCP_ENV_VAR,
         "mcp_server_url": MCP_SERVER_URL,
+    },
+    "google_workspace_integration": {
+        "google_client_id": GOOGLE_CLIENT_ID,
+        "google_client_secret": GOOGLE_CLIENT_SECRET,
+        "google_redirect_uri": GOOGLE_REDIRECT_URI,
+        "calendar_provider": CALENDAR_PROVIDER,
     },
 }

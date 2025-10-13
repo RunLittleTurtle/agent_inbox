@@ -203,5 +203,67 @@ CONFIG_SECTIONS = [
                 'note': 'Editing this updates the URL in your .env file. Requires OAuth authentication.'
             }
         ]
+    },
+    {
+        'key': 'google_workspace_integration',
+        'label': 'Google Workspace Authentication',
+        'description': 'Direct Google Calendar API access (primary workflow for faster, cheaper operations)',
+        'card_style': 'blue',
+        'fields': [
+            {
+                'key': 'google_oauth_status',
+                'label': 'Google OAuth Status',
+                'type': 'readonly',
+                'description': 'Shows whether Google OAuth is configured for your account',
+                'default': 'Not configured',
+                'note': 'Click "Connect Google Calendar" button to authenticate and enable direct Google API access'
+            },
+            {
+                'key': 'google_calendar_connect_button',
+                'label': 'Connect Google Calendar',
+                'type': 'button',
+                'action': 'initiate_google_oauth',
+                'description': 'Start Google OAuth flow to grant calendar access',
+                'note': 'Opens OAuth consent screen in new window. You\'ll be asked to grant calendar permissions.'
+            },
+            {
+                'key': 'calendar_provider',
+                'label': 'Provider Priority',
+                'type': 'select',
+                'default': 'auto',
+                'description': 'Choose which calendar provider to use for operations',
+                'options': [
+                    'auto',
+                    'google_only',
+                    'rube_only'
+                ],
+                'placeholder': 'auto',
+                'note': 'auto: Try Google first, fallback to Rube MCP (recommended) | google_only: Only use Google Workspace | rube_only: Only use Rube MCP'
+            },
+            {
+                'key': 'google_client_id',
+                'label': 'Google Client ID',
+                'type': 'password',
+                'description': 'OAuth 2.0 Client ID from Google Cloud Console',
+                'placeholder': 'your-client-id.apps.googleusercontent.com',
+                'note': 'Optional: Override the system-wide Google OAuth client ID'
+            },
+            {
+                'key': 'google_client_secret',
+                'label': 'Google Client Secret',
+                'type': 'password',
+                'description': 'OAuth 2.0 Client Secret from Google Cloud Console',
+                'placeholder': 'your-client-secret',
+                'note': 'Optional: Override the system-wide Google OAuth client secret'
+            },
+            {
+                'key': 'google_redirect_uri',
+                'label': 'Google Redirect URI',
+                'type': 'text',
+                'default': 'http://localhost:3000/api/auth/google/callback',
+                'description': 'OAuth 2.0 redirect URI configured in Google Cloud Console',
+                'note': 'Must match exactly with what\'s configured in Google Cloud Console'
+            }
+        ]
     }
 ]

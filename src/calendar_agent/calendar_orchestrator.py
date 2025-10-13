@@ -85,6 +85,10 @@ class CalendarAgent:
         """
         Initialize Google Workspace executor and tools.
         Must be called before using the agent.
+
+        Note:
+            Gracefully handles missing Google OAuth credentials by creating
+            a no-tools agent that guides users to connect Google Calendar.
         """
         if self._initialized:
             return
@@ -93,13 +97,23 @@ class CalendarAgent:
 
         try:
             # Create Google Workspace executor and READ tools
+            # Returns (None, []) if credentials missing - no exception raised
             self.executor, self.tools = await ExecutorFactory.create_executor(self.user_id)
+
+            if self.executor is None:
+                self.logger.warning(
+                    f"[CalendarAgent] ⚠️  No Google OAuth credentials found for user {self.user_id}. "
+                    "Agent will run in no-tools mode and guide user to connect Google Calendar."
+                )
+            else:
+                self.logger.info(f"[CalendarAgent] ✅ Google Workspace executor created successfully")
 
             self.logger.info(f"[CalendarAgent] ✅ Loaded {len(self.tools)} Google Workspace READ tools")
             for tool in self.tools:
                 self.logger.info(f"[CalendarAgent]    - {tool.name}")
 
             # Create booking node for WRITE operations
+            # BookingNode gracefully handles None executor
             self.booking_node_instance = BookingNode(
                 executor=self.executor,
                 model=self.model

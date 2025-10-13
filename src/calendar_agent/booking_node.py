@@ -49,18 +49,22 @@ class BookingNode:
 
     def __init__(
         self,
-        executor: GoogleWorkspaceExecutor,
+        executor: Optional[GoogleWorkspaceExecutor],
         model: Optional[ChatAnthropic] = None
     ):
         """
         Initialize BookingNode with Google Workspace executor.
 
         Args:
-            executor: Google Workspace Calendar executor
+            executor: Google Workspace Calendar executor, or None if credentials missing
             model: LLM model for extraction and analysis
+
+        Note:
+            When executor is None (missing Google OAuth credentials), the booking node
+            will gracefully handle requests and guide users to connect their account.
         """
         from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
-        self.executor = executor  # Use generic executor interface
+        self.executor = executor  # Use generic executor interface (can be None)
         self.model = model or ChatAnthropic(
             model=LLM_CONFIG.get("model", DEFAULT_LLM_MODEL),
             temperature=LLM_CONFIG.get("temperature", 0.1),
@@ -76,6 +80,19 @@ class BookingNode:
         messages = state.get("messages", [])
         if not messages:
             return {"messages": [AIMessage(content="No messages found.")]}
+
+        # Handle missing Google OAuth credentials gracefully
+        if self.executor is None:
+            error_message = (
+                "Cannot process booking request: Google Calendar is not connected.\n\n"
+                "To enable calendar bookings, please connect your Google Calendar account:\n\n"
+                "1. Go to the Configuration App (config app)\n"
+                "2. Look for the 'Connect Google Account' or 'Google Calendar' section\n"
+                "3. Follow the OAuth flow to authorize calendar access\n"
+                "4. Once connected, you'll be able to create and manage calendar events!\n\n"
+                "After connecting your account, please try your booking request again."
+            )
+            return {"messages": messages + [AIMessage(content=error_message)]}
 
         # NOTE: Task tracking not available with MessagesState
         current_task = None

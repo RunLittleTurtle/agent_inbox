@@ -37,7 +37,7 @@ class ExecutorFactory:
     @staticmethod
     async def create_executor(
         user_id: str
-    ) -> Tuple[GoogleWorkspaceExecutor, List[BaseTool]]:
+    ) -> Tuple[Optional[GoogleWorkspaceExecutor], List[BaseTool]]:
         """
         Create Google Workspace executor AND read-only tools.
 
@@ -46,16 +46,17 @@ class ExecutorFactory:
 
         Returns:
             Tuple of (executor, read_tools):
-            - executor: GoogleWorkspaceExecutor for WRITE operations (bookings)
-            - read_tools: List of READ-ONLY tools for calendar_agent node
+            - executor: GoogleWorkspaceExecutor for WRITE operations (bookings), or None if credentials missing
+            - read_tools: List of READ-ONLY tools for calendar_agent node, or empty list if no executor
 
-        Raises:
-            ValueError: If Google OAuth credentials not available
+        Note:
+            Returns (None, []) gracefully when Google OAuth credentials are not available,
+            allowing the agent to display user guidance instead of crashing.
         """
         logger.info(f"Creating Google Workspace executor for user_id={user_id}")
 
-        # Create Google Workspace executor (required - no fallback)
-        executor = await ExecutorFactory._create_google_executor(user_id, required=True)
+        # Create Google Workspace executor (graceful - returns None if credentials missing)
+        executor = await ExecutorFactory._create_google_executor(user_id, required=False)
 
         # Get read-only tools from executor
         read_tools = await ExecutorFactory._get_read_tools(executor)
@@ -126,17 +127,24 @@ class ExecutorFactory:
             return None
 
     @staticmethod
-    async def _get_read_tools(executor: GoogleWorkspaceExecutor) -> List[BaseTool]:
+    async def _get_read_tools(executor: Optional[GoogleWorkspaceExecutor]) -> List[BaseTool]:
         """
         Get READ-ONLY tools from Google Workspace executor.
 
         Args:
-            executor: GoogleWorkspaceExecutor instance
+            executor: GoogleWorkspaceExecutor instance, or None if no credentials available
 
         Returns:
-            List of READ-ONLY LangChain tools (list-events, get-event, list-calendars)
+            List of READ-ONLY LangChain tools (list-events, get-event, list-calendars),
+            or empty list if executor is None
         """
         print(f"\n[EXECUTOR_FACTORY] Getting READ tools from executor")
+
+        if executor is None:
+            print(f"[EXECUTOR_FACTORY] ℹ️  No executor available (missing Google OAuth credentials)")
+            logger.info("No executor available - returning empty tool list")
+            return []
+
         print(f"[EXECUTOR_FACTORY] Executor type: {type(executor).__name__}")
 
         if not isinstance(executor, GoogleWorkspaceExecutor):

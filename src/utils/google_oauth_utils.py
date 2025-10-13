@@ -65,7 +65,7 @@ async def load_google_credentials(user_id: str) -> Optional[Dict[str, str]]:
 
         result = supabase.table("user_secrets") \
             .select("google_access_token, google_refresh_token, google_client_id, google_client_secret") \
-            .eq("user_id", user_id) \
+            .eq("clerk_id", user_id) \
             .execute()
 
         # Check if credentials exist
@@ -156,8 +156,8 @@ async def save_google_credentials(
 
         # Check if user_secrets record exists
         existing = supabase.table("user_secrets") \
-            .select("user_id") \
-            .eq("user_id", user_id) \
+            .select("clerk_id") \
+            .eq("clerk_id", user_id) \
             .execute()
 
         credentials_data = {
@@ -172,12 +172,12 @@ async def save_google_credentials(
             logger.info(f"Updating Google credentials for user {user_id}")
             supabase.table("user_secrets") \
                 .update(credentials_data) \
-                .eq("user_id", user_id) \
+                .eq("clerk_id", user_id) \
                 .execute()
         else:
             # Insert new record
             logger.info(f"Inserting new Google credentials for user {user_id}")
-            credentials_data['user_id'] = user_id
+            credentials_data['clerk_id'] = user_id
             supabase.table("user_secrets") \
                 .insert(credentials_data) \
                 .execute()
@@ -232,7 +232,7 @@ async def delete_google_credentials(user_id: str) -> bool:
                 'google_client_id': None,
                 'google_client_secret': None
             }) \
-            .eq("user_id", user_id) \
+            .eq("clerk_id", user_id) \
             .execute()
 
         logger.info(f"Successfully deleted Google OAuth credentials for user {user_id}")

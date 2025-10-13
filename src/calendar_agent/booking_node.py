@@ -31,7 +31,9 @@ from shared_utils import DEFAULT_LLM_MODEL
 from .state import BookingRequest
 from .execution_result import ExecutionStatus
 from .mcp_executor import MCPToolExecutor
+from .google_workspace_executor import GoogleWorkspaceExecutor
 from .prompt import get_booking_extraction_prompt
+from typing import Union
 
 
 
@@ -47,16 +49,25 @@ class ApprovalResponse(BaseModel):
 class BookingNode:
     """Dedicated node for booking operations with human approval"""
 
-    def __init__(self, booking_tools: List, model: Optional[ChatAnthropic] = None):
+    def __init__(
+        self,
+        executor: Union[GoogleWorkspaceExecutor, MCPToolExecutor],
+        model: Optional[ChatAnthropic] = None
+    ):
+        """
+        Initialize BookingNode with provider-agnostic executor.
+
+        Args:
+            executor: Calendar executor (Google Workspace or Rube MCP)
+            model: LLM model for extraction and analysis
+        """
         from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
-        self.booking_tools = booking_tools
+        self.executor = executor  # Use generic executor interface
         self.model = model or ChatAnthropic(
             model=LLM_CONFIG.get("model", DEFAULT_LLM_MODEL),
             temperature=LLM_CONFIG.get("temperature", 0.1),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY")
         )
-        # Initialize the MCP executor
-        self.mcp_executor = MCPToolExecutor(booking_tools)
 
     async def booking_approval_node(self, state: MessagesState, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -130,8 +141,8 @@ class BookingNode:
                 action = validation_result["action"]
 
                 if action == "approve":
-                    # Execute the booking using the new MCP executor
-                    execution_result = await self.mcp_executor.execute_booking_request(
+                    # Execute the booking using the configured executor (Google or MCP)
+                    execution_result = await self.executor.execute_booking_request(
                         booking_request,
                         validation_result.get("modifications", {})
                     )

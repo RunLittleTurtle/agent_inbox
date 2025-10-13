@@ -39,6 +39,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from .state import CalendarAgentState, RoutingDecision, BookingContext
 from .prompt import get_formatted_prompt_with_context, get_no_tools_prompt, get_routing_system_prompt
+from .executor_factory import ExecutorFactory
 from uuid import uuid4
 
 # Import OAuth token utilities
@@ -225,9 +226,6 @@ class CalendarAgentWithMCP:
             all_tools = await self._get_mcp_tools()
 
             # Filter tools: separate booking tools from read-only tools
-            self.booking_tools = []
-            self.tools = []
-
             booking_tool_names = {
                 'google_calendar-quick-add-event',
                 'google_calendar-create-event',
@@ -241,12 +239,15 @@ class CalendarAgentWithMCP:
                 'google_calendar-query-free-busy-calendars'  # This tool doesn't work, use list-events instead
             }
 
+            booking_tools = []
+            self.tools = []
+
             for tool in all_tools:
                 if tool.name in excluded_tool_names:
                     print(f"   EXCLUDED: {tool.name} (doesn't work properly)")
                     continue
                 elif tool.name in booking_tool_names:
-                    self.booking_tools.append(tool)
+                    booking_tools.append(tool)
                 else:
                     self.tools.append(tool)
 
@@ -254,19 +255,44 @@ class CalendarAgentWithMCP:
             for tool in self.tools:
                 print(f"   {tool.name}: {tool.description}")
 
-            print(f"Separated {len(self.booking_tools)} booking tools for approval workflow")
-            for tool in self.booking_tools:
+            print(f"Separated {len(booking_tools)} booking tools for approval workflow")
+            for tool in booking_tools:
                 print(f"   {tool.name}: [REQUIRES APPROVAL]")
+
+            # Create executor using factory pattern
+            # Priority: Google Workspace (primary) -> Rube MCP (fallback)
+            self.executor = await ExecutorFactory.create_executor(
+                user_id=self.user_id,
+                mcp_tools=booking_tools,
+                provider_preference="auto"  # Try Google first, fallback to Rube MCP
+            )
+
+            # Get executor type for logging
+            executor_type = type(self.executor).__name__
+            print(f"Using {executor_type} for calendar operations")
 
             # Create the graph
             self.graph = await self._create_calendar_graph()
 
         except Exception as e:
             print(f"Failed to initialize MCP client: {e}")
-            # Fallback to no tools if MCP connection fails
-            self.tools = []
-            self.booking_tools = []
-            self.graph = await self._create_calendar_graph()
+            # Try Google Workspace as fallback even if MCP fails
+            try:
+                self.executor = await ExecutorFactory.create_executor(
+                    user_id=self.user_id,
+                    mcp_tools=None,
+                    provider_preference="google_only"
+                )
+                executor_type = type(self.executor).__name__
+                print(f"Using {executor_type} as fallback after MCP failure")
+                self.tools = []  # No read-only tools without MCP
+                self.graph = await self._create_calendar_graph()
+            except Exception as fallback_error:
+                print(f"Google Workspace fallback also failed: {fallback_error}")
+                # No executor available - create graph without booking support
+                self.tools = []
+                self.executor = None
+                self.graph = await self._create_calendar_graph()
 
     async def _create_calendar_graph(self):
         """Create calendar agent using pure LangGraph create_react_agent pattern"""
@@ -309,8 +335,8 @@ class CalendarAgentWithMCP:
 
 
 
-        # If no booking tools, just return the simple agent
-        if not self.booking_tools:
+        # If no executor, just return the simple agent
+        if not hasattr(self, 'executor') or self.executor is None:
             return calendar_agent
 
         # Create StateGraph wrapper for routing to booking node
@@ -319,8 +345,8 @@ class CalendarAgentWithMCP:
 
         workflow = StateGraph(MessagesState)
 
-        # Initialize booking node
-        booking_node = BookingNode(self.booking_tools, self.model)
+        # Initialize booking node with executor
+        booking_node = BookingNode(self.executor, self.model)
 
         # Add nodes - SIMPLIFIED: Only 2 nodes needed for 3-button UI
         workflow.add_node("calendar_agent", calendar_agent)
@@ -349,7 +375,16 @@ class CalendarAgentWithMCP:
             context_str = "\n".join([f"{getattr(msg, 'type', 'message')}: {msg.content}" for msg in messages[-6:] if hasattr(msg, 'content')])
 
             # Get available tools for dynamic prompt generation
-            available_tools_list = [f"- {tool.name}: {tool.description}" for tool in self.booking_tools] if self.booking_tools else ["- No MCP tools available"]
+            # Note: Tool descriptions are based on MCP tool names, even when using Google Workspace API
+            # The executor handles mapping these tool names to the appropriate API calls
+            booking_tool_names = [
+                'google_calendar-create-event',
+                'google_calendar-update-event',
+                'google_calendar-add-attendees-to-event',
+                'google_calendar-delete-event',
+                'google_calendar-quick-add-event'
+            ]
+            available_tools_list = [f"- {name}: Calendar operation" for name in booking_tool_names]
             available_tools_text = "\n".join(available_tools_list)
 
             # Use centralized routing prompt from prompt.py

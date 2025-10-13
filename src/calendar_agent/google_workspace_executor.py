@@ -26,20 +26,35 @@ class GoogleWorkspaceExecutor:
 
         Args:
             google_credentials: Dict containing:
-                - google_access_token
-                - google_refresh_token
-                - google_client_id
-                - google_client_secret
+                - google_access_token (optional - can be None, will auto-refresh from refresh_token)
+                - google_refresh_token (required)
+                - google_client_id (required)
+                - google_client_secret (required)
+
+        Note:
+            Per OAuth 2.0 best practices, access_token can be None.
+            The google.oauth2.credentials.Credentials library will automatically
+            use the refresh_token to obtain a fresh access_token on first use.
         """
+        # Required scopes for Google Calendar API
+        # https://developers.google.com/calendar/api/guides/auth
+        # Note: Must match the scopes used during OAuth flow in config app
+        # Using the broadest scope that includes all calendar operations
+        calendar_scopes = [
+            'https://www.googleapis.com/auth/calendar'  # Full calendar access (read/write events, settings)
+        ]
+
         self.credentials = Credentials(
-            token=google_credentials.get('google_access_token'),
+            token=google_credentials.get('google_access_token'),  # Can be None
             refresh_token=google_credentials.get('google_refresh_token'),
             client_id=google_credentials.get('google_client_id'),
             client_secret=google_credentials.get('google_client_secret'),
-            token_uri='https://oauth2.googleapis.com/token'
+            token_uri='https://oauth2.googleapis.com/token',
+            scopes=calendar_scopes  # CRITICAL: Required for token refresh
         )
 
         # Build Google Calendar service
+        # If token is None, the library will auto-refresh on first API call
         self.service = build('calendar', 'v3', credentials=self.credentials)
         self.calendar_id = 'primary'  # Use primary calendar
 

@@ -43,11 +43,12 @@ async def load_google_credentials(user_id: str) -> Optional[Dict[str, str]]:
     """
     try:
         # Check if Supabase is configured
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SECRET_KEY")
 
         if not supabase_url or not supabase_key:
             logger.warning("Supabase not configured - cannot load Google credentials")
+            logger.warning("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY environment variables")
             return None
 
         # Import Supabase client
@@ -75,22 +76,37 @@ async def load_google_credentials(user_id: str) -> Optional[Dict[str, str]]:
 
         creds = result.data[0]
 
-        # Validate that all required fields are present
-        required_fields = ['google_access_token', 'google_refresh_token', 'google_client_id', 'google_client_secret']
-        missing_fields = [field for field in required_fields if not creds.get(field)]
-
-        if missing_fields:
-            logger.warning(f"Incomplete Google credentials for user {user_id}: missing {missing_fields}")
+        # Validate that user-specific refresh token is present
+        # Note: google_access_token is OPTIONAL - refresh token is sufficient
+        if not creds.get('google_refresh_token'):
+            logger.warning(f"No Google refresh token found for user {user_id}")
             return None
 
+        # OAuth Application Credentials (same for all users)
+        # These are from the OAuth app registration in Google Cloud Console
+        # Priority: Supabase user_secrets > .env fallback
+        google_client_id = creds.get('google_client_id') or os.getenv('GOOGLE_CLIENT_ID')
+        google_client_secret = creds.get('google_client_secret') or os.getenv('GOOGLE_CLIENT_SECRET')
+
+        if not google_client_id or not google_client_secret:
+            logger.error(f"Missing Google OAuth app credentials. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env")
+            return None
+
+        # Log whether access token is present (helpful for debugging)
+        has_access_token = bool(creds.get('google_access_token'))
         logger.info(f"Successfully loaded Google OAuth credentials for user {user_id}")
+        logger.info(f"  - access_token present: {has_access_token}")
+        logger.info(f"  - refresh_token: ✅")
+        logger.info(f"  - client_id source: {'Supabase' if creds.get('google_client_id') else '.env'}")
+        logger.info(f"  - client_secret source: {'Supabase' if creds.get('google_client_secret') else '.env'}")
 
         # Return credentials in expected format
+        # access_token can be None - google.oauth2.credentials.Credentials will auto-refresh using refresh_token
         return {
-            'google_access_token': creds['google_access_token'],
-            'google_refresh_token': creds['google_refresh_token'],
-            'google_client_id': creds['google_client_id'],
-            'google_client_secret': creds['google_client_secret']
+            'google_access_token': creds.get('google_access_token'),  # Can be None (will auto-refresh)
+            'google_refresh_token': creds['google_refresh_token'],  # User-specific
+            'google_client_id': google_client_id,  # App-level (from Supabase or .env)
+            'google_client_secret': google_client_secret  # App-level (from Supabase or .env)
         }
 
     except Exception as e:
@@ -137,11 +153,12 @@ async def save_google_credentials(
     """
     try:
         # Check if Supabase is configured
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SECRET_KEY")
 
         if not supabase_url or not supabase_key:
             logger.error("Supabase not configured - cannot save Google credentials")
+            logger.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY environment variables")
             return False
 
         # Import Supabase client
@@ -205,11 +222,12 @@ async def delete_google_credentials(user_id: str) -> bool:
     """
     try:
         # Check if Supabase is configured
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SECRET_KEY")
 
         if not supabase_url or not supabase_key:
             logger.error("Supabase not configured - cannot delete Google credentials")
+            logger.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY environment variables")
             return False
 
         # Import Supabase client

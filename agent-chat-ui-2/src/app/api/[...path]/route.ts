@@ -80,37 +80,57 @@ async function handleRequest(request: NextRequest) {
       );
     }
 
-    // Fetch user-specific API keys from Supabase
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
-    const { data: userSecrets, error: secretsError } = await supabase
-      .from("user_secrets")
-      .select("*")
-      .eq("clerk_id", userId)
-      .maybeSingle();
+    // LOCAL DEVELOPMENT BYPASS: Use environment variables for API keys when running locally
+    const isLocalDev = LANGGRAPH_API_URL.includes('localhost') || LANGGRAPH_API_URL.includes('127.0.0.1');
+    let openaiKey: string | null = null;
+    let anthropicKey: string | null = null;
 
-    if (secretsError) {
-      console.error("Error fetching user secrets:", secretsError);
-      return NextResponse.json(
-        { error: "Failed to fetch user API keys. Please add your API keys in the config page." },
-        { status: 403 }
-      );
-    }
+    if (isLocalDev) {
+      // Local development: Use API keys from environment variables
+      console.log("[API Route] Local development detected - using .env API keys");
+      openaiKey = process.env.OPENAI_API_KEY || null;
+      anthropicKey = process.env.ANTHROPIC_API_KEY || null;
 
-    if (!userSecrets) {
-      return NextResponse.json(
-        { error: "No API keys found. Please add your OpenAI or Anthropic API keys in the config page." },
-        { status: 403 }
-      );
-    }
+      if (!openaiKey && !anthropicKey) {
+        console.error("[API Route] No API keys found in environment variables");
+        return NextResponse.json(
+          { error: "No API keys configured in .env file. Please add OPENAI_API_KEY or ANTHROPIC_API_KEY." },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Production: Fetch user-specific API keys from Supabase
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
+      const { data: userSecrets, error: secretsError } = await supabase
+        .from("user_secrets")
+        .select("*")
+        .eq("clerk_id", userId)
+        .maybeSingle();
 
-    const openaiKey = userSecrets.openai_api_key;
-    const anthropicKey = userSecrets.anthropic_api_key;
+      if (secretsError) {
+        console.error("Error fetching user secrets:", secretsError);
+        return NextResponse.json(
+          { error: "Failed to fetch user API keys. Please add your API keys in the config page." },
+          { status: 403 }
+        );
+      }
 
-    if (!openaiKey && !anthropicKey) {
-      return NextResponse.json(
-        { error: "No API keys configured. Please add at least one API key (OpenAI or Anthropic) in the config page." },
-        { status: 403 }
-      );
+      if (!userSecrets) {
+        return NextResponse.json(
+          { error: "No API keys found. Please add your OpenAI or Anthropic API keys in the config page." },
+          { status: 403 }
+        );
+      }
+
+      openaiKey = userSecrets.openai_api_key;
+      anthropicKey = userSecrets.anthropic_api_key;
+
+      if (!openaiKey && !anthropicKey) {
+        return NextResponse.json(
+          { error: "No API keys configured. Please add at least one API key (OpenAI or Anthropic) in the config page." },
+          { status: 403 }
+        );
+      }
     }
 
     // Extract path from URL

@@ -5,6 +5,7 @@ Creates Google Workspace executor with OAuth credentials from Supabase.
 This factory implements the Strategy pattern for future provider additions
 (Microsoft Graph, Apple Calendar, etc.) without changing booking_node or calendar_orchestrator.
 """
+import os
 import logging
 from typing import Optional, List, Tuple
 from langchain_core.tools import BaseTool
@@ -69,7 +70,13 @@ class ExecutorFactory:
         required: bool = True
     ) -> Optional[GoogleWorkspaceExecutor]:
         """
-        Create Google Workspace executor with OAuth credentials.
+        Create Google Workspace executor with OAuth refresh_token from Supabase.
+
+        Simple & Direct - follows same pattern as MCP auth:
+        1. Fetch refresh_token from Supabase
+        2. Get client_id/secret from .env
+        3. Create Google Credentials object
+        4. Done!
 
         Args:
             user_id: Clerk user ID
@@ -97,25 +104,44 @@ class ExecutorFactory:
             logger.info("No user_id provided, skipping Google Workspace executor")
             return None
 
-        # Load Google OAuth credentials from Supabase
+        # Fetch refresh_token from Supabase (simple!)
         try:
-            print(f"[EXECUTOR_FACTORY] Loading Google OAuth credentials from Supabase...")
-            google_creds = await load_google_credentials(user_id)
+            print(f"[EXECUTOR_FACTORY] Fetching Google refresh_token from Supabase...")
+            refresh_token = await load_google_credentials(user_id)
 
-            if google_creds:
-                print(f"[EXECUTOR_FACTORY] ✅ Google OAuth credentials found")
-                print(f"[EXECUTOR_FACTORY] Creating GoogleWorkspaceExecutor...")
-                logger.info(f"Google OAuth credentials found for user {user_id}")
-                executor = GoogleWorkspaceExecutor(google_creds)
-                print(f"[EXECUTOR_FACTORY] ✅ GoogleWorkspaceExecutor created successfully")
-                return executor
-            else:
-                print(f"[EXECUTOR_FACTORY] ❌ No Google OAuth credentials in Supabase for user {user_id}")
-                error_msg = f"No Google OAuth credentials found for user {user_id}. Please connect Google Calendar in the config app."
+            if not refresh_token:
+                print(f"[EXECUTOR_FACTORY] ❌ No Google refresh_token for user {user_id}")
+                error_msg = f"No Google refresh_token found. Please connect Google Calendar in config app."
                 if required:
                     raise ValueError(error_msg)
-                logger.info(f"No Google OAuth credentials for user {user_id}")
                 return None
+
+            print(f"[EXECUTOR_FACTORY] ✅ Found Google refresh_token")
+
+            # Get OAuth app credentials from .env (shared across users)
+            client_id = os.getenv("GOOGLE_CLIENT_ID")
+            client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+
+            if not client_id or not client_secret:
+                print(f"[EXECUTOR_FACTORY] ❌ Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env")
+                error_msg = "Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env"
+                if required:
+                    raise ValueError(error_msg)
+                return None
+
+            print(f"[EXECUTOR_FACTORY] ✅ Found Google OAuth app credentials in .env")
+
+            # Build credentials dict for GoogleWorkspaceExecutor
+            google_creds = {
+                'google_refresh_token': refresh_token,
+                'google_client_id': client_id,
+                'google_client_secret': client_secret
+            }
+
+            print(f"[EXECUTOR_FACTORY] Creating GoogleWorkspaceExecutor...")
+            executor = GoogleWorkspaceExecutor(google_creds)
+            print(f"[EXECUTOR_FACTORY] ✅ GoogleWorkspaceExecutor created successfully")
+            return executor
 
         except Exception as e:
             print(f"[EXECUTOR_FACTORY] ❌ Exception: {e}")

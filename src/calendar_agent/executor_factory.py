@@ -126,12 +126,16 @@ class ExecutorFactory:
         Raises:
             ValueError: If required=True and credentials not available
         """
+        print(f"\n[EXECUTOR_FACTORY] _create_google_executor for user: {user_id}")
+
         if not GOOGLE_OAUTH_AVAILABLE:
+            print(f"[EXECUTOR_FACTORY] ❌ Google OAuth utilities not available")
             if required:
                 raise ValueError("Google OAuth utilities not available")
             return None
 
         if not user_id:
+            print(f"[EXECUTOR_FACTORY] ❌ No user_id provided")
             if required:
                 raise ValueError("user_id required for Google Workspace executor")
             logger.info("No user_id provided, skipping Google Workspace executor")
@@ -139,19 +143,28 @@ class ExecutorFactory:
 
         # Load Google OAuth credentials from Supabase
         try:
+            print(f"[EXECUTOR_FACTORY] Loading Google OAuth credentials from Supabase...")
             google_creds = await load_google_credentials(user_id)
 
             if google_creds:
+                print(f"[EXECUTOR_FACTORY] ✅ Google OAuth credentials found")
+                print(f"[EXECUTOR_FACTORY] Creating GoogleWorkspaceExecutor...")
                 logger.info(f"Google OAuth credentials found for user {user_id}")
-                return GoogleWorkspaceExecutor(google_creds)
+                executor = GoogleWorkspaceExecutor(google_creds)
+                print(f"[EXECUTOR_FACTORY] ✅ GoogleWorkspaceExecutor created successfully")
+                return executor
             else:
+                print(f"[EXECUTOR_FACTORY] ❌ No Google OAuth credentials in Supabase for user {user_id}")
                 if required:
                     raise ValueError(f"No Google OAuth credentials found for user {user_id}")
                 logger.info(f"No Google OAuth credentials for user {user_id}")
                 return None
 
         except Exception as e:
+            print(f"[EXECUTOR_FACTORY] ❌ Exception: {e}")
             logger.error(f"Error creating Google Workspace executor: {e}")
+            import traceback
+            traceback.print_exc()
             if required:
                 raise ValueError(f"Failed to create Google Workspace executor: {e}")
             return None
@@ -194,20 +207,33 @@ class ExecutorFactory:
         Returns:
             List of READ-ONLY LangChain tools (list-events, get-event, list-calendars)
         """
+        print(f"\n[EXECUTOR_FACTORY] _get_read_tools called")
+        print(f"[EXECUTOR_FACTORY] Executor type: {type(executor).__name__}")
+        print(f"[EXECUTOR_FACTORY] Is GoogleWorkspaceExecutor: {isinstance(executor, GoogleWorkspaceExecutor)}")
+
         if isinstance(executor, GoogleWorkspaceExecutor):
             if not GOOGLE_WORKSPACE_TOOLS_AVAILABLE:
+                print(f"[EXECUTOR_FACTORY] ❌ google_workspace_tools module not available!")
                 logger.warning("google_workspace_tools not available - returning empty tool list")
                 return []
 
             try:
+                print(f"[EXECUTOR_FACTORY] Creating Google Workspace READ tools...")
                 read_tools = create_google_workspace_read_tools(executor)
+                print(f"[EXECUTOR_FACTORY] ✅ Created {len(read_tools)} Google Workspace READ tools:")
+                for tool in read_tools:
+                    print(f"[EXECUTOR_FACTORY]    - {tool.name}")
                 logger.info(f"Created {len(read_tools)} Google Workspace READ tools")
                 return read_tools
             except Exception as e:
+                print(f"[EXECUTOR_FACTORY] ❌ EXCEPTION creating Google Workspace tools:")
                 logger.error(f"Error creating Google Workspace tools: {e}")
+                import traceback
+                traceback.print_exc()
                 return []
         else:
             # For MCP executors, tools are handled separately in calendar_orchestrator
+            print(f"[EXECUTOR_FACTORY] Not GoogleWorkspaceExecutor (is {type(executor).__name__})")
             return []
 
     @staticmethod

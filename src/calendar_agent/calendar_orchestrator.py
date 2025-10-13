@@ -261,6 +261,9 @@ class CalendarAgentWithMCP:
 
             # Create executor using factory pattern AND get read-only tools
             # Priority: Google Workspace (primary) -> Rube MCP (fallback)
+            print(f"\n[CALENDAR_AGENT] Calling ExecutorFactory for user {self.user_id}")
+            print(f"[CALENDAR_AGENT] Available MCP booking tools: {len(booking_tools)}")
+
             self.executor, google_read_tools = await ExecutorFactory.create_executor(
                 user_id=self.user_id,
                 mcp_tools=booking_tools,
@@ -269,16 +272,24 @@ class CalendarAgentWithMCP:
 
             # Get executor type for logging
             executor_type = type(self.executor).__name__
-            print(f"Using {executor_type} for calendar operations")
+            print(f"\n[CALENDAR_AGENT] ===== ExecutorFactory Results =====")
+            print(f"[CALENDAR_AGENT] Executor type: {executor_type}")
+            print(f"[CALENDAR_AGENT] google_read_tools returned: {len(google_read_tools)} tools")
+            print(f"[CALENDAR_AGENT] google_read_tools is empty: {len(google_read_tools) == 0}")
 
             # Use Google Workspace READ tools if available, otherwise use MCP tools
             if google_read_tools:
-                print(f"Using {len(google_read_tools)} Google Workspace READ tools for calendar_agent")
+                print(f"[CALENDAR_AGENT] ✅ Using {len(google_read_tools)} Google Workspace READ tools")
                 self.tools = google_read_tools
                 for tool in self.tools:
-                    print(f"   {tool.name}: Google Workspace API")
+                    print(f"[CALENDAR_AGENT]    - {tool.name}: Google Workspace API")
             else:
-                print(f"Using {len(self.tools)} Rube MCP READ tools for calendar_agent")
+                print(f"[CALENDAR_AGENT] Using {len(self.tools)} Rube MCP READ tools (fallback)")
+                for tool in self.tools:
+                    print(f"[CALENDAR_AGENT]    - {tool.name}: Rube MCP")
+
+            print(f"[CALENDAR_AGENT] Final self.tools count: {len(self.tools)}")
+            print(f"[CALENDAR_AGENT] =====================================\n")
 
             # Create the graph
             self.graph = await self._create_calendar_graph()
@@ -312,25 +323,71 @@ class CalendarAgentWithMCP:
                 self.graph = await self._create_calendar_graph()
 
     async def _create_calendar_graph(self):
-        """Create calendar agent using pure LangGraph create_react_agent pattern"""
+        """Create calendar agent - Google uses editable prompts, Rube uses hardcoded"""
 
-        # Create enhanced prompt for calendar operations using imported prompts
+        # Create enhanced prompt for calendar operations
         if not self.tools:
+            # SAFETY: No tools available (both Google and Rube failed)
             prompt = get_no_tools_prompt()
+            print(f"[PROMPT] Using NO_TOOLS prompt - no Google OAuth, no Rube MCP")
         else:
-            # Get timezone context from config using the context function
-            from .config import get_current_context
-            context = get_current_context()
-            timezone_name = context["timezone_name"]
-            current_time = datetime.fromisoformat(context["current_time"])
+            # Tools available - check if we're using Google or Rube
+            executor_type = type(self.executor).__name__ if hasattr(self, 'executor') and self.executor else "Unknown"
 
-            # Use the imported prompt function with dynamic context
-            prompt = get_formatted_prompt_with_context(
-                timezone_name=timezone_name,
-                current_time_iso=context["current_time"],
-                today_str=context["today"],
-                tomorrow_str=context["tomorrow"]
-            )
+            if executor_type == "GoogleWorkspaceExecutor":
+                # GOOGLE PATH: Load user-editable prompt from Supabase
+                print(f"[PROMPT] Google Workspace detected - loading user-editable prompt")
+                user_prompt = None
+                if self.user_id:
+                    try:
+                        from utils.config_utils import get_agent_config_from_supabase
+                        agent_config = get_agent_config_from_supabase(self.user_id, "calendar_agent")
+                        user_prompt = agent_config.get("agent_system_prompt")
+                        if user_prompt:
+                            print(f"[PROMPT] ✅ Loaded user-edited prompt from Supabase")
+                        else:
+                            print(f"[PROMPT] No user-edited prompt, using default Google prompt")
+                    except Exception as e:
+                        print(f"[PROMPT] Error loading user prompt: {e}, using default")
+
+                # Format prompt with dynamic context
+                from .config import get_current_context
+                context = get_current_context()
+                if user_prompt:
+                    try:
+                        prompt = user_prompt.format(
+                            current_time=context["current_time"],
+                            timezone_name=context["timezone_name"],
+                            today=context["today"],
+                            tomorrow=context["tomorrow"]
+                        )
+                        print(f"[PROMPT] Using user-edited Google prompt")
+                    except KeyError as e:
+                        print(f"[PROMPT] User prompt missing placeholder {e}, using default")
+                        prompt = get_formatted_prompt_with_context(
+                            timezone_name=context["timezone_name"],
+                            current_time_iso=context["current_time"],
+                            today_str=context["today"],
+                            tomorrow_str=context["tomorrow"]
+                        )
+                else:
+                    prompt = get_formatted_prompt_with_context(
+                        timezone_name=context["timezone_name"],
+                        current_time_iso=context["current_time"],
+                        today_str=context["today"],
+                        tomorrow_str=context["tomorrow"]
+                    )
+            else:
+                # RUBE PATH: Use hardcoded prompt (WORKING - DON'T CHANGE!)
+                print(f"[PROMPT] Rube MCP or other executor ({executor_type}) - using hardcoded prompt")
+                from .config import get_current_context
+                context = get_current_context()
+                prompt = get_formatted_prompt_with_context(
+                    timezone_name=context["timezone_name"],
+                    current_time_iso=context["current_time"],
+                    today_str=context["today"],
+                    tomorrow_str=context["tomorrow"]
+                )
 
         # Create the main calendar agent (read-only operations)
         calendar_agent = create_react_agent(

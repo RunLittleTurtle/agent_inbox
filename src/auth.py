@@ -20,6 +20,7 @@ References:
 from langgraph_sdk import Auth
 import os
 import sys
+import asyncio
 import jwt
 from jwt import PyJWKClient
 import logging
@@ -136,8 +137,8 @@ async def get_current_user(authorization: str | None) -> Auth.types.MinimalUserD
     token = authorization.replace("Bearer ", "").strip()
 
     try:
-        # Get signing key from Clerk's JWKS
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        # Get signing key from Clerk's JWKS (async-safe for local dev, backward compatible for production)
+        signing_key = await asyncio.to_thread(jwks_client.get_signing_key_from_jwt, token)
 
         # Verify JWT signature and decode payload
         payload = jwt.decode(

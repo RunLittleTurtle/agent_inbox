@@ -10,11 +10,19 @@ The factory makes it easy to add more providers in the future
 (Microsoft Graph, Apple Calendar, etc.) without changing booking_node or calendar_orchestrator.
 """
 import logging
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
 from langchain_core.tools import BaseTool
 
 from .mcp_executor import MCPToolExecutor
 from .google_workspace_executor import GoogleWorkspaceExecutor
+
+# Import tool wrapper utility
+try:
+    from .google_workspace_tools import create_google_workspace_read_tools
+    GOOGLE_WORKSPACE_TOOLS_AVAILABLE = True
+except ImportError:
+    logging.warning("google_workspace_tools not available - READ tools disabled")
+    GOOGLE_WORKSPACE_TOOLS_AVAILABLE = False
 
 # Import OAuth utilities
 try:
@@ -36,9 +44,9 @@ class ExecutorFactory:
         user_id: Optional[str] = None,
         mcp_tools: Optional[List[BaseTool]] = None,
         provider_preference: str = "auto"
-    ) -> Union[GoogleWorkspaceExecutor, MCPToolExecutor]:
+    ) -> Tuple[Union[GoogleWorkspaceExecutor, MCPToolExecutor], List[BaseTool]]:
         """
-        Create executor based on credential availability and user preference.
+        Create executor AND read-only tools based on credential availability.
 
         Priority (when provider_preference="auto"):
         1. Google Workspace API (if OAuth credentials available)
@@ -54,7 +62,9 @@ class ExecutorFactory:
                 - "rube_only": Only use Rube MCP
 
         Returns:
-            GoogleWorkspaceExecutor or MCPToolExecutor
+            Tuple of (executor, read_tools):
+            - executor: GoogleWorkspaceExecutor or MCPToolExecutor for WRITE operations
+            - read_tools: List of READ-ONLY tools for calendar_agent node
 
         Raises:
             ValueError: If no executor can be created with available credentials
@@ -63,10 +73,14 @@ class ExecutorFactory:
 
         # Handle preference-based selection
         if provider_preference == "google_only":
-            return await ExecutorFactory._create_google_executor(user_id, required=True)
+            executor = await ExecutorFactory._create_google_executor(user_id, required=True)
+            read_tools = await ExecutorFactory._get_read_tools(executor)
+            return executor, read_tools
 
         elif provider_preference == "rube_only":
-            return await ExecutorFactory._create_mcp_executor(mcp_tools, required=True)
+            executor = await ExecutorFactory._create_mcp_executor(mcp_tools, required=True)
+            # MCP tools are handled separately in calendar_orchestrator
+            return executor, []
 
         # Auto selection: Try Google first, fallback to Rube MCP
         elif provider_preference == "auto":
@@ -74,14 +88,16 @@ class ExecutorFactory:
             google_executor = await ExecutorFactory._create_google_executor(user_id, required=False)
             if google_executor:
                 logger.info("Using Google Workspace API executor (primary workflow)")
-                return google_executor
+                read_tools = await ExecutorFactory._get_read_tools(google_executor)
+                return google_executor, read_tools
 
             # Fallback to Rube MCP
             logger.info("Google OAuth not configured, falling back to Rube MCP")
             mcp_executor = await ExecutorFactory._create_mcp_executor(mcp_tools, required=False)
             if mcp_executor:
                 logger.info("Using Rube MCP executor (fallback workflow)")
-                return mcp_executor
+                # MCP tools are handled separately in calendar_orchestrator
+                return mcp_executor, []
 
             # Neither available
             raise ValueError(
@@ -166,6 +182,33 @@ class ExecutorFactory:
 
         logger.info(f"Creating Rube MCP executor with {len(mcp_tools)} tools")
         return MCPToolExecutor(mcp_tools)
+
+    @staticmethod
+    async def _get_read_tools(executor) -> List[BaseTool]:
+        """
+        Get READ-ONLY tools from executor for calendar_agent node.
+
+        Args:
+            executor: GoogleWorkspaceExecutor or MCPToolExecutor
+
+        Returns:
+            List of READ-ONLY LangChain tools (list-events, get-event, list-calendars)
+        """
+        if isinstance(executor, GoogleWorkspaceExecutor):
+            if not GOOGLE_WORKSPACE_TOOLS_AVAILABLE:
+                logger.warning("google_workspace_tools not available - returning empty tool list")
+                return []
+
+            try:
+                read_tools = create_google_workspace_read_tools(executor)
+                logger.info(f"Created {len(read_tools)} Google Workspace READ tools")
+                return read_tools
+            except Exception as e:
+                logger.error(f"Error creating Google Workspace tools: {e}")
+                return []
+        else:
+            # For MCP executors, tools are handled separately in calendar_orchestrator
+            return []
 
     @staticmethod
     async def get_provider_status(

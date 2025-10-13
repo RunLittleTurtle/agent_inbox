@@ -421,3 +421,179 @@ class GoogleWorkspaceExecutor:
         except Exception:
             # Fallback to UTC
             return 'UTC'
+
+    # =============================================================================
+    # READ OPERATIONS - For calendar_agent node (no interrupts needed)
+    # =============================================================================
+
+    async def list_events(
+        self,
+        time_min: Optional[str] = None,
+        time_max: Optional[str] = None,
+        max_results: int = 250,
+        order_by: str = "startTime",
+        single_events: bool = True
+    ) -> str:
+        """
+        List calendar events within time range using Google Calendar API.
+
+        This is a READ-ONLY operation used by the calendar_agent node
+        to check availability and list upcoming events.
+
+        Args:
+            time_min: RFC3339 timestamp (lower bound for event end time)
+            time_max: RFC3339 timestamp (upper bound for event start time)
+            max_results: Maximum number of events to return (default 250, max 2500)
+            order_by: Sort by "startTime" or "updated"
+            single_events: Whether to expand recurring events
+
+        Returns:
+            Formatted string with event list for LLM consumption
+        """
+        try:
+            # Build query parameters
+            params = {
+                'calendarId': self.calendar_id,
+                'maxResults': max_results,
+                'singleEvents': single_events,
+                'orderBy': order_by if order_by == "startTime" else None
+            }
+
+            if time_min:
+                params['timeMin'] = time_min
+            if time_max:
+                params['timeMax'] = time_max
+
+            # Execute API call in thread pool
+            def _sync_list():
+                return self.service.events().list(**params).execute()
+
+            events_result = await asyncio.to_thread(_sync_list)
+            events = events_result.get('items', [])
+
+            if not events:
+                return "No events found in the specified time range."
+
+            # Format events for LLM
+            formatted_events = []
+            for event in events:
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                end = event['end'].get('dateTime', event['end'].get('date'))
+                summary = event.get('summary', 'No title')
+                event_id = event.get('id', '')
+
+                # Get attendees if present
+                attendees = event.get('attendees', [])
+                attendee_str = ""
+                if attendees:
+                    attendee_emails = [att.get('email', '') for att in attendees]
+                    attendee_str = f" | Attendees: {', '.join(attendee_emails)}"
+
+                formatted_events.append(
+                    f"• {start} to {end} - {summary} (ID: {event_id}){attendee_str}"
+                )
+
+            return f"Found {len(events)} events:\n" + "\n".join(formatted_events)
+
+        except HttpError as e:
+            return f"Error listing events: {e.reason}"
+        except Exception as e:
+            return f"Unexpected error listing events: {str(e)}"
+
+    async def get_event(self, event_id: str) -> str:
+        """
+        Get single event details by ID using Google Calendar API.
+
+        This is a READ-ONLY operation used by the calendar_agent node
+        to view specific event details.
+
+        Args:
+            event_id: Google Calendar event ID
+
+        Returns:
+            Formatted string with event details for LLM consumption
+        """
+        try:
+            # Execute API call in thread pool
+            def _sync_get():
+                return self.service.events().get(
+                    calendarId=self.calendar_id,
+                    eventId=event_id
+                ).execute()
+
+            event = await asyncio.to_thread(_sync_get)
+
+            # Format event details
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            end = event['end'].get('dateTime', event['end'].get('date'))
+            summary = event.get('summary', 'No title')
+            description = event.get('description', 'No description')
+            location = event.get('location', 'No location')
+            html_link = event.get('htmlLink', '')
+
+            # Get attendees
+            attendees = event.get('attendees', [])
+            attendee_list = []
+            for att in attendees:
+                email = att.get('email', '')
+                status = att.get('responseStatus', 'needsAction')
+                attendee_list.append(f"{email} ({status})")
+
+            result = f"""Event Details:
+Title: {summary}
+Start: {start}
+End: {end}
+Location: {location}
+Description: {description}
+Event ID: {event_id}
+Link: {html_link}"""
+
+            if attendee_list:
+                result += "\nAttendees:\n  " + "\n  ".join(attendee_list)
+
+            return result
+
+        except HttpError as e:
+            return f"Error retrieving event: {e.reason}"
+        except Exception as e:
+            return f"Unexpected error retrieving event: {str(e)}"
+
+    async def list_calendars(self) -> str:
+        """
+        List all calendars for the authenticated user using Google Calendar API.
+
+        This is a READ-ONLY operation used by the calendar_agent node
+        to show available calendars.
+
+        Returns:
+            Formatted string with calendar list for LLM consumption
+        """
+        try:
+            # Execute API call in thread pool
+            def _sync_list_calendars():
+                return self.service.calendarList().list().execute()
+
+            calendar_list = await asyncio.to_thread(_sync_list_calendars)
+            calendars = calendar_list.get('items', [])
+
+            if not calendars:
+                return "No calendars found."
+
+            # Format calendars for LLM
+            formatted_calendars = []
+            for calendar in calendars:
+                summary = calendar.get('summary', 'No name')
+                calendar_id = calendar.get('id', '')
+                access_role = calendar.get('accessRole', 'unknown')
+                primary = " (PRIMARY)" if calendar.get('primary', False) else ""
+
+                formatted_calendars.append(
+                    f"• {summary}{primary} - ID: {calendar_id} | Access: {access_role}"
+                )
+
+            return f"Found {len(calendars)} calendars:\n" + "\n".join(formatted_calendars)
+
+        except HttpError as e:
+            return f"Error listing calendars: {e.reason}"
+        except Exception as e:
+            return f"Unexpected error listing calendars: {str(e)}"

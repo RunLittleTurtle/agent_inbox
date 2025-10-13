@@ -259,9 +259,9 @@ class CalendarAgentWithMCP:
             for tool in booking_tools:
                 print(f"   {tool.name}: [REQUIRES APPROVAL]")
 
-            # Create executor using factory pattern
+            # Create executor using factory pattern AND get read-only tools
             # Priority: Google Workspace (primary) -> Rube MCP (fallback)
-            self.executor = await ExecutorFactory.create_executor(
+            self.executor, google_read_tools = await ExecutorFactory.create_executor(
                 user_id=self.user_id,
                 mcp_tools=booking_tools,
                 provider_preference="auto"  # Try Google first, fallback to Rube MCP
@@ -271,6 +271,15 @@ class CalendarAgentWithMCP:
             executor_type = type(self.executor).__name__
             print(f"Using {executor_type} for calendar operations")
 
+            # Use Google Workspace READ tools if available, otherwise use MCP tools
+            if google_read_tools:
+                print(f"Using {len(google_read_tools)} Google Workspace READ tools for calendar_agent")
+                self.tools = google_read_tools
+                for tool in self.tools:
+                    print(f"   {tool.name}: Google Workspace API")
+            else:
+                print(f"Using {len(self.tools)} Rube MCP READ tools for calendar_agent")
+
             # Create the graph
             self.graph = await self._create_calendar_graph()
 
@@ -278,14 +287,22 @@ class CalendarAgentWithMCP:
             print(f"Failed to initialize MCP client: {e}")
             # Try Google Workspace as fallback even if MCP fails
             try:
-                self.executor = await ExecutorFactory.create_executor(
+                self.executor, google_read_tools = await ExecutorFactory.create_executor(
                     user_id=self.user_id,
                     mcp_tools=None,
                     provider_preference="google_only"
                 )
                 executor_type = type(self.executor).__name__
                 print(f"Using {executor_type} as fallback after MCP failure")
-                self.tools = []  # No read-only tools without MCP
+
+                # Use Google Workspace READ tools
+                if google_read_tools:
+                    self.tools = google_read_tools
+                    print(f"Loaded {len(self.tools)} Google Workspace READ tools as fallback")
+                else:
+                    self.tools = []
+                    print("WARNING: No read-only tools available (no MCP and no Google tools)")
+
                 self.graph = await self._create_calendar_graph()
             except Exception as fallback_error:
                 print(f"Google Workspace fallback also failed: {fallback_error}")

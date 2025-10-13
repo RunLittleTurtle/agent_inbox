@@ -106,11 +106,16 @@ class ExecutorFactory:
 
         # Fetch refresh_token from Supabase (simple!)
         try:
+            print(f"[EXECUTOR_FACTORY] ===== GOOGLE OAUTH DEBUG =====")
+            print(f"[EXECUTOR_FACTORY] user_id being queried: {user_id}")
             print(f"[EXECUTOR_FACTORY] Fetching Google refresh_token from Supabase...")
             refresh_token = await load_google_credentials(user_id)
+            print(f"[EXECUTOR_FACTORY] Query result: {'FOUND ✅' if refresh_token else 'NOT FOUND ❌'}")
 
             if not refresh_token:
                 print(f"[EXECUTOR_FACTORY] ❌ No Google refresh_token for user {user_id}")
+                print(f"[EXECUTOR_FACTORY] ===== END DEBUG =====")
+
                 error_msg = f"No Google refresh_token found. Please connect Google Calendar in config app."
                 if required:
                     raise ValueError(error_msg)

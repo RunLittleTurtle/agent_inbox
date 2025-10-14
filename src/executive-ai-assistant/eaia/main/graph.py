@@ -189,6 +189,7 @@ def human_node(state: State):
 class ConfigSchema(TypedDict):
     db_id: int
     model: str
+    user_id: str  # Clerk user ID for OAuth credential fetching
 
 
 graph_builder = StateGraph(State, config_schema=ConfigSchema)

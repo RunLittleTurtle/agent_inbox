@@ -52,6 +52,11 @@ async def main(state: JobKickoff, config):
             thread_id,
             "executive_main",
             input={"email": email},
+            config={
+                "configurable": {
+                    "user_id": user_id
+                }
+            },
             multitask_strategy="rollback",
         )
 

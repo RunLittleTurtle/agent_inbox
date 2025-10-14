@@ -151,6 +151,13 @@ class ExecutorFactory:
             client_id = os.getenv("GOOGLE_CLIENT_ID")
             client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
 
+            print(f"[EXECUTOR_FACTORY] ===== OAUTH APP CREDENTIALS DEBUG =====")
+            print(f"[EXECUTOR_FACTORY] GOOGLE_CLIENT_ID from env: '{client_id}'")
+            print(f"[EXECUTOR_FACTORY] Client ID length: {len(client_id) if client_id else 0}")
+            print(f"[EXECUTOR_FACTORY] Client ID prefix: {client_id[:30] if client_id else 'NONE'}...")
+            print(f"[EXECUTOR_FACTORY] GOOGLE_CLIENT_SECRET exists: {bool(client_secret)}")
+            print(f"[EXECUTOR_FACTORY] Secret length: {len(client_secret) if client_secret else 0}")
+
             if not client_id or not client_secret:
                 print(f"[EXECUTOR_FACTORY] ❌ Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env")
                 error_msg = "Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env"

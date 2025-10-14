@@ -1,5 +1,7 @@
 # LangGraph Development Principles
 
+ALWAYS use 2025 modern way for LangGraph, Supabase, Railway, Clerk auth, Google api 2.0 when you do your research online.
+
 ALWAYS use LangGraph v.1, follow these principles and patterns.
 
 ALWAYS activate virtual environment: `source .venv/bin/activate`
@@ -23,6 +25,8 @@ Always follow KISS principle and work iteratively.
 When coding, use clear errors and logs—no graceful fallbacks. We need to know when things break.
 
 For agent_inbox questions: https://github.com/langchain-ai/agent-inbox
+
+Commit and Push for automatic deployement for Langgraph and Railway. For vercel, use the vercel CLI manually.
 
 ## Production Deployment Architecture (2025)
 

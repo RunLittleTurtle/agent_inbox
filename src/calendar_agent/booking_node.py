@@ -28,7 +28,14 @@ from pydantic import BaseModel, Field
 
 from shared_utils import DEFAULT_LLM_MODEL
 
-from .config import USER_TIMEZONE, get_current_context
+from .config import (
+    USER_TIMEZONE,
+    get_current_context,
+    LLM_CONFIG,
+    WORK_HOURS_START,
+    WORK_HOURS_END,
+    DEFAULT_MEETING_DURATION
+)
 from .state import BookingRequest
 from .execution_result import ExecutionStatus
 from .google_workspace_executor import GoogleWorkspaceExecutor
@@ -64,7 +71,6 @@ class BookingNode:
             When executor is None (missing Google OAuth credentials), the booking node
             will gracefully handle requests and guide users to connect their account.
         """
-        from .config import LLM_CONFIG, USER_TIMEZONE, WORK_HOURS_START, WORK_HOURS_END, DEFAULT_MEETING_DURATION
         self.executor = executor  # Use generic executor interface (can be None)
         self.model = model or ChatAnthropic(
             model=LLM_CONFIG.get("model", DEFAULT_LLM_MODEL),

@@ -243,6 +243,16 @@ class CalendarAgent:
             last_message = messages[-1]
             content = getattr(last_message, 'content', '')
 
+            # Handle structured content (list) or plain string
+            if isinstance(content, list):
+                # Extract text from all content blocks
+                content_str = " ".join(
+                    str(block.get('text', '')) if isinstance(block, dict) else str(block)
+                    for block in content
+                )
+            else:
+                content_str = str(content) if content else ''
+
             # Check if agent explicitly mentioned booking approval
             booking_keywords = [
                 "booking approval",
@@ -251,7 +261,7 @@ class CalendarAgent:
                 "requires booking approval"
             ]
 
-            if any(keyword in content.lower() for keyword in booking_keywords):
+            if any(keyword in content_str.lower() for keyword in booking_keywords):
                 self.logger.info("[CalendarAgent] Routing to booking_approval node")
                 return "booking_approval"
 

@@ -28,7 +28,6 @@ For agent_inbox questions: https://github.com/langchain-ai/agent-inbox
 
 ### Vercel Deployments (4 UIs)
 - **agent-chat-ui-2**: Live chat interface for real-time agent interaction
-- **agent-inbox-2**: Main inbox UI for async jobs and human-in-the-loop workflows
 - **agent-inbox**: Legacy inbox (maintained for compatibility)
 - **config-app**: Agent configuration management UI
 

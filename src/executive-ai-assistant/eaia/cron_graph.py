@@ -18,6 +18,14 @@ async def main(state: JobKickoff, config):
     minutes_since: int = state["minutes_since"]
     config_data = await get_config(config)
     email = config_data["email"]
+    user_id = config_data.get("user_id")
+
+    # Inject user_id into config for OAuth credential fetching (follows OAuth integration pattern)
+    if user_id:
+        if "configurable" not in config:
+            config["configurable"] = {}
+        config["configurable"]["user_id"] = user_id
+        config["metadata"] = {"user_id": user_id, "clerk_user_id": user_id}
 
     async for email in fetch_group_emails(email, minutes_since=minutes_since, config=config):
         thread_id = str(

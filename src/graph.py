@@ -444,10 +444,18 @@ def get_api_keys_from_config(config: Optional[RunnableConfig] = None) -> Dict[st
     if config and "configurable" in config:
         configurable = config["configurable"]
 
+        logger.info(f"[get_api_keys_from_config] ===== CONFIG DEBUG =====")
+        logger.info(f"[get_api_keys_from_config] configurable keys: {list(configurable.keys())}")
+        logger.info(f"[get_api_keys_from_config] 'user_id' in configurable: {'user_id' in configurable}")
+
         # Extract keys from config (user-specific)
         openai_key = configurable.get("openai_api_key")
         anthropic_key = configurable.get("anthropic_api_key")
         user_id = configurable.get("user_id", "unknown_user")
+
+        logger.info(f"[get_api_keys_from_config] Extracted user_id: '{user_id}'")
+        logger.info(f"[get_api_keys_from_config] user_id type: {type(user_id)}")
+        logger.info(f"[get_api_keys_from_config] user_id == 'unknown_user': {user_id == 'unknown_user'}")
 
         # In production, require at least one API key
         if not openai_key and not anthropic_key:

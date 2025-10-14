@@ -93,11 +93,17 @@ class CalendarAgent:
         if self._initialized:
             return
 
+        self.logger.info(f"[CalendarAgent] ===== INITIALIZATION DEBUG =====")
+        self.logger.info(f"[CalendarAgent] user_id from self.user_id: '{self.user_id}'")
+        self.logger.info(f"[CalendarAgent] user_id type: {type(self.user_id)}")
+        self.logger.info(f"[CalendarAgent] user_id is None: {self.user_id is None}")
+        self.logger.info(f"[CalendarAgent] user_id length: {len(self.user_id) if self.user_id else 0}")
         self.logger.info(f"[CalendarAgent] Initializing Google Workspace integration...")
 
         try:
             # Create Google Workspace executor and READ tools
             # Returns (None, []) if credentials missing - no exception raised
+            self.logger.info(f"[CalendarAgent] Calling ExecutorFactory.create_executor with user_id='{self.user_id}'")
             self.executor, self.tools = await ExecutorFactory.create_executor(self.user_id)
 
             if self.executor is None:
@@ -291,6 +297,11 @@ async def create_calendar_agent(
     Returns:
         Compiled calendar agent graph ready for invocation
     """
+    logger.info(f"[create_calendar_agent] ===== FACTORY FUNCTION DEBUG =====")
+    logger.info(f"[create_calendar_agent] user_id received: '{user_id}'")
+    logger.info(f"[create_calendar_agent] user_id type: {type(user_id)}")
+    logger.info(f"[create_calendar_agent] user_id is None: {user_id is None}")
+    logger.info(f"[create_calendar_agent] user_id length: {len(user_id) if user_id else 0}")
     logger.info(f"[create_calendar_agent] Creating agent for user_id={user_id}")
 
     # Create agent instance

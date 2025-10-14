@@ -37,7 +37,12 @@ async def get_credentials(
     config: dict | None = None,
     langsmith_api_key: str | None = None
 ) -> Credentials:
-    """Get Google API credentials using existing OAuth setup.
+    """Get Google API credentials using centralized OAuth utilities.
+
+    Following the proven calendar_agent pattern:
+    - Fetches refresh_token from Supabase via utils/google_oauth_utils.py
+    - Gets OAuth app credentials (client_id/secret) from .env
+    - Creates Google Credentials object with auto-refresh
 
     Args:
         user_email: User's Gmail email address
@@ -49,111 +54,85 @@ async def get_credentials(
     """
     logger.info(f"[get_credentials] Starting credential fetch for {user_email}")
 
-    # Try to load from user_secrets table (via global config API)
+    # Import centralized OAuth utility (same as calendar_agent)
+    from utils.google_oauth_utils import load_google_credentials
+
+    # Extract user_id from LangGraph config
+    user_id = None
+    if config:
+        logger.debug(f"[get_credentials] Config structure: {list(config.keys())}")
+
+        user_id = config.get("configurable", {}).get("user_id")
+        if not user_id:
+            metadata = config.get("metadata", {})
+            user_id = metadata.get("user_id") or metadata.get("clerk_user_id")
+            logger.debug(f"[get_credentials] Extracted user_id from metadata: {user_id}")
+        else:
+            logger.debug(f"[get_credentials] Extracted user_id from configurable: {user_id}")
+
+    # Try Supabase fetch if user_id available (PRODUCTION PATH)
     client_id = None
     client_secret = None
     refresh_token = None
 
-    if config:
+    if user_id:
         try:
-            import httpx
+            logger.info(f"[get_credentials] Fetching refresh_token from Supabase for user_id: {user_id}")
+            refresh_token = await load_google_credentials(user_id)
 
-            # Extract user_id from LangGraph config
-            logger.debug(f"[get_credentials] Config structure: {list(config.keys())}")
-
-            user_id = config.get("configurable", {}).get("user_id")
-            if not user_id:
-                metadata = config.get("metadata", {})
-                user_id = metadata.get("user_id") or metadata.get("clerk_user_id")
-                logger.debug(f"[get_credentials] Extracted user_id from metadata: {user_id}")
+            if refresh_token:
+                logger.info("✓ [get_credentials] Loaded Google refresh_token from Supabase user_secrets")
             else:
-                logger.debug(f"[get_credentials] Extracted user_id from configurable: {user_id}")
-
-            if user_id:
-                # Fetch global config (which includes user_secrets)
-                config_api_url = os.getenv("CONFIG_API_URL", "http://localhost:8000")
-                logger.info(f"[get_credentials] Fetching from CONFIG_API_URL: {config_api_url}")
-                logger.info(f"[get_credentials] User ID: {user_id}")
-
-                async with httpx.AsyncClient(timeout=5.0) as client_http:
-                    fetch_url = f"{config_api_url}/api/config/values"
-                    fetch_params = {"agent_id": "global", "user_id": user_id}
-                    logger.debug(f"[get_credentials] Request: GET {fetch_url} params={fetch_params}")
-
-                    response = await client_http.get(fetch_url, params=fetch_params)
-                    logger.debug(f"[get_credentials] Response status: {response.status_code}")
-
-                    if response.status_code == 200:
-                        data = response.json()
-                        google_workspace = data.get("google_workspace", {})
-                        client_id = google_workspace.get("google_client_id")
-                        client_secret = google_workspace.get("google_client_secret")
-                        refresh_token = google_workspace.get("google_refresh_token")
-
-                        # Log what we got (masked)
-                        logger.debug(f"[get_credentials] Has client_id: {bool(client_id)}")
-                        logger.debug(f"[get_credentials] Has client_secret: {bool(client_secret)}")
-                        logger.debug(f"[get_credentials] Has refresh_token: {bool(refresh_token)}")
-
-                        if all([client_id, client_secret, refresh_token]):
-                            logger.info("✓ [get_credentials] Loaded Google credentials from user_secrets (Supabase)")
-                        else:
-                            missing = []
-                            if not client_id: missing.append("client_id")
-                            if not client_secret: missing.append("client_secret")
-                            if not refresh_token: missing.append("refresh_token")
-                            logger.warning(f"✗ [get_credentials] Incomplete credentials from Supabase. Missing: {', '.join(missing)}")
-                    else:
-                        logger.warning(f"✗ [get_credentials] Config API returned status {response.status_code}: {response.text[:200]}")
-            else:
-                logger.warning("✗ [get_credentials] No user_id found in config - skipping Supabase fetch")
-                logger.debug(f"[get_credentials] Config keys checked: configurable.user_id, metadata.user_id, metadata.clerk_user_id")
+                logger.warning(f"✗ [get_credentials] No refresh_token found in Supabase for user {user_id}")
         except Exception as e:
-            logger.error(f"✗ [get_credentials] Failed to load credentials from user_secrets: {e}")
+            logger.error(f"✗ [get_credentials] Failed to load credentials from Supabase: {e}")
             import traceback
             logger.debug(f"[get_credentials] Traceback: {traceback.format_exc()[:500]}")
+    else:
+        logger.warning("✗ [get_credentials] No user_id found in config - skipping Supabase fetch")
+        logger.debug(f"[get_credentials] Config keys checked: configurable.user_id, metadata.user_id, metadata.clerk_user_id")
 
-    # Fallback to environment variables (.env file)
-    if not all([client_id, client_secret, refresh_token]):
-        logger.info("[get_credentials] Attempting fallback to environment variables")
+    # Fallback to environment variables (.env file) for LOCAL DEV only
+    if not refresh_token:
+        logger.info("[get_credentials] Attempting fallback to environment variables (.env)")
 
-        env_client_id = os.getenv("GOOGLE_CLIENT_ID")
-        env_client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         env_refresh_token = os.getenv("GMAIL_REFRESH_TOKEN")
-
-        logger.debug(f"[get_credentials] Env has GOOGLE_CLIENT_ID: {bool(env_client_id)}")
-        logger.debug(f"[get_credentials] Env has GOOGLE_CLIENT_SECRET: {bool(env_client_secret)}")
         logger.debug(f"[get_credentials] Env has GMAIL_REFRESH_TOKEN: {bool(env_refresh_token)}")
 
-        client_id = client_id or env_client_id
-        client_secret = client_secret or env_client_secret
-        refresh_token = refresh_token or env_refresh_token
-
-        if all([client_id, client_secret, refresh_token]):
-            logger.info("✓ [get_credentials] Loaded Google credentials from environment variables (.env)")
+        if env_refresh_token:
+            refresh_token = env_refresh_token
+            logger.info("✓ [get_credentials] Loaded refresh_token from environment variables (.env)")
         else:
-            logger.warning("✗ [get_credentials] Incomplete credentials from environment variables")
+            logger.warning("✗ [get_credentials] No refresh_token in environment variables")
 
+    # Get OAuth app credentials from .env (shared across all users)
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+
+    logger.debug(f"[get_credentials] Env has GOOGLE_CLIENT_ID: {bool(client_id)}")
+    logger.debug(f"[get_credentials] Env has GOOGLE_CLIENT_SECRET: {bool(client_secret)}")
+
+    # Validate all required credentials
     if not all([client_id, client_secret, refresh_token]):
         missing = []
-        if not client_id: missing.append("client_id")
-        if not client_secret: missing.append("client_secret")
-        if not refresh_token: missing.append("refresh_token")
+        if not client_id: missing.append("GOOGLE_CLIENT_ID")
+        if not client_secret: missing.append("GOOGLE_CLIENT_SECRET")
+        if not refresh_token: missing.append("google_refresh_token")
 
         error_msg = (
             f"Missing Gmail OAuth credentials: {', '.join(missing)}. "
-            "Please set Google Workspace credentials in Supabase user_secrets table or .env file"
+            "Please connect your Google account in the config-app, or set GOOGLE_* vars in .env for local dev."
         )
         logger.error(f"✗ [get_credentials] {error_msg}")
         raise ValueError(error_msg)
 
-    # Create credentials with refresh token
+    # Create credentials with refresh token (OAuth 2.0 best practice)
     logger.info("[get_credentials] Creating Google OAuth2 Credentials object")
     logger.debug(f"[get_credentials] Token URI: https://oauth2.googleapis.com/token")
     logger.debug(f"[get_credentials] Scopes: {', '.join(_SCOPES)}")
 
     creds = Credentials(
-        token=None,  # Will be refreshed automatically
+        token=None,  # Will be refreshed automatically on first API call
         refresh_token=refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=client_id,

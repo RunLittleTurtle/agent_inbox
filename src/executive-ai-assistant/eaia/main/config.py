@@ -44,14 +44,18 @@ def _resolve_templates(config_data: dict) -> dict:
 
 async def _fetch_from_supabase(config: dict) -> dict | None:
     """
-    Fetch user configuration from Supabase Config API
+    Fetch user configuration from Supabase (SIMPLIFIED - NO CONFIG_API).
+
+    Following the calendar_agent pattern:
+    - Google OAuth credentials are fetched via gmail.py (using utils/google_oauth_utils.py)
+    - Agent-specific config comes from config.yaml (checked into repo)
+    - This function is kept minimal for future Supabase config table integration
+
     Returns flattened config dict or None if fetch fails
     """
     import os
-    import httpx
 
     # Extract user_id from LangGraph config metadata
-    # LangGraph Cloud passes user identity through thread metadata
     user_id = config.get("configurable", {}).get("user_id")
     if not user_id:
         # Try alternative locations where user_id might be stored
@@ -59,75 +63,20 @@ async def _fetch_from_supabase(config: dict) -> dict | None:
         user_id = metadata.get("user_id") or metadata.get("clerk_user_id")
 
     if not user_id:
-        print("  No user_id found in config - skipping Supabase fetch")
+        print("  No user_id found in config - using config.yaml")
         return None
 
-    # Get Config API URL from environment or use default
-    config_api_url = os.environ.get("CONFIG_API_URL", "http://localhost:8000")
-    agent_id = "executive-ai-assistant"
+    # NOTE: Google OAuth credentials are handled by eaia/gmail.py via load_google_credentials()
+    # This function is simplified to focus on agent-specific config only
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            # Fetch agent-specific config
-            agent_response = await client.get(
-                f"{config_api_url}/api/config/values",
-                params={"agent_id": agent_id, "user_id": user_id}
-            )
-
-            # Fetch global config (API keys, credentials)
-            global_response = await client.get(
-                f"{config_api_url}/api/config/values",
-                params={"agent_id": "global", "user_id": user_id}
-            )
-
-            if agent_response.status_code != 200:
-                print(f"  Config API returned {agent_response.status_code} - falling back to config.yaml")
-                return None
-
-            agent_data = agent_response.json()
-            global_data = global_response.json() if global_response.status_code == 200 else {}
-
-            print(f" Fetched config from Supabase for user {user_id}")
-
-            # Flatten nested config structure to match config.yaml format
-            # Input:  { values: { section_key: { field_key: { current: value, ... } } } }
-            # Output: { field_key: value, ... }
-            flat_config = {}
-
-            # First, flatten agent-specific config
-            values = agent_data.get("values", {})
-            for section_key, section_value in values.items():
-                if isinstance(section_value, dict):
-                    for field_key, field_value in section_value.items():
-                        if isinstance(field_value, dict) and "current" in field_value:
-                            flat_config[field_key] = field_value["current"]
-
-            # Then, add global config (API keys from user_secrets)
-            # Global config comes as flat structure, not nested
-            for section_key, section_value in global_data.items():
-                if section_key == "ai_models":
-                    # Extract API keys
-                    if isinstance(section_value, dict):
-                        flat_config["anthropic_api_key"] = section_value.get("anthropic_api_key", "")
-                        flat_config["openai_api_key"] = section_value.get("openai_api_key", "")
-                elif section_key == "langgraph_system":
-                    # Extract LangSmith key
-                    if isinstance(section_value, dict):
-                        flat_config["langsmith_api_key"] = section_value.get("langsmith_api_key", "")
-                elif section_key == "google_workspace":
-                    # Extract Google credentials
-                    if isinstance(section_value, dict):
-                        flat_config["google_client_id"] = section_value.get("google_client_id", "")
-                        flat_config["google_client_secret"] = section_value.get("google_client_secret", "")
-                        flat_config["google_refresh_token"] = section_value.get("google_refresh_token", "")
-
-            print(f" DEBUG: Flattened config has {len(flat_config)} fields")
-            print(f" DEBUG: Has API keys: anthropic={bool(flat_config.get('anthropic_api_key'))}, openai={bool(flat_config.get('openai_api_key'))}")
-
-            return flat_config
+        # Future: Fetch agent-specific config from Supabase config table
+        # For now, we use config.yaml (checked into repo)
+        print(f"  Using config.yaml for user {user_id} (Supabase config table not yet implemented)")
+        return None
 
     except Exception as e:
-        print(f"  Error fetching from Supabase Config API: {e}")
+        print(f"  Error fetching from Supabase: {e}")
         return None
 
 

@@ -65,6 +65,12 @@ async def load_google_credentials(user_id: str) -> Optional[str]:
             .execute()
 
         logger.info(f"[Google OAuth] Query executed")
+
+        # Check if result is None (Supabase client error)
+        if result is None:
+            logger.error(f"[Google OAuth] ❌ Supabase query returned None - connection failed")
+            return None
+
         logger.info(f"[Google OAuth] result.data type: {type(result.data)}")
         logger.info(f"[Google OAuth] result.data is None: {result.data is None}")
 

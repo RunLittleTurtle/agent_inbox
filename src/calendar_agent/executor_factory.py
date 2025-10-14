@@ -13,23 +13,36 @@ from langchain_core.tools import BaseTool
 from .google_workspace_executor import GoogleWorkspaceExecutor
 
 # Import tool wrapper utility
+# CRITICAL: This import determines if Google Calendar tools are available
+# If this fails, the agent will show fallback "connect Google Calendar" message
 try:
+    print("[EXECUTOR_FACTORY] Attempting to import google_workspace_tools...")
     from .google_workspace_tools import create_google_workspace_read_tools
     GOOGLE_WORKSPACE_TOOLS_AVAILABLE = True
     print("[EXECUTOR_FACTORY] ✅ google_workspace_tools imported successfully")
+    logging.info("google_workspace_tools imported successfully")
 except ImportError as e:
-    print(f"[EXECUTOR_FACTORY] ❌ ImportError for google_workspace_tools: {e}")
-    print(f"[EXECUTOR_FACTORY] Import traceback:")
+    error_msg = f"ImportError: {e}"
+    print(f"[EXECUTOR_FACTORY] ❌ IMPORT FAILED: {error_msg}")
+    print(f"[EXECUTOR_FACTORY] Full traceback:")
     import traceback
-    traceback.print_exc()
-    logging.warning(f"google_workspace_tools not available - READ tools disabled. Error: {e}")
+    traceback_str = traceback.format_exc()
+    print(traceback_str)
+    logging.error(f"google_workspace_tools import failed - READ tools disabled. {error_msg}\n{traceback_str}")
     GOOGLE_WORKSPACE_TOOLS_AVAILABLE = False
 except Exception as e:
-    print(f"[EXECUTOR_FACTORY] ❌ Unexpected error importing google_workspace_tools: {type(e).__name__}: {e}")
+    error_msg = f"{type(e).__name__}: {e}"
+    print(f"[EXECUTOR_FACTORY] ❌ UNEXPECTED ERROR: {error_msg}")
+    print(f"[EXECUTOR_FACTORY] Full traceback:")
     import traceback
-    traceback.print_exc()
-    logging.error(f"Unexpected error importing google_workspace_tools: {e}")
+    traceback_str = traceback.format_exc()
+    print(traceback_str)
+    logging.error(f"Unexpected error importing google_workspace_tools: {error_msg}\n{traceback_str}")
     GOOGLE_WORKSPACE_TOOLS_AVAILABLE = False
+
+# Log the final state
+print(f"[EXECUTOR_FACTORY] GOOGLE_WORKSPACE_TOOLS_AVAILABLE = {GOOGLE_WORKSPACE_TOOLS_AVAILABLE}")
+logging.info(f"ExecutorFactory initialized: GOOGLE_WORKSPACE_TOOLS_AVAILABLE={GOOGLE_WORKSPACE_TOOLS_AVAILABLE}")
 
 # Import OAuth utilities
 try:

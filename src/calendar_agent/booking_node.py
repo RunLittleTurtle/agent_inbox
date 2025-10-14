@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from shared_utils import DEFAULT_LLM_MODEL
 
+from .config import USER_TIMEZONE, get_current_context
 from .state import BookingRequest
 from .execution_result import ExecutionStatus
 from .google_workspace_executor import GoogleWorkspaceExecutor
@@ -262,9 +263,9 @@ class BookingNode:
     ) -> Optional[Dict[str, Any]]:
         """Enhanced booking detail extraction with full conversation context"""
 
-        # Get timezone context from config using async pattern
-
-        timezone_name = USER_TIMEZONE
+        # Get timezone context using centralized function
+        context = get_current_context()
+        timezone_name = context['timezone_name']
         # Use asyncio.to_thread to avoid blocking I/O in async context
         current_time = await asyncio.to_thread(lambda: datetime.now(ZoneInfo(timezone_name)))
 

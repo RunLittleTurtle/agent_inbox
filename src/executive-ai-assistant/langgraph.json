@@ -1,10 +1,10 @@
 {
   "dependencies": ["./pyproject.toml"],
   "graphs": {
-    "main": "./eaia/main/graph.py:graph",
-    "cron": "./eaia/cron_graph.py:cron_app",
-    "general_reflection": "./eaia/reflection_graphs.py:general_reflection",
-    "multi_reflection": "./eaia/reflection_graphs.py:multi_reflection"
+    "executive_main": "./src/executive-ai-assistant/eaia/main/graph.py:app",
+    "executive_cron": "./src/executive-ai-assistant/eaia/cron_graph.py:graph",
+    "executive_general_reflection": "./src/executive-ai-assistant/eaia/reflection_graphs.py:general_reflection_graph",
+    "executive_multi_reflection": "./src/executive-ai-assistant/eaia/reflection_graphs.py:multi_reflection_graph"
   },
   "env": ".env"
 }

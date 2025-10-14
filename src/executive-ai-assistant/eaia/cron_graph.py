@@ -50,7 +50,7 @@ async def main(state: JobKickoff, config):
 
         await client.runs.create(
             thread_id,
-            "main",
+            "executive_main",
             input={"email": email},
             multitask_strategy="rollback",
         )

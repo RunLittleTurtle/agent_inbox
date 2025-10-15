@@ -96,7 +96,10 @@ async def main(
                     pass
                 else:
                     continue
-        await client.threads.update(thread_id, metadata={"email_id": email["id"]})
+        await client.threads.update(thread_id, metadata={
+            "graph_id": "executive_main",  # Preserve graph_id for inbox filtering
+            "email_id": email["id"]
+        })
 
         print(f" Creating workflow run for thread {thread_id} with graph main")
         run_result = await client.runs.create(

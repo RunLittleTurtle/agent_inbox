@@ -108,7 +108,10 @@ class LocalCronTimer:
                     print(f"  Email already processed, skipping...")
                     break
 
-                await self.client.threads.update(thread_id, metadata={"email_id": email["id"]})
+                await self.client.threads.update(thread_id, metadata={
+                    "graph_id": "executive_main",  # Preserve graph_id for inbox filtering
+                    "email_id": email["id"]
+                })
 
                 print(f" Creating workflow run for thread {thread_id}")
                 run_result = await self.client.runs.create(

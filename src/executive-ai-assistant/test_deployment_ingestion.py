@@ -267,7 +267,10 @@ async def run_sample_ingestion(email, user_id, deployment_url, minutes_since=60,
                         raise e
 
                 # Update thread metadata
-                await client.threads.update(thread_id, metadata={"email_id": email_data["id"]})
+                await client.threads.update(thread_id, metadata={
+                    "graph_id": "executive_main",  # Preserve graph_id for inbox filtering
+                    "email_id": email_data["id"]
+                })
 
                 # Create run
                 print_info(f"  Creating workflow run...")

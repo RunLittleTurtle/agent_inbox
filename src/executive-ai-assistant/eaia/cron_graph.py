@@ -50,7 +50,10 @@ async def main(state: JobKickoff, config):
         recent_email = thread_info["metadata"].get("email_id")
         if recent_email == email["id"]:
             break
-        await client.threads.update(thread_id, metadata={"email_id": email["id"]})
+        await client.threads.update(thread_id, metadata={
+            "graph_id": "executive_main",  # Preserve graph_id for inbox filtering
+            "email_id": email["id"]
+        })
 
         await client.runs.create(
             thread_id,

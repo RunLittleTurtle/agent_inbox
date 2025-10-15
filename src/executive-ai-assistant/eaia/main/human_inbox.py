@@ -114,7 +114,7 @@ async def send_message(state: State, config, store):
                 "prompt_types": ["background"],
                 "assistant_key": config["configurable"].get("assistant_id", "default"),
             }
-            await LGC.runs.create(None, "multi_reflection_graph", input=rewrite_state)
+            await LGC.runs.create(None, "executive_multi_reflection", input=rewrite_state)
     elif response["type"] == "ignore":
         msg = {
             "role": "assistant",
@@ -180,7 +180,7 @@ async def send_email_draft(state: State, config, store):
                 "prompt_types": ["tone", "email", "background", "calendar"],
                 "assistant_key": config["configurable"].get("assistant_id", "default"),
             }
-            await LGC.runs.create(None, "multi_reflection_graph", input=rewrite_state)
+            await LGC.runs.create(None, "executive_multi_reflection", input=rewrite_state)
     elif response["type"] == "ignore":
         msg = {
             "role": "assistant",
@@ -227,7 +227,7 @@ async def send_email_draft(state: State, config, store):
                 "prompt_types": ["tone", "email", "background", "calendar"],
                 "assistant_key": config["configurable"].get("assistant_id", "default"),
             }
-            await LGC.runs.create(None, "multi_reflection_graph", input=rewrite_state)
+            await LGC.runs.create(None, "executive_multi_reflection", input=rewrite_state)
     elif response["type"] == "accept":
         if memory:
             await save_email(state, config, store, "email")
@@ -275,7 +275,7 @@ async def notify(state: State, config, store):
                 "prompt_types": ["email", "background", "calendar"],
                 "assistant_key": config["configurable"].get("assistant_id", "default"),
             }
-            await LGC.runs.create(None, "multi_reflection_graph", input=rewrite_state)
+            await LGC.runs.create(None, "executive_multi_reflection", input=rewrite_state)
     elif response["type"] == "ignore":
         msg = {
             "role": "assistant",
@@ -341,7 +341,7 @@ async def send_cal_invite(state: State, config, store):
                 "prompt_types": ["email", "background", "calendar"],
                 "assistant_key": config["configurable"].get("assistant_id", "default"),
             }
-            await LGC.runs.create(None, "multi_reflection_graph", input=rewrite_state)
+            await LGC.runs.create(None, "executive_multi_reflection", input=rewrite_state)
     elif response["type"] == "ignore":
         msg = {
             "role": "assistant",
@@ -384,7 +384,7 @@ async def send_cal_invite(state: State, config, store):
                 "prompt_types": ["email", "background", "calendar"],
                 "assistant_key": config["configurable"].get("assistant_id", "default"),
             }
-            await LGC.runs.create(None, "multi_reflection_graph", input=rewrite_state)
+            await LGC.runs.create(None, "executive_multi_reflection", input=rewrite_state)
     elif response["type"] == "accept":
         if memory:
             await save_email(state, config, store, "email")

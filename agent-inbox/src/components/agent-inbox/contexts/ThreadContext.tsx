@@ -29,7 +29,7 @@ import { useLocalStorage } from "../hooks/use-local-storage";
 import { useInboxes } from "../hooks/use-inboxes";
 import { logger } from "../utils/logger";
 import { useAuth } from "@clerk/nextjs";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseClient } from "@/lib/supabase";
 
 type ThreadContentType<
   ThreadValues extends Record<string, any> = Record<string, any>,
@@ -532,11 +532,9 @@ export function ThreadsProvider<
         const runConfig: any = userId ? { configurable: { user_id: userId } } : undefined;
 
         if (userId) {
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+          const supabase = getSupabaseClient();
 
-          if (supabaseUrl && supabaseKey) {
-            const supabase = createSupabaseClient(supabaseUrl, supabaseKey);
+          if (supabase) {
             const { data: userSecrets, error } = await supabase
               .from("user_secrets")
               .select("*")

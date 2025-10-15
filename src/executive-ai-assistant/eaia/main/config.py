@@ -44,16 +44,17 @@ def _resolve_templates(config_data: dict) -> dict:
 
 async def _fetch_from_supabase(config: dict) -> dict | None:
     """
-    Fetch user configuration from Supabase (SIMPLIFIED - NO CONFIG_API).
+    Fetch user configuration from Supabase agent_configs and user_secrets tables.
 
     Following the calendar_agent pattern:
+    - Agent-specific config (models, prompts) from agent_configs table
+    - User secrets (API keys, credentials) from user_secrets table
     - Google OAuth credentials are fetched via gmail.py (using utils/google_oauth_utils.py)
-    - Agent-specific config comes from config.yaml (checked into repo)
-    - This function is kept minimal for future Supabase config table integration
 
     Returns flattened config dict or None if fetch fails
     """
     import os
+    from supabase import create_client, Client
 
     # Extract user_id from LangGraph config metadata
     user_id = config.get("configurable", {}).get("user_id")
@@ -66,17 +67,82 @@ async def _fetch_from_supabase(config: dict) -> dict | None:
         print("  No user_id found in config - using config.yaml")
         return None
 
-    # NOTE: Google OAuth credentials are handled by eaia/gmail.py via load_google_credentials()
-    # This function is simplified to focus on agent-specific config only
+    # Initialize Supabase client
+    SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
+
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print(f"  Supabase credentials not configured - falling back to config.yaml for user {user_id}")
+        return None
 
     try:
-        # Future: Fetch agent-specific config from Supabase config table
-        # For now, we use config.yaml (checked into repo)
-        print(f"  Using config.yaml for user {user_id} (Supabase config table not yet implemented)")
-        return None
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+        # 1. Fetch agent-specific config from agent_configs table
+        agent_config_result = supabase.table("agent_configs") \
+            .select("config_data, prompts") \
+            .eq("clerk_id", user_id) \
+            .eq("agent_id", "executive_ai_assistant") \
+            .maybe_single() \
+            .execute()
+
+        # 2. Fetch user secrets (API keys, timezone, etc.) from user_secrets table
+        user_secrets_result = supabase.table("user_secrets") \
+            .select("anthropic_api_key, openai_api_key, timezone") \
+            .eq("clerk_id", user_id) \
+            .maybe_single() \
+            .execute()
+
+        # 3. Load base config from config.yaml as foundation
+        config_path = _ROOT.joinpath("config.yaml")
+
+        def _load_yaml():
+            with open(config_path) as stream:
+                return yaml.safe_load(stream)
+
+        base_config = await asyncio.to_thread(_load_yaml)
+
+        # 4. Merge configurations (priority: agent_configs > user_secrets > config.yaml)
+        merged_config = base_config.copy()
+
+        # Merge user secrets (API keys, timezone)
+        if user_secrets_result and user_secrets_result.data:
+            secrets = user_secrets_result.data
+            if secrets.get("anthropic_api_key"):
+                merged_config["anthropic_api_key"] = secrets["anthropic_api_key"]
+            if secrets.get("openai_api_key"):
+                merged_config["openai_api_key"] = secrets["openai_api_key"]
+            if secrets.get("timezone"):
+                merged_config["timezone"] = secrets["timezone"]
+
+        # Merge agent-specific config (models, prompts)
+        if agent_config_result and agent_config_result.data:
+            config_data = agent_config_result.data.get("config_data", {})
+
+            # Flatten nested config structure from Supabase
+            # Config is stored as: {"llm_triage": {"triage_model": "...", "triage_temperature": ...}}
+            # We need to flatten to: {"triage_model": "...", "triage_temperature": ...}
+            for section_key, section_values in config_data.items():
+                if isinstance(section_values, dict):
+                    merged_config.update(section_values)
+
+            # Merge prompts
+            prompts = agent_config_result.data.get("prompts", {})
+            if prompts:
+                merged_config.update(prompts)
+
+        print(f"  Loaded config from Supabase for user {user_id}")
+        print(f"    - triage_model: {merged_config.get('triage_model', 'not set')}")
+        print(f"    - draft_model: {merged_config.get('draft_model', 'not set')}")
+        print(f"    - has_anthropic_key: {bool(merged_config.get('anthropic_api_key'))}")
+        print(f"    - has_openai_key: {bool(merged_config.get('openai_api_key'))}")
+
+        return merged_config
 
     except Exception as e:
         print(f"  Error fetching from Supabase: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 

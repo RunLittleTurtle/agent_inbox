@@ -266,7 +266,27 @@ export default function useInterruptedActions<
           setStreamFinished(true);
         }
       } catch (e: any) {
-        logger.error("Error sending human response", e);
+        // CRITICAL: Log full error details for debugging
+        logger.error("Error sending human response - FULL ERROR DETAILS:", {
+          error: e,
+          message: e?.message,
+          stack: e?.stack,
+          response: e?.response,
+          status: e?.response?.status,
+          statusText: e?.response?.statusText,
+          data: e?.response?.data,
+        });
+
+        // Also log to console for production debugging
+        console.error("=== SEND HUMAN RESPONSE ERROR ===");
+        console.error("Error object:", e);
+        console.error("Error message:", e?.message);
+        console.error("Error stack:", e?.stack);
+        if (e?.response) {
+          console.error("HTTP Response status:", e.response.status);
+          console.error("HTTP Response data:", e.response.data);
+        }
+        console.error("=================================");
 
         if ("message" in e && e.message.includes("Invalid assistant ID")) {
           toast({
@@ -277,11 +297,13 @@ export default function useInterruptedActions<
             duration: 5000,
           });
         } else {
+          // Show more detailed error message if available
+          const errorDetails = e?.message || e?.response?.statusText || "Unknown error";
           toast({
             title: "Error",
-            description: "Failed to submit response.",
+            description: `Failed to submit response. ${errorDetails} - Check browser console for details.`,
             variant: "destructive",
-            duration: 5000,
+            duration: 8000,
           });
         }
 

@@ -526,32 +526,30 @@ export function ThreadsProvider<
 
     // Pass minimal config - agent will load API keys via get_config()
     // This follows LangGraph 2025 best practices for multi-tenant configuration
-    const executeRun = async () => {
-      try {
-        const runConfig = userId ? { configurable: { user_id: userId } } : undefined;
+    try {
+      const runConfig = userId ? { configurable: { user_id: userId } } : undefined;
 
-        if (options?.stream) {
-          return client.runs.stream(threadId, graphId, {
-            command: {
-              resume: response,
-            },
-            config: runConfig,
-            streamMode: "events",
-          });
-        }
-        return client.runs.create(threadId, graphId, {
+      if (options?.stream) {
+        // IMPORTANT: Must directly return the AsyncGenerator, not wrap in async function
+        // Otherwise we get: TypeError: (x(...) , n) is not async iterable
+        return client.runs.stream(threadId, graphId, {
           command: {
             resume: response,
           },
           config: runConfig,
-        });
-      } catch (e: any) {
-        logger.error("Error sending human response", e);
-        throw e;
+          streamMode: "events",
+        }) as any;
       }
-    };
-
-    return executeRun() as any;
+      return client.runs.create(threadId, graphId, {
+        command: {
+          resume: response,
+        },
+        config: runConfig,
+      }) as any;
+    } catch (e: any) {
+      logger.error("Error sending human response", e);
+      throw e;
+    }
   };
 
   const clearThreadData = React.useCallback(() => {

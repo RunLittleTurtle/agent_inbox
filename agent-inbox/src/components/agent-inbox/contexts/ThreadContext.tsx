@@ -136,7 +136,7 @@ const getClient = ({ agentInboxes, getItem, toast, clerkToken }: GetClientArgs) 
 export function ThreadsProvider<
   ThreadValues extends Record<string, any> = Record<string, any>,
 >({ children }: { children: React.ReactNode }): React.ReactElement {
-  const { getItem } = useLocalStorage();
+  const { getItem, setItem } = useLocalStorage();
   const { toast } = useToast();
   const { getToken, userId } = useAuth(); // Clerk JWT token + userId for config
 
@@ -159,6 +159,50 @@ export function ThreadsProvider<
   const limitParam = searchParams.get(LIMIT_PARAM);
   const offsetParam = searchParams.get(OFFSET_PARAM);
   const inboxParam = searchParams.get(INBOX_PARAM);
+
+  // Auto-fetch LangSmith API key from Supabase on mount
+  React.useEffect(() => {
+    const fetchLangSmithApiKey = async () => {
+      // Skip if not in browser or no userId
+      if (typeof window === "undefined" || !userId) {
+        return;
+      }
+
+      // Check if LangSmith API key already exists in localStorage
+      const existingKey = getItem(LANGCHAIN_API_KEY_LOCAL_STORAGE_KEY);
+      if (existingKey) {
+        logger.log("LangSmith API key already in localStorage");
+        return;
+      }
+
+      // Fetch the key from Supabase via config API
+      try {
+        const clerkToken = await getToken();
+        const configUrl = process.env.NEXT_PUBLIC_CONFIG_URL || "https://config-app.vercel.app";
+        const response = await fetch(`${configUrl}/api/config/user-secrets/langsmith`, {
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          logger.error("Failed to fetch LangSmith API key from Supabase", response.status);
+          return;
+        }
+
+        const data = await response.json();
+        if (data.success && data.langsmith_api_key) {
+          // Populate localStorage with the fetched key
+          setItem(LANGCHAIN_API_KEY_LOCAL_STORAGE_KEY, data.langsmith_api_key);
+          logger.log("LangSmith API key auto-populated from Supabase");
+        }
+      } catch (error) {
+        logger.error("Error auto-fetching LangSmith API key", error);
+      }
+    };
+
+    fetchLangSmithApiKey();
+  }, [userId, getItem, setItem, getToken]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {

@@ -34,14 +34,39 @@ load_dotenv(env_path)
 import httpx
 
 
-async def create_cron_via_api(user_id: str, email: str, schedule: str = "* * * * *"):
+async def create_cron_via_api(user_id: str, email: str | None = None, schedule: str = "* * * * *"):
     """
     Create cron job via Config API webhook endpoint
 
     This calls the Railway-deployed FastAPI endpoint that:
     1. Creates LangGraph Platform cron job
     2. Stores cron_id in Supabase user_crons table
+
+    If email is not provided, fetches it from user_secrets table (recommended!)
     """
+    # If email not provided, fetch from Supabase user_secrets (source of truth)
+    if not email:
+        print(f"\n=== Fetching email from user_secrets ===")
+        from supabase import create_client
+
+        supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SECRET_KEY")
+
+        if not supabase_url or not supabase_key:
+            print("✗ Error: Missing Supabase credentials")
+            print("  Cannot fetch email from user_secrets")
+            return None
+
+        supabase = create_client(supabase_url, supabase_key)
+        result = supabase.table("user_secrets").select("email").eq("clerk_id", user_id).single().execute()
+
+        if not result or not result.data:
+            print(f"✗ Error: No user_secrets found for {user_id}")
+            return None
+
+        email = result.data["email"]
+        print(f"  ✓ Found email: {email}")
+
     config_api_url = os.getenv(
         "CONFIG_API_URL",
         "https://agentinbox-production.up.railway.app"
@@ -146,7 +171,7 @@ async def main():
     parser.add_argument(
         "--email",
         type=str,
-        help="Gmail address for this user"
+        help="Gmail address (optional - will fetch from user_secrets if not provided)"
     )
     parser.add_argument(
         "--schedule",
@@ -164,11 +189,12 @@ async def main():
 
     if args.all_users:
         await create_crons_for_all_users()
-    elif args.user_id and args.email:
+    elif args.user_id:
+        # Email is optional - will fetch from user_secrets if not provided
         await create_cron_via_api(args.user_id, args.email, args.schedule)
     else:
         print("Error: Must provide either:")
-        print("  --user-id and --email")
+        print("  --user-id (email optional - fetched from user_secrets)")
         print("  OR --all-users")
         parser.print_help()
         sys.exit(1)

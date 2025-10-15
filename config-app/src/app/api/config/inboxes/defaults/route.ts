@@ -13,7 +13,7 @@ const DEFAULT_INBOXES = [
   },
   {
     inbox_name: "Executive Main",
-    graph_id: "executive-ai-assistant",
+    graph_id: "executive_main",
     deployment_url: "https://multi-agent-app-1d1e061875eb5640a47e3bb201edb076.us.langgraph.app",
     is_default: true,
     selected: false,

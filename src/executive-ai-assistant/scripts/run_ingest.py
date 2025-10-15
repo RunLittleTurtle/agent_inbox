@@ -1,13 +1,19 @@
 import argparse
 import asyncio
 import os
+import sys
 from typing import Optional
+
+# Add src to Python path for module imports
+script_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(script_dir, '..', '..', '..')
+sys.path.insert(0, src_dir)
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
 
 # Load .env from project root
-env_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', '.env')
+env_path = os.path.join(script_dir, '..', '..', '..', '.env')
 load_dotenv(env_path)
 
 # Debug: Check if credentials are loaded
@@ -31,12 +37,21 @@ async def main(
     early: bool = True,
     rerun: bool = False,
     email: Optional[str] = None,
+    user_id: Optional[str] = None,
 ):
+    # Build config with user_id for OAuth credential fetching
+    config = {"configurable": {}}
+    if user_id:
+        config["configurable"]["user_id"] = user_id
+        config["metadata"] = {"user_id": user_id, "clerk_user_id": user_id}
+        print(f"[CONFIG] Using user_id: {user_id}")
+
     if email is None:
-        config_data = await get_config({"configurable": {}})
+        config_data = await get_config(config)
         email_address = config_data["email"]
     else:
         email_address = email
+
     if url is None:
         client = get_client(url="http://127.0.0.1:2025")
     else:
@@ -44,12 +59,13 @@ async def main(
             url=url
         )
 
-    print(f" Fetching emails for {email_address} from last {minutes_since} minutes...")
+    print(f"[INBOX] Fetching emails for {email_address} from last {minutes_since} minutes...")
 
     email_count = 0
     async for email in fetch_group_emails(
         email_address,
         minutes_since=minutes_since,
+        config=config,  # Pass config for OAuth credentials
         gmail_token=gmail_token,
         gmail_secret=gmail_secret,
     ):
@@ -136,6 +152,12 @@ if __name__ == "__main__":
         default=None,
         help="The email address to use",
     )
+    parser.add_argument(
+        "--user-id",
+        type=str,
+        default=None,
+        help="Clerk user ID for OAuth credential fetching",
+    )
 
     args = parser.parse_args()
     asyncio.run(
@@ -147,5 +169,6 @@ if __name__ == "__main__":
             early=bool(args.early),
             rerun=bool(args.rerun),
             email=args.email,
+            user_id=args.user_id,
         )
     )

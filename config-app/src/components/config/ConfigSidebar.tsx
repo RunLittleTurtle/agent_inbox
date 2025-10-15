@@ -90,7 +90,11 @@ export function ConfigSidebar({
             </button>
 
             {agents
-              .filter((agent) => agent.config.CONFIG_INFO.config_type !== 'env_file')
+              .filter((agent) =>
+                agent.config.CONFIG_INFO.config_type !== 'env_file' &&
+                agent.id !== '_react_agent_mcp_template' &&
+                agent.id !== 'interface_uis'
+              )
               .map((agent) => {
                 const displayName = getDisplayName(agent);
                 const isSelected = selectedAgent === agent.id;

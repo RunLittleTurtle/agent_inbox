@@ -59,33 +59,9 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'langgraph_system',
-        'label': 'LangGraph System',
-        'description': 'Core LangGraph and monitoring configuration',
-        'fields': [
-            {
-                'key': 'langsmith_api_key',
-                'label': 'LangSmith API Key (Developer Only)',
-                'type': 'password',
-                'envVar': 'LANGSMITH_API_KEY',
-                'description': 'API key for LangSmith monitoring and tracing (for admin/developer use)',
-                'placeholder': 'lsv2_pt_...'
-            },
-            {
-                'key': 'langchain_project',
-                'label': 'LangChain Project Name',
-                'type': 'text',
-                'envVar': 'LANGCHAIN_PROJECT',
-                'default': 'ambient-email-agent',
-                'readonly': True,
-                'description': 'Project name for LangSmith organization (read-only - changing this can break things)'
-            }
-        ]
-    },
-    {
         'key': 'google_workspace',
-        'label': 'Google Workspace OAuth (Admin)',
-        'description': 'Global OAuth credentials - configure once, all users authenticate through these credentials',
+        'label': 'Google Workspace Integration',
+        'description': 'Connect your Google account to enable Gmail, Calendar, and other Google services',
         'fields': [
             {
                 'key': 'google_client_id',
@@ -110,30 +86,27 @@ CONFIG_SECTIONS = [
         ]
     },
     {
-        'key': 'mcp_integration',
-        'label': 'Rube MCP Server Configuration',
-        'description': 'Universal MCP server providing access to 500+ applications',
+        'key': 'langgraph_system',
+        'label': 'LangGraph System',
+        'description': 'Core LangGraph and monitoring configuration',
         'fields': [
             {
-                'key': 'mcp_env_var',
-                'label': 'Rube Environment Variable',
-                'type': 'text',
+                'key': 'langsmith_api_key',
+                'label': 'LangSmith API Key (Developer Only)',
+                'type': 'password',
+                'envVar': 'LANGSMITH_API_KEY',
                 'readonly': True,
-                'default': 'RUBE_MCP_SERVER',
-                'description': 'Environment variable for Rube MCP server URL (read-only)',
-                'placeholder': 'RUBE_MCP_SERVER',
-                'required': False,
-                'note': 'Rube uses a single unified MCP server for all 500+ applications'
+                'description': 'API key for LangSmith monitoring and tracing (for admin/developer use)',
+                'placeholder': 'lsv2_pt_...'
             },
             {
-                'key': 'mcp_server_url',
-                'label': 'Rube MCP Server URL',
+                'key': 'langchain_project',
+                'label': 'LangChain Project Name',
                 'type': 'text',
-                'description': 'The Rube MCP server URL (editable - updates .env file)',
-                'placeholder': 'https://rube.app/mcp',
-                'default': 'https://rube.app/mcp',
-                'required': True,
-                'note': 'Rube provides unified access to 500+ apps through OAuth 2.1'
+                'envVar': 'LANGCHAIN_PROJECT',
+                'default': 'ambient-email-agent',
+                'readonly': True,
+                'description': 'Project name for LangSmith organization (read-only - changing this can break things)'
             }
         ]
     },

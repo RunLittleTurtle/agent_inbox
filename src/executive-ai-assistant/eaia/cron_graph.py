@@ -37,10 +37,13 @@ async def main(state: JobKickoff, config):
             if "user_respond" in email:
                 continue
             if e.response.status_code == 404:
-                # Create thread with graph_id metadata so Agent Inbox can filter it
+                # Create thread with graph_id and owner metadata for Agent Inbox filtering
                 thread_info = await client.threads.create(
                     thread_id=thread_id,
-                    metadata={"graph_id": "executive_main"}
+                    metadata={
+                        "graph_id": "executive_main",
+                        "owner": user_id  # Required for auth.py multi-tenant filtering
+                    }
                 )
             else:
                 raise e
@@ -52,6 +55,7 @@ async def main(state: JobKickoff, config):
             break
         await client.threads.update(thread_id, metadata={
             "graph_id": "executive_main",  # Preserve graph_id for inbox filtering
+            "owner": user_id,  # Preserve owner for auth.py multi-tenant filtering
             "email_id": email["id"]
         })
 

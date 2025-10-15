@@ -262,13 +262,20 @@ async def run_sample_ingestion(email, user_id, deployment_url, minutes_since=60,
                 except httpx.HTTPStatusError as e:
                     if e.response.status_code == 404:
                         print_info(f"  Creating new thread...")
-                        thread_info = await client.threads.create(thread_id=thread_id)
+                        thread_info = await client.threads.create(
+                            thread_id=thread_id,
+                            metadata={
+                                "graph_id": "executive_main",
+                                "owner": user_id  # Required for auth.py multi-tenant filtering
+                            }
+                        )
                     else:
                         raise e
 
                 # Update thread metadata
                 await client.threads.update(thread_id, metadata={
                     "graph_id": "executive_main",  # Preserve graph_id for inbox filtering
+                    "owner": user_id,  # Preserve owner for auth.py multi-tenant filtering
                     "email_id": email_data["id"]
                 })
 

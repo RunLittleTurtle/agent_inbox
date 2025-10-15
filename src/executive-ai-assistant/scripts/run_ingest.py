@@ -81,7 +81,13 @@ async def main(
             if "user_respond" in email:
                 continue
             if e.response.status_code == 404:
-                thread_info = await client.threads.create(thread_id=thread_id)
+                thread_info = await client.threads.create(
+                    thread_id=thread_id,
+                    metadata={
+                        "graph_id": "executive_main",
+                        "owner": user_id  # Required for auth.py multi-tenant filtering
+                    } if user_id else {"graph_id": "executive_main"}
+                )
             else:
                 raise e
         if "user_respond" in email:
@@ -96,10 +102,13 @@ async def main(
                     pass
                 else:
                     continue
-        await client.threads.update(thread_id, metadata={
+        metadata = {
             "graph_id": "executive_main",  # Preserve graph_id for inbox filtering
             "email_id": email["id"]
-        })
+        }
+        if user_id:
+            metadata["owner"] = user_id  # Preserve owner for auth.py multi-tenant filtering
+        await client.threads.update(thread_id, metadata=metadata)
 
         print(f" Creating workflow run for thread {thread_id} with graph main")
         run_result = await client.runs.create(

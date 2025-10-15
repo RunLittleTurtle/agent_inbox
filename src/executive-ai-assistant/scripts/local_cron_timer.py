@@ -94,7 +94,11 @@ class LocalCronTimer:
                     if "user_respond" in email:
                         continue
                     if e.response.status_code == 404:
-                        thread_info = await self.client.threads.create(thread_id=thread_id)
+                        # Note: owner metadata not added in local dev mode (no user_id available)
+                        thread_info = await self.client.threads.create(
+                            thread_id=thread_id,
+                            metadata={"graph_id": "executive_main"}
+                        )
                     else:
                         print(f" Error getting thread: {e}")
                         continue
@@ -108,6 +112,7 @@ class LocalCronTimer:
                     print(f"  Email already processed, skipping...")
                     break
 
+                # Note: owner metadata not added in local dev mode (no user_id available)
                 await self.client.threads.update(thread_id, metadata={
                     "graph_id": "executive_main",  # Preserve graph_id for inbox filtering
                     "email_id": email["id"]

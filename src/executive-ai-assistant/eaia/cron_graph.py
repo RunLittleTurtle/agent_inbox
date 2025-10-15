@@ -37,7 +37,11 @@ async def main(state: JobKickoff, config):
             if "user_respond" in email:
                 continue
             if e.response.status_code == 404:
-                thread_info = await client.threads.create(thread_id=thread_id)
+                # Create thread with graph_id metadata so Agent Inbox can filter it
+                thread_info = await client.threads.create(
+                    thread_id=thread_id,
+                    metadata={"graph_id": "executive_main"}
+                )
             else:
                 raise e
         if "user_respond" in email:

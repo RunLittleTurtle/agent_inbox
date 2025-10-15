@@ -29,7 +29,6 @@ import { useLocalStorage } from "../hooks/use-local-storage";
 import { useInboxes } from "../hooks/use-inboxes";
 import { logger } from "../utils/logger";
 import { useAuth } from "@clerk/nextjs";
-import { getSupabaseClient } from "@/lib/supabase";
 
 type ThreadContentType<
   ThreadValues extends Record<string, any> = Record<string, any>,
@@ -525,50 +524,11 @@ export function ThreadsProvider<
       return undefined as any;
     }
 
-    // Async wrapper to handle API key fetching
+    // Pass minimal config - agent will load API keys via get_config()
+    // This follows LangGraph 2025 best practices for multi-tenant configuration
     const executeRun = async () => {
       try {
-        // Fetch user-specific API keys from Supabase
-        const runConfig: any = userId ? { configurable: { user_id: userId } } : undefined;
-
-        if (userId) {
-          const supabase = getSupabaseClient();
-
-          if (supabase) {
-            const { data: userSecrets, error } = await supabase
-              .from("user_secrets")
-              .select("*")
-              .eq("clerk_id", userId)
-              .maybeSingle();
-
-            if (error) {
-              logger.error("Failed to fetch user API keys from Supabase", error);
-              toast({
-                title: "Error",
-                description: "Failed to fetch your API keys. Please try again.",
-                variant: "destructive",
-                duration: 5000,
-              });
-              return undefined;
-            }
-
-            if (!userSecrets) {
-              toast({
-                title: "No API keys found",
-                description: "Please add your OpenAI or Anthropic API keys in the config page.",
-                variant: "destructive",
-                duration: 5000,
-              });
-              return undefined;
-            }
-
-            // Inject user-specific API keys into config
-            runConfig.configurable.openai_api_key = userSecrets.openai_api_key;
-            runConfig.configurable.anthropic_api_key = userSecrets.anthropic_api_key;
-
-            logger.log("Using user-specific API keys for agent execution");
-          }
-        }
+        const runConfig = userId ? { configurable: { user_id: userId } } : undefined;
 
         if (options?.stream) {
           return client.runs.stream(threadId, graphId, {

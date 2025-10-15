@@ -15,19 +15,44 @@ class JobKickoff(TypedDict):
 
 
 async def main(state: JobKickoff, config):
+    """
+    Process emails for a SINGLE user (2025 multi-tenant pattern)
+
+    This cron runs PER-USER with user context passed via config:
+    - config["configurable"]["user_id"] set by LangGraph Platform
+    - config["configurable"]["email"] set by LangGraph Platform
+    - Each user has their own cron job created via /api/webhooks/gmail-connected
+
+    No longer loops through users - that's handled by having multiple cron jobs!
+    """
     minutes_since: int = state["minutes_since"]
+
+    # User context comes from the cron job's assistant config
+    # (set during cron creation in config_api/main.py)
     config_data = await get_config(config)
-    email = config_data["email"]
+    email_address = config_data["email"]
     user_id = config_data.get("user_id")
 
-    # Inject user_id into config for OAuth credential fetching (follows OAuth integration pattern)
-    if user_id:
-        if "configurable" not in config:
-            config["configurable"] = {}
-        config["configurable"]["user_id"] = user_id
-        config["metadata"] = {"user_id": user_id, "clerk_user_id": user_id}
+    if not user_id:
+        print("[ERROR] No user_id in cron config - this should never happen!")
+        print(f"[ERROR] Config data: {config_data}")
+        return  # Exit gracefully
 
-    async for email in fetch_group_emails(email, minutes_since=minutes_since, config=config):
+    print(f"[CRON] Processing emails for user {user_id} ({email_address})")
+    print(f"[CRON] Fetching emails from last {minutes_since} minutes")
+
+    # Ensure user_id is in config for OAuth credential fetching
+    if "configurable" not in config:
+        config["configurable"] = {}
+    config["configurable"]["user_id"] = user_id
+    config["metadata"] = {"user_id": user_id, "clerk_user_id": user_id}
+
+    email_count = 0
+    processed_count = 0
+
+    async for email in fetch_group_emails(email_address, minutes_since=minutes_since, config=config):
+        email_count += 1
+        print(f"[CRON] Email {email_count}: {email.get('subject', 'No Subject')[:50]}")
         thread_id = str(
             uuid.UUID(hex=hashlib.md5(email["thread_id"].encode("UTF-8")).hexdigest())
         )
@@ -70,6 +95,11 @@ async def main(state: JobKickoff, config):
             },
             multitask_strategy="rollback",
         )
+        processed_count += 1
+        print(f"[CRON] Created workflow run for thread {thread_id}")
+
+    # Final summary
+    print(f"[CRON] Completed for user {user_id}: {processed_count}/{email_count} emails processed")
 
 
 graph = StateGraph(JobKickoff)

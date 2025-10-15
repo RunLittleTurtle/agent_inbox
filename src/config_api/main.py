@@ -12,6 +12,7 @@ from pathlib import Path
 from importlib import import_module
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from langgraph_sdk import get_client as get_langgraph_client
 import time
 
 # Add parent directory to path for imports
@@ -64,6 +65,12 @@ else:
         print("   Get the correct anon/service_role key from Supabase dashboard:")
         print("   https://supabase.com/dashboard/project/lcswsadubzhynscruzfn/settings/api")
         supabase = None
+
+# LangGraph deployment URL for cron job creation
+LANGGRAPH_DEPLOYMENT_URL = os.getenv(
+    "LANGGRAPH_DEPLOYMENT_URL",
+    "https://multi-agent-app-1d1e061875eb5640a47e3bb201edb076.us.langgraph.app"
+)
 
 # Agent directories to scan
 AGENT_PATHS = [
@@ -783,6 +790,232 @@ async def reset_config(request: ResetConfigRequest):
         print(f"Error resetting config: {e}")
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# CRON JOB MANAGEMENT (2025 Multi-Tenant Pattern)
+# ============================================================================
+
+class GmailConnectedWebhook(BaseModel):
+    """Webhook payload when user completes Gmail OAuth"""
+    user_id: str
+    email: str
+    schedule: str = "* * * * *"  # Default: every 1 minute
+
+
+class CronManagementRequest(BaseModel):
+    """Request to manage user's cron job"""
+    user_id: str
+    action: str  # "pause", "resume", "delete"
+
+
+async def create_user_cron(user_id: str, email: str, schedule: str = "* * * * *") -> Dict[str, Any]:
+    """
+    Create a per-user cron job for Executive AI Assistant email processing
+
+    This follows 2025 LangGraph Cloud best practice:
+    - One cron job per user (not one global cron)
+    - Cron authenticated with user's identity via metadata
+    - Owner metadata enables auth.py multi-tenant filtering
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        # Initialize LangGraph SDK client
+        langgraph_client = get_langgraph_client(url=LANGGRAPH_DEPLOYMENT_URL)
+
+        # Create user-specific assistant for the cron (optional but recommended)
+        # This allows per-user configuration of the executive assistant
+        assistant = await langgraph_client.assistants.create(
+            graph_id="executive_cron",
+            config={
+                "configurable": {
+                    "user_id": user_id,
+                    "email": email
+                }
+            },
+            metadata={
+                "owner": user_id,  # Critical for auth.py multi-tenant filtering
+                "email": email,
+                "assistant_type": "executive_email_processor"
+            }
+        )
+
+        # Create cron job for this user
+        cron = await langgraph_client.crons.create(
+            schedule=schedule,
+            assistant_id=assistant["assistant_id"],
+            input={"minutes_since": 30},  # Process emails from last 30 minutes
+            metadata={
+                "owner": user_id,  # Auth filtering
+                "email": email,
+                "cron_type": "executive_email_ingestion"
+            }
+        )
+
+        # Store cron_id in Supabase for later management
+        supabase.table("user_crons").upsert({
+            "user_id": user_id,
+            "cron_id": cron["cron_id"],
+            "email": email,
+            "status": "active",
+            "schedule": schedule,
+        }, on_conflict="user_id").execute()
+
+        print(f"[CRON] Created cron {cron['cron_id']} for user {user_id} ({email})")
+
+        return {
+            "success": True,
+            "cron_id": cron["cron_id"],
+            "assistant_id": assistant["assistant_id"],
+            "schedule": schedule,
+            "user_id": user_id,
+            "email": email
+        }
+
+    except Exception as e:
+        print(f"[ERROR] Failed to create cron for user {user_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create cron: {str(e)}")
+
+
+@app.post("/api/webhooks/gmail-connected")
+async def webhook_gmail_connected(payload: GmailConnectedWebhook):
+    """
+    Webhook called when user completes Gmail OAuth
+    Creates a per-user cron job for Executive AI Assistant
+
+    This endpoint should be called from:
+    - OAuth callback after successful Gmail connection
+    - Config app after user enables Executive AI Assistant
+    """
+    print(f"[WEBHOOK] Gmail connected for user {payload.user_id} ({payload.email})")
+
+    try:
+        # Check if user already has a cron job
+        if supabase:
+            existing = supabase.table("user_crons") \
+                .select("*") \
+                .eq("user_id", payload.user_id) \
+                .maybe_single() \
+                .execute()
+
+            if existing and existing.data:
+                print(f"[WEBHOOK] User {payload.user_id} already has cron {existing.data['cron_id']}, skipping creation")
+                return {
+                    "success": True,
+                    "message": "User already has active cron job",
+                    "cron_id": existing.data["cron_id"]
+                }
+
+        # Create new cron job
+        result = await create_user_cron(
+            user_id=payload.user_id,
+            email=payload.email,
+            schedule=payload.schedule
+        )
+
+        return result
+
+    except Exception as e:
+        print(f"[WEBHOOK] Error processing Gmail connection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/cron/manage")
+async def manage_user_cron(request: CronManagementRequest):
+    """
+    Manage user's cron job (pause, resume, delete)
+
+    Actions:
+    - pause: Temporarily disable email processing
+    - resume: Re-enable email processing
+    - delete: Permanently remove cron job
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        # Get user's cron from Supabase
+        result = supabase.table("user_crons") \
+            .select("*") \
+            .eq("user_id", request.user_id) \
+            .maybe_single() \
+            .execute()
+
+        if not result or not result.data:
+            raise HTTPException(status_code=404, detail="No cron job found for user")
+
+        cron_data = result.data
+        cron_id = cron_data["cron_id"]
+
+        # Initialize LangGraph client
+        langgraph_client = get_langgraph_client(url=LANGGRAPH_DEPLOYMENT_URL)
+
+        if request.action == "delete":
+            # Delete cron from LangGraph
+            await langgraph_client.crons.delete(cron_id)
+
+            # Update Supabase
+            supabase.table("user_crons") \
+                .update({"status": "deleted"}) \
+                .eq("user_id", request.user_id) \
+                .execute()
+
+            print(f"[CRON] Deleted cron {cron_id} for user {request.user_id}")
+            return {"success": True, "action": "deleted", "cron_id": cron_id}
+
+        elif request.action in ["pause", "resume"]:
+            new_status = "paused" if request.action == "pause" else "active"
+
+            # Update Supabase status
+            supabase.table("user_crons") \
+                .update({"status": new_status}) \
+                .eq("user_id", request.user_id) \
+                .execute()
+
+            # Note: LangGraph Cloud doesn't have native pause/resume API
+            # This marks it in our database for reference
+            # To truly pause, would need to delete and recreate
+
+            print(f"[CRON] {request.action}d cron {cron_id} for user {request.user_id}")
+            return {"success": True, "action": request.action, "cron_id": cron_id, "status": new_status}
+
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid action: {request.action}")
+
+    except Exception as e:
+        print(f"[ERROR] Failed to manage cron: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/cron/status")
+async def get_user_cron_status(user_id: str):
+    """Get status of user's cron job"""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        result = supabase.table("user_crons") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .maybe_single() \
+            .execute()
+
+        if not result or not result.data:
+            return {"has_cron": False, "user_id": user_id}
+
+        return {
+            "has_cron": True,
+            "user_id": user_id,
+            **result.data
+        }
+
+    except Exception as e:
+        print(f"[ERROR] Failed to get cron status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

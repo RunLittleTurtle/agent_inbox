@@ -1,7 +1,7 @@
 {
   "STANDARD_LLM_MODEL_OPTIONS": [
     "claude-sonnet-4-5-20250929",
-    "claude-3-5-haiku-20241022",
+    "claude-haiku-4-5-20251001",
     "gpt-5",
     "gpt-5-mini",
     "gpt-4o",
@@ -37,7 +37,7 @@
   "STANDARD_AGENT_STATUS_OPTIONS": ["active", "disabled"],
   "MODEL_DESCRIPTIONS": {
     "claude-sonnet-4-5-20250929": "The best overall model - Expensive",
-    "claude-3-5-haiku-20241022": "Fast, cost-effective for simple tasks",
+    "claude-haiku-4-5-20251001": "Fast, cost-effective for simple tasks",
     "gpt-4o": "Balanced performance, good reasoning and writing",
     "gpt-5": "Advanced capabilities, Balanced pricing",
     "gpt-5-mini": "Fast, cost-efficient GPT-5 variant",
@@ -67,7 +67,7 @@
       "supports_temperature": true,
       "temperature_range": [0, 1]
     },
-    "claude-3-5-haiku-20241022": {
+    "claude-haiku-4-5-20251001": {
       "supports_temperature": true,
       "temperature_range": [0, 1]
     },
@@ -97,7 +97,7 @@
   "DEFAULT_TIMEZONE": "America/Toronto",
   "DEFAULT_TEMPERATURE": 0.2,
   "DEFAULT_STREAMING": false,
-  "DEFAULT_TRIAGE_MODEL": "claude-3-5-haiku-20241022",
+  "DEFAULT_TRIAGE_MODEL": "claude-haiku-4-5-20251001",
   "DEFAULT_DRAFT_MODEL": "claude-sonnet-4-5-20250929",
   "DEFAULT_REWRITE_MODEL": "claude-sonnet-4-5-20250929",
   "DEFAULT_SCHEDULING_MODEL": "gpt-4o",

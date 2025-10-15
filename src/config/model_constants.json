@@ -1,7 +1,7 @@
 {
   "STANDARD_LLM_MODEL_OPTIONS": [
     "claude-sonnet-4-5-20250929",
-    "claude-3-5-haiku-20241022",
+    "claude-haiku-4-5-20251001",
     "gpt-5",
     "gpt-4o",
     "o3",
@@ -21,15 +21,17 @@
     "Asia/Singapore",
     "Australia/Sydney"
   ],
-  "STANDARD_TEMPERATURE_OPTIONS": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+  "STANDARD_TEMPERATURE_OPTIONS": [
+    0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
+  ],
   "STANDARD_AGENT_STATUS_OPTIONS": ["active", "disabled"],
   "MODEL_DESCRIPTIONS": {
     "claude-sonnet-4-5-20250929": "The best overall model - Expensive",
-    "claude-3-5-haiku-20241022": "Fast, cost-effective for simple tasks",
+    "claude-haiku-4-5-20251001": "Fast, cost-effective for simple tasks",
     "gpt-4o": "Balanced performance, good reasoning and writing",
-    "gpt-5": "Advanced capabilities, Balanced pricing",
-    "o3": "Specialized reasoning, Expensive",
-    "claude-opus-4-1-20250805": "Most expensive - Great but sonnet-4.5 is better and cheaper"
+    "gpt-5": "NOT WORKING-Advanced capabilities, Balanced pricing",
+    "o3": "NOT WORKING-Specialized reasoning, Expensive",
+    "claude-opus-4-1-20250805": "NOT WORKING-Most expensive - Great but sonnet-4.5 is better and cheaper"
   },
   "TEMPERATURE_DESCRIPTIONS": {
     "0": "Most focused - Deterministic, consistent responses",
@@ -44,13 +46,13 @@
     "0.9": "Very Creative - Will Hallucinate",
     "1": "Most creative - Maximum randomness"
   },
-  "DEFAULT_LLM_MODEL": "claude-sonnet-4-5-20250929",
+  "DEFAULT_LLM_MODEL": "claude-haiku-4-5-20251001",
   "DEFAULT_TIMEZONE": "America/Toronto",
-  "DEFAULT_TEMPERATURE": 0.2,
+  "DEFAULT_TEMPERATURE": 0.3,
   "DEFAULT_STREAMING": false,
-  "DEFAULT_TRIAGE_MODEL": "claude-3-5-haiku-20241022",
+  "DEFAULT_TRIAGE_MODEL": "claude-haiku-4-5-20251001",
   "DEFAULT_DRAFT_MODEL": "claude-sonnet-4-5-20250929",
   "DEFAULT_REWRITE_MODEL": "claude-sonnet-4-5-20250929",
-  "DEFAULT_SCHEDULING_MODEL": "gpt-4o",
+  "DEFAULT_SCHEDULING_MODEL": "claude-haiku-4-5-20251001",
   "DEFAULT_REFLECTION_MODEL": "claude-sonnet-4-5-20250929"
 }

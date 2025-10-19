@@ -30,12 +30,16 @@ async function handleRequest(request: NextRequest) {
     let clerkToken: string | null = null;
 
     // Primary method: Get from Clerk auth context (when middleware runs)
+    // CRITICAL 2025 Pattern: This fetches a FRESH token on EVERY request
+    // Clerk SDK handles token caching/lifecycle automatically
+    // This ensures long-running SSE streams always have valid tokens
     const authResult = await auth();
     userId = authResult?.userId || null;
 
-    // Only try to get token if we have an auth result
+    // Fetch fresh token for this request (no frontend caching needed)
     if (authResult?.getToken) {
       clerkToken = await authResult.getToken();
+      console.log("[API Route] Fresh Clerk token fetched for request");
     }
 
     // Fallback method: Use authenticateRequest for SDK requests (when middleware is bypassed)

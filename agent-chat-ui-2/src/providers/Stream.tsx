@@ -191,27 +191,46 @@ const StreamSession = ({
           return; // Don't propagate this error
         }
 
-        // Handle 404 on runs/stream endpoint - indicates routing issue
+        // Handle 404 on runs/stream endpoint - log for debugging
         if (err.status === 404 && err.message?.includes('/runs/stream')) {
-          console.error("[Stream] Critical: API route not found for /runs/stream");
-          console.error("[Stream] This indicates the API proxy route is not properly configured");
+          console.error("[Stream] API route not found for /runs/stream");
+          console.error("[Stream] Error details:", {
+            status: err.status,
+            message: err.message,
+            clerkTokenPresent: !!clerkToken,
+            apiUrl,
+            timestamp: new Date().toISOString()
+          });
           toast.error("Connection Error", {
-            description: "Failed to connect to the streaming endpoint. The application will reload to reset the connection.",
+            description: "Stream connection failed. Please try again or check your network connection.",
             duration: 5000,
           });
-          // Force reload after a delay to reset hydration state
-          setTimeout(() => {
-            if (typeof window !== 'undefined') {
-              console.log("[Stream] Reloading page to reset connection...");
-              window.location.reload();
-            }
-          }, 3000);
+          return;
+        }
+
+        // Handle 401/403 auth errors - token may be expired
+        if (err.status === 401 || err.status === 403) {
+          console.error("[Stream] Authentication failed - token may be expired");
+          console.error("[Stream] Auth error details:", {
+            status: err.status,
+            message: err.message,
+            clerkTokenPresent: !!clerkToken,
+            timestamp: new Date().toISOString()
+          });
+          toast.error("Authentication Error", {
+            description: "Your session may have expired. Please refresh the page.",
+            duration: 5000,
+          });
           return;
         }
 
         // For other stream errors, log for debugging
         if (err.message?.includes('stream')) {
-          console.warn("[Stream] Stream connection error, may attempt reconnection");
+          console.warn("[Stream] Stream connection error:", {
+            status: err.status,
+            message: err.message,
+            timestamp: new Date().toISOString()
+          });
         }
       }
     },

@@ -191,6 +191,34 @@ async function handleRequest(request: NextRequest) {
       body: modifiedBody,
     });
 
+    // Enhanced error handling for auth failures (2025 CVE-2025-29927 pattern)
+    // Check for authentication/authorization errors before streaming
+    if (response.status === 401 || response.status === 403) {
+      console.error("[API Route] Auth failed:", {
+        status: response.status,
+        url: targetUrl,
+        hasClerkToken: !!clerkToken,
+        userId: userId,
+        timestamp: new Date().toISOString()
+      });
+
+      return NextResponse.json(
+        {
+          error: "Authentication failed",
+          message: "Your session may have expired. Please refresh the page.",
+          code: "AUTH_EXPIRED"
+        },
+        {
+          status: response.status,
+          headers: {
+            "X-Auth-Error": "token-expired",
+            "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+            "Access-Control-Allow-Credentials": "true",
+          }
+        }
+      );
+    }
+
     // Stream response body directly without buffering (LangGraph 2025 best practice)
     // This enables real-time SSE streaming for supervisor + sub-agent tool calls
     return new NextResponse(response.body, {

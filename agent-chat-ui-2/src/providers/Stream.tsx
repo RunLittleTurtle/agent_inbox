@@ -126,11 +126,13 @@ const StreamSession = ({
   const currentRunIdRef = useRef<string | null>(null);
   const currentThreadIdRef = useRef<string | null>(null);
 
-  // Initialize client ONCE on mount with initial token
-  // Client doesn't need token updates - API route handles auth validation
+  // Re-initialize client when token refreshes to ensure fresh auth headers
+  // This ensures streaming requests always use the latest JWT token
   useEffect(() => {
-    if (clerkToken && apiUrl && !clientRef.current) {
-      console.log("[Client] Initializing client (one-time setup)");
+    if (clerkToken && apiUrl) {
+      const isNewClient = !clientRef.current;
+      console.log(isNewClient ? "[Client] Initializing client" : "[Client] Updating client with fresh token");
+
       clientRef.current = new Client({
         apiUrl,
         apiKey: apiKey ?? undefined,
@@ -147,8 +149,9 @@ const StreamSession = ({
     assistantId,
     threadId: threadId ?? null,
     fetchStateHistory: true,  // Required by SDK - 404 errors handled by onError callback below
-    // Pass Clerk JWT for authenticated streaming
-    // Note: Token refreshes in background, API route handles validation
+    // Pass fresh Clerk JWT for authenticated streaming
+    // Hook will re-initialize when clerkToken updates (every 50s background refresh)
+    // This ensures all streaming requests use valid, non-expired tokens
     defaultHeaders: clerkToken
       ? {
           Authorization: `Bearer ${clerkToken}`,

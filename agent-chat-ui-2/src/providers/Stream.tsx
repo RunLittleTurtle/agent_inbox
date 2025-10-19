@@ -2,7 +2,6 @@ import React, {
   createContext,
   useContext,
   ReactNode,
-  useState,
   useEffect,
   useRef,
   useCallback,
@@ -26,7 +25,6 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { getApiKey } from "@/lib/api-key";
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
-import { useAuth } from "@clerk/nextjs";
 
 export type StateType = { messages: Message[]; ui?: UIMessage[] };
 
@@ -86,62 +84,28 @@ const StreamSession = ({
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
 
-  // Get Clerk JWT for LangGraph custom auth (2025)
-  const { getToken, isLoaded } = useAuth();
-  const [clerkToken, setClerkToken] = useState<string | null>(null);
-
-  // Fetch and auto-refresh Clerk token (tokens expire after 60 seconds)
-  // Keep refresh in background without forcing re-initialization
-  useEffect(() => {
-    if (!isLoaded) return; // Wait for Clerk to load
-
-    // Initial token fetch
-    console.log("[Token] Fetching initial token...");
-    getToken().then((token) => {
-      console.log("[Token] Initial token received");
-      setClerkToken(token);
-    });
-
-    // Refresh token every 50 seconds (before the 60-second expiry)
-    // Token refresh happens silently in the background
-    const interval = setInterval(() => {
-      console.log("[Token] Background token refresh (50s interval)...");
-      getToken({ skipCache: true }).then((token) => {
-        console.log("[Token] Token refreshed silently");
-        setClerkToken(token);
-        // NOTE: No re-initialization - API route handles auth validation
-      }).catch((error) => {
-        console.error("[Token] Failed to refresh token:", error);
-      });
-    }, 50000); // 50 seconds
-
-    return () => {
-      console.log("[Token] Cleaning up token refresh interval");
-      clearInterval(interval);
-    };
-  }, [getToken, isLoaded]);
+  // 2025 Pattern: NO frontend token management
+  // Token authentication is handled entirely by Next.js API route
+  // The API route fetches fresh Clerk tokens on EVERY request server-side
+  // This prevents SSE stream disruption from frontend token refresh
 
   // Create LangGraph client for manual run cancellation
   const clientRef = useRef<Client | null>(null);
   const currentRunIdRef = useRef<string | null>(null);
   const currentThreadIdRef = useRef<string | null>(null);
 
-  // Re-initialize client when token refreshes to ensure fresh auth headers
-  // This ensures streaming requests always use the latest JWT token
+  // Initialize client ONCE - no token dependency
+  // Backend API route handles all auth
   useEffect(() => {
-    if (clerkToken && apiUrl) {
-      const isNewClient = !clientRef.current;
-      console.log(isNewClient ? "[Client] Initializing client" : "[Client] Updating client with fresh token");
-
+    if (apiUrl && !clientRef.current) {
+      console.log("[Client] Initializing client (backend handles auth)");
       clientRef.current = new Client({
         apiUrl,
         apiKey: apiKey ?? undefined,
-        defaultHeaders: {
-          Authorization: `Bearer ${clerkToken}`,
-        },
+        // No Authorization header - backend adds it
       });
     }
-  }, [clerkToken, apiUrl, apiKey]);
+  }, [apiUrl, apiKey]);
 
   const streamValue = useTypedStream({
     apiUrl,
@@ -149,14 +113,8 @@ const StreamSession = ({
     assistantId,
     threadId: threadId ?? null,
     fetchStateHistory: true,  // Required by SDK - 404 errors handled by onError callback below
-    // Pass fresh Clerk JWT for authenticated streaming
-    // Hook will re-initialize when clerkToken updates (every 50s background refresh)
-    // This ensures all streaming requests use valid, non-expired tokens
-    defaultHeaders: clerkToken
-      ? {
-          Authorization: `Bearer ${clerkToken}`,
-        }
-      : undefined,
+    // No defaultHeaders - backend API route handles auth
+    // This prevents stream disruption from token refresh
     onCustomEvent: (event, options) => {
       if (isUIMessage(event) || isRemoveUIMessage(event)) {
         options.mutate((prev) => {
@@ -200,7 +158,6 @@ const StreamSession = ({
           console.error("[Stream] Error details:", {
             status: err.status,
             message: err.message,
-            clerkTokenPresent: !!clerkToken,
             apiUrl,
             timestamp: new Date().toISOString()
           });
@@ -211,13 +168,12 @@ const StreamSession = ({
           return;
         }
 
-        // Handle 401/403 auth errors - token may be expired
+        // Handle 401/403 auth errors - backend token fetch failed
         if (err.status === 401 || err.status === 403) {
-          console.error("[Stream] Authentication failed - token may be expired");
+          console.error("[Stream] Authentication failed - backend token issue");
           console.error("[Stream] Auth error details:", {
             status: err.status,
             message: err.message,
-            clerkTokenPresent: !!clerkToken,
             timestamp: new Date().toISOString()
           });
           toast.error("Authentication Error", {

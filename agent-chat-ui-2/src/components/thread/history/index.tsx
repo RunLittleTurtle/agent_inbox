@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useThreads } from "@/providers/Thread";
 import { Thread } from "@langchain/langgraph-sdk";
 import { useEffect } from "react";
+import { useStreamContext } from "@/providers/Stream";
 
 import { getContentString } from "../utils";
 import { useQueryState, parseAsBoolean } from "nuqs";
@@ -84,7 +85,9 @@ export default function ThreadHistory() {
 
   const { getThreads, threads, setThreads, threadsLoading, setThreadsLoading } =
     useThreads();
+  const stream = useStreamContext();
 
+  // Fetch threads on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     setThreadsLoading(true);
@@ -93,6 +96,13 @@ export default function ThreadHistory() {
       .catch(console.error)
       .finally(() => setThreadsLoading(false));
   }, []);
+
+  // Refetch threads when stream completes (new thread created)
+  useEffect(() => {
+    if (!stream.isLoading && stream.messages.length > 0) {
+      getThreads().then(setThreads).catch(console.error);
+    }
+  }, [stream.isLoading, getThreads, setThreads, stream.messages.length]);
 
   return (
     <>

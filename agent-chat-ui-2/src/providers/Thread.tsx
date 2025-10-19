@@ -34,13 +34,20 @@ function getThreadSearchMetadata(
   }
 }
 
+// Helper function to get API URL from current domain (2025 Next.js pattern)
+// Works with any production domain: chat.mekanize.app, agent-chat-ui-2.vercel.app, localhost
+function getApiUrl(): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/api`;
+}
+
 export function ThreadProvider({ children }: { children: ReactNode }) {
   // Get environment variables as fallbacks
   const envApiUrl: string | undefined = process.env.NEXT_PUBLIC_API_URL;
   const envAssistantId: string | undefined = process.env.NEXT_PUBLIC_ASSISTANT_ID;
 
   const [apiUrl] = useQueryState("apiUrl", {
-    defaultValue: envApiUrl || "",
+    defaultValue: envApiUrl || getApiUrl() || "",
   });
   const [assistantId] = useQueryState("assistantId", {
     defaultValue: envAssistantId || "",
